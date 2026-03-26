@@ -225,8 +225,8 @@ export const Admin: React.FC = () => {
     <div className="admin-dashboard-wrapper">
       <div className="admin-dashboard">
         <header className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src="/logo.png" alt="Readlyme" style={{ height: '32px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', userSelect: 'none' }}>
+          <img src="/logo.png" alt="Readlyme" style={{ height: '38px', pointerEvents: 'none', userSelect: 'none' }} draggable={false} />
           <h1 style={{ display: 'none' }}>Readlyme | Operações</h1>
         </div>
         <div className="admin-tabs">

@@ -40,8 +40,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <div className="login-container">
       <div className="login-box">
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <img src="/logo.png" alt="Readlyme Logo" style={{ maxWidth: '180px', height: 'auto' }} />
+        <div style={{ textAlign: 'center', marginBottom: '24px', userSelect: 'none' }}>
+          <img 
+            src="/logo.png" 
+            alt="Readlyme Logo" 
+            style={{ maxWidth: '240px', height: 'auto', userSelect: 'none', pointerEvents: 'none' }} 
+            draggable={false} 
+          />
         </div>
         <p className="login-subtitle">Faça login com seu E-mail da compra</p>
 
