@@ -1,15 +1,16 @@
 import React from 'react';
 import { BookCard } from '../components/BookCard';
-import { PlayCircle } from 'lucide-react';
+import { PlayCircle, BookOpen } from 'lucide-react';
 import './Library.css';
 
 interface LibraryProps {
   books: any[];
   onRead: (title: string, coverUrl: string) => void;
   onToggleWishlist: (id: string) => void;
+  isLoading?: boolean;
 }
 
-export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlist }) => {
+export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlist, isLoading }) => {
   const purchasedBooks = books.filter(b => b.hasAccess);
   const currentlyReading = purchasedBooks.filter(b => b.isReading);
 
@@ -37,15 +38,28 @@ export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlis
     const x = e.pageX - scrollRef.current.offsetLeft;
     const walk = (x - startX) * 2;
     if (Math.abs(x - startX) > 5) {
-      setIsMoved(true); // Drag occurred
+      setIsMoved(true);
     }
     scrollRef.current.scrollLeft = scrollLeft - walk;
   };
 
   const handleContinueClick = (title: string, coverUrl: string) => {
-    if (isMoved) return; // Prevent opening if it was a drag
+    if (isMoved) return;
     onRead(title, coverUrl);
   };
+
+  // EMPTY STATE
+  if (!isLoading && purchasedBooks.length === 0) {
+    return (
+      <div className="library-empty">
+        <div className="empty-icon-wrapper">
+          <BookOpen size={48} strokeWidth={1.2} />
+        </div>
+        <h2>Sua biblioteca está vazia</h2>
+        <p>Os livros que você comprar vão aparecer aqui, prontos para leitura instantânea.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 'var(--spacing-lg) var(--spacing-md)' }}>

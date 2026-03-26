@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Home as HomeIcon, Library as LibraryIcon, Settings as SettingsIcon } from 'lucide-react'
+import { Home as HomeIcon, Library as LibraryIcon, User as UserIcon } from 'lucide-react'
 import { Home } from './pages/Home'
 import { Library } from './pages/Library'
 import { Login } from './pages/Login'
@@ -12,36 +12,52 @@ function App() {
     return <Admin />
   }
 
-  const [userId, setUserId] = useState<string | null>(null)
+  // SESSION PERSISTENCE via localStorage
+  const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('ebookpro_userId'))
+  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('ebookpro_userEmail'))
   const [activeTab, setActiveTab] = useState('home')
   const [readerData, setReaderData] = useState<{url: string, title: string} | null>(null)
   
   const [catalog, setCatalog] = useState<any[]>([])
   const [myBooksData, setMyBooksData] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const handleLogin = (id: string, email: string) => {
+    setUserId(id)
+    setUserEmail(email)
+    localStorage.setItem('ebookpro_userId', id)
+    localStorage.setItem('ebookpro_userEmail', email)
+  }
+
+  const handleLogout = () => {
+    setUserId(null)
+    setUserEmail(null)
+    localStorage.removeItem('ebookpro_userId')
+    localStorage.removeItem('ebookpro_userEmail')
+  }
 
   useEffect(() => {
     if (userId) {
-      // Buscar catálogo completo
-      fetch('/api/ebooks')
-        .then(r => r.json())
-        .then(data => {
-          if (Array.isArray(data)) setCatalog(data);
-        })
-        .catch(console.error);
-
-      // Buscar livros comprados pelo usuário
-      fetch('/api/ebooks/my', { headers: { 'x-user-id': userId } })
-        .then(r => r.json())
-        .then(data => {
-          if (Array.isArray(data)) setMyBooksData(data);
-        })
-        .catch(console.error);
+      setIsLoading(true)
+      Promise.all([
+        fetch('/api/ebooks').then(r => r.json()),
+        fetch('/api/ebooks/my', { headers: { 'x-user-id': userId } }).then(r => r.json())
+      ]).then(([catalogData, myBooks]) => {
+        if (Array.isArray(catalogData)) setCatalog(catalogData)
+        if (Array.isArray(myBooks)) setMyBooksData(myBooks)
+      }).catch(console.error)
+        .finally(() => setIsLoading(false))
     }
   }, [userId])
 
   // Merge the catalog with user access and local wishlist states
-  // In a real app wishlist might be stored in the DB, but we keep it local for MVP
-  const [wishlistIds, setWishlistIds] = useState<string[]>([])
+  const [wishlistIds, setWishlistIds] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('ebookpro_wishlist') || '[]') } catch { return [] }
+  })
+
+  useEffect(() => {
+    localStorage.setItem('ebookpro_wishlist', JSON.stringify(wishlistIds))
+  }, [wishlistIds])
   
   const books = catalog.map(book => ({
     ...book,
@@ -50,7 +66,6 @@ function App() {
   }))
 
   const handleOpenReader = (title: string, _coverUrl?: string) => {
-    // Determine the actual PDF URL from the book catalog
     const book = books.find(b => b.title === title);
     if (book && book.pdfUrl) {
       setReaderData({ url: book.pdfUrl, title });
@@ -66,7 +81,7 @@ function App() {
   }
 
   if (!userId) {
-    return <Login onLogin={(id) => setUserId(id)} />
+    return <Login onLogin={handleLogin} />
   }
 
   return (
@@ -80,20 +95,32 @@ function App() {
       ) : (
         <>
           <main className="app-main">
-            {activeTab === 'home' && <Home books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} />}
-            {activeTab === 'library' && <Library books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} />}
-            {activeTab === 'settings' && (
-              <div style={{ padding: 'var(--spacing-md)', paddingTop: 'var(--spacing-lg)' }}>
-                <h1 style={{ marginBottom: 'var(--spacing-md)' }}>Configurações</h1>
-                <p style={{ color: 'var(--text-secondary)' }}>Ajustes de conta e notificações.</p>
-                <button 
-                  onClick={() => setUserId(null)}
-                  style={{
-                    marginTop: '20px', padding: '10px 20px', background: 'rgba(255,255,255,0.1)', 
-                    color: 'white', border: '1px solid #333', borderRadius: '8px', cursor: 'pointer'
-                  }}
-                >
-                  Sair (Logout)
+            {activeTab === 'home' && <Home books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} isLoading={isLoading} userEmail={userEmail} />}
+            {activeTab === 'library' && <Library books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} isLoading={isLoading} />}
+            {activeTab === 'profile' && (
+              <div className="profile-page">
+                <div className="profile-card">
+                  <div className="profile-avatar">
+                    {(userEmail || '?')[0].toUpperCase()}
+                  </div>
+                  <h2 className="profile-name">{userEmail}</h2>
+                  <p className="profile-stats">{myBooksData.length} livro(s) na sua biblioteca</p>
+                </div>
+                
+                <div className="profile-section">
+                  <h3>Conta</h3>
+                  <div className="profile-item">
+                    <span>E-mail</span>
+                    <span className="profile-value">{userEmail}</span>
+                  </div>
+                  <div className="profile-item">
+                    <span>Versão do App</span>
+                    <span className="profile-value">1.0.0</span>
+                  </div>
+                </div>
+
+                <button className="logout-btn" onClick={handleLogout}>
+                  Sair da Conta
                 </button>
               </div>
             )}
@@ -106,8 +133,8 @@ function App() {
             <button className={`bottom-nav-item ${activeTab === 'library' ? 'active' : ''}`} onClick={() => setActiveTab('library')}>
               <LibraryIcon /> <span>Biblioteca</span>
             </button>
-            <button className={`bottom-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-              <SettingsIcon /> <span>Opções</span>
+            <button className={`bottom-nav-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
+              <UserIcon /> <span>Perfil</span>
             </button>
           </nav>
         </>

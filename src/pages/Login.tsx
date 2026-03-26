@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './Login.css';
 
 interface LoginProps {
-  onLogin: (userId: string) => void;
+  onLogin: (userId: string, email: string) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -25,7 +25,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       const data = await res.json();
       
       if (res.ok) {
-        onLogin(data.id);
+        onLogin(data.id, data.email);
       } else {
         alert(data.error || 'Erro ao realizar login');
       }
@@ -41,7 +41,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     <div className="login-container">
       <div className="login-box">
         <h1 className="login-logo">Ebooks<span>Pro</span></h1>
-        <p className="login-subtitle">Faça login com seu E-mail da compra (A primeira senha que você digitar será registrada)</p>
+        <p className="login-subtitle">Faça login com seu E-mail da compra</p>
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="input-group">

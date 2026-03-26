@@ -101,3 +101,120 @@
     height: 20px;
   }
 }
+
+/* ========== PROFILE PAGE ========== */
+.profile-page {
+  padding: var(--spacing-xl) var(--spacing-md);
+  max-width: 500px;
+  margin: 0 auto;
+}
+.profile-card {
+  text-align: center;
+  padding: var(--spacing-xl);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: var(--spacing-xl);
+}
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-primary), #B8860B);
+  color: #000;
+  font-size: 32px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--spacing-md);
+}
+.profile-name {
+  font-size: 18px;
+  font-weight: 600;
+  word-break: break-all;
+}
+.profile-stats {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-top: 4px;
+}
+.profile-section {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  margin-bottom: var(--spacing-xl);
+}
+.profile-section h3 {
+  padding: var(--spacing-md);
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.profile-item {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 15px;
+}
+.profile-item:last-child {
+  border-bottom: none;
+}
+.profile-value {
+  color: var(--text-secondary);
+  max-width: 60%;
+  text-align: right;
+  word-break: break-all;
+}
+.logout-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 77, 79, 0.3);
+  background: rgba(255, 77, 79, 0.08);
+  color: #ff4d4f;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.logout-btn:hover {
+  background: rgba(255, 77, 79, 0.15);
+}
+
+/* ========== LIBRARY EMPTY STATE ========== */
+.library-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--text-secondary);
+}
+.empty-icon-wrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--spacing-lg);
+  color: var(--accent-primary);
+}
+.library-empty h2 {
+  color: var(--text-primary);
+  font-size: 20px;
+  margin-bottom: var(--spacing-sm);
+}
+.library-empty p {
+  font-size: 15px;
+  max-width: 280px;
+  line-height: 1.5;
+}

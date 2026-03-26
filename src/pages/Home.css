@@ -41,9 +41,98 @@
 }
 
 .home-content {
-  margin-top: calc(-1 * var(--spacing-sm)); /* pulls the content up smoothly */
+  margin-top: calc(-1 * var(--spacing-sm));
   position: relative;
   z-index: 3;
+}
+
+/* ========== SEARCH BAR ========== */
+.search-container {
+  position: relative;
+  padding: 0 var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  z-index: 4;
+}
+.search-icon {
+  position: absolute;
+  left: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 14px 14px 14px 44px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+.search-input::placeholder {
+  color: var(--text-secondary);
+}
+.empty-search {
+  text-align: center;
+  padding: var(--spacing-xl) var(--spacing-md);
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+/* ========== SKELETON LOADING ========== */
+.hero-skeleton {
+  background: var(--bg-secondary) !important;
+  animation: shimmer 1.5s infinite;
+}
+.skeleton-row {
+  padding: 0 var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+.skeleton-title {
+  width: 140px;
+  height: 20px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  margin-bottom: var(--spacing-md);
+  animation: shimmer 1.5s infinite;
+}
+.skeleton-cards {
+  display: flex;
+  gap: var(--spacing-md);
+  overflow: hidden;
+}
+.skeleton-card {
+  flex-shrink: 0;
+  width: 140px;
+}
+.skeleton-cover {
+  width: 140px;
+  height: 210px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  animation: shimmer 1.5s infinite;
+}
+.skeleton-text {
+  width: 100px;
+  height: 14px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  margin-top: var(--spacing-sm);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
 }
 
 @media (min-width: 768px) {

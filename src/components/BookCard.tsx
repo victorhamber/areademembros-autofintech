@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bookmark } from 'lucide-react';
+import { Bookmark, Lock } from 'lucide-react';
 import './BookCard.css';
 
 interface BookCardProps {
@@ -24,16 +24,24 @@ export const BookCard: React.FC<BookCardProps> = ({
   onToggleWishlist
 }) => {
   return (
-    <div className="book-card" onClick={() => onClick(id, hasAccess)}>
+    <div className="book-card fade-in" onClick={() => onClick(id, hasAccess)}>
       <div className="cover-container">
         <img src={coverUrl} alt={title} className="book-cover" loading="lazy" draggable={false} />
+        
         {hasAccess && <div className="badge-access">Comprado</div>}
+        
+        {/* Lock overlay for books without access */}
+        {!hasAccess && (
+          <div className="lock-overlay">
+            <Lock size={20} strokeWidth={2.5} />
+          </div>
+        )}
         
         {/* Wishlist Button Overlay */}
         <button 
           className="wishlist-btn"
           onClick={(e) => {
-            e.stopPropagation(); // Prevents opening the book when clicking the bookmark
+            e.stopPropagation();
             if (onToggleWishlist) onToggleWishlist(id);
           }}
           aria-label={isWishlisted ? "Remover dos favoritos" : "Adicionar aos favoritos"}
