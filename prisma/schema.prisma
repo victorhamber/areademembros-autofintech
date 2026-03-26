@@ -72,3 +72,14 @@ model Highlight {
   color       String   @default("yellow")
   createdAt   DateTime @default(now())
 }
+
+model WebhookLog {
+  id          String   @id @default(uuid())
+  event       String
+  buyerEmail  String?
+  buyerName   String?
+  productId   String?
+  status      String   @default("received")
+  details     String?
+  createdAt   DateTime @default(now())
+}

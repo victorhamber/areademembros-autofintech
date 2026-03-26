@@ -241,13 +241,110 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
   try {
     const hottok = (req.headers['x-hotmart-hottok'] || req.query.hottok) as string;
     if (process.env.HOTMART_HOTTOK && hottok !== process.env.HOTMART_HOTTOK) {
+      await prisma.webhookLog.create({
+        data: { event: 'AUTH_FAILED', status: 'rejected', details: 'Invalid hottok token' }
+      });
       return res.status(401).json({ error: 'Invalid Hotmart Token' });
     }
-    console.log('Webhook Received:', req.body);
-    return res.status(200).json({ status: 'Received' });
+
+    const body = req.body;
+    const event = body.event || 'UNKNOWN';
+    const buyerEmail = body.data?.buyer?.email?.toLowerCase()?.trim();
+    const buyerName = body.data?.buyer?.name || body.data?.buyer?.first_name || null;
+    const productId = String(body.data?.product?.id || body.data?.product?.ucode || '');
+    const offerCode = body.data?.product?.offer_code || body.data?.purchase?.offer?.code || productId;
+
+    console.log(`[Hotmart Webhook] Event: ${event}, Buyer: ${buyerEmail}, Product: ${productId}, Offer: ${offerCode}`);
+
+    // PURCHASE_APPROVED — Create user + grant access
+    if (event === 'PURCHASE_APPROVED' || event === 'PURCHASE_COMPLETE') {
+      if (!buyerEmail) {
+        await prisma.webhookLog.create({
+          data: { event, status: 'error', details: 'Missing buyer email' }
+        });
+        return res.status(200).json({ status: 'Error: no buyer email' });
+      }
+
+      // Find or create user
+      let user = await prisma.user.findUnique({ where: { email: buyerEmail } });
+      if (!user) {
+        user = await prisma.user.create({
+          data: { email: buyerEmail, name: buyerName }
+        });
+      } else if (buyerName && !user.name) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { name: buyerName }
+        });
+      }
+
+      // Find ebook by hotmartOffer (try offer code, then product ID)
+      let ebook = await prisma.ebook.findUnique({ where: { hotmartOffer: offerCode } });
+      if (!ebook && productId !== offerCode) {
+        ebook = await prisma.ebook.findUnique({ where: { hotmartOffer: productId } });
+      }
+
+      if (!ebook) {
+        await prisma.webhookLog.create({
+          data: { event, buyerEmail, buyerName, productId: offerCode, status: 'error', details: `No ebook found for offer: ${offerCode}` }
+        });
+        return res.status(200).json({ status: 'No matching ebook' });
+      }
+
+      // Grant access (idempotent)
+      try {
+        await prisma.purchase.create({
+          data: { userId: user.id, ebookId: ebook.id }
+        });
+      } catch (e: any) {
+        // Already has access — no problem
+        if (!e.message?.includes('Unique constraint')) {
+          throw e;
+        }
+      }
+
+      await prisma.webhookLog.create({
+        data: { event, buyerEmail, buyerName, productId: offerCode, status: 'success', details: `Granted access to "${ebook.title}"` }
+      });
+
+      console.log(`[Hotmart] ✅ Access granted: ${buyerEmail} -> ${ebook.title}`);
+      return res.status(200).json({ status: 'Access granted' });
+    }
+
+    // PURCHASE_CANCELED / PURCHASE_REFUNDED — Revoke access
+    if (event === 'PURCHASE_CANCELED' || event === 'PURCHASE_REFUNDED' || event === 'PURCHASE_CHARGEBACK') {
+      if (buyerEmail) {
+        const user = await prisma.user.findUnique({ where: { email: buyerEmail } });
+        const ebook = await prisma.ebook.findUnique({ where: { hotmartOffer: offerCode } }) 
+                   || (productId !== offerCode ? await prisma.ebook.findUnique({ where: { hotmartOffer: productId } }) : null);
+
+        if (user && ebook) {
+          await prisma.purchase.deleteMany({ where: { userId: user.id, ebookId: ebook.id } });
+          await prisma.webhookLog.create({
+            data: { event, buyerEmail, buyerName, productId: offerCode, status: 'success', details: `Revoked access to "${ebook.title}"` }
+          });
+          console.log(`[Hotmart] ❌ Access revoked: ${buyerEmail} -> ${ebook.title}`);
+        } else {
+          await prisma.webhookLog.create({
+            data: { event, buyerEmail, buyerName, productId: offerCode, status: 'warning', details: 'User or ebook not found for revocation' }
+          });
+        }
+      }
+      return res.status(200).json({ status: 'Processed' });
+    }
+
+    // Other events — just log
+    await prisma.webhookLog.create({
+      data: { event, buyerEmail, buyerName, productId: offerCode, status: 'ignored', details: `Unhandled event type: ${event}` }
+    });
+
+    return res.status(200).json({ status: 'Event logged' });
   } catch (error) {
-    console.error('Webhook Error:', error);
-    return res.status(500).json({ error: 'Internal Processing Error' });
+    console.error('[Hotmart Webhook Error]', error);
+    await prisma.webhookLog.create({
+      data: { event: 'SYSTEM_ERROR', status: 'error', details: String(error) }
+    }).catch(() => {});
+    return res.status(200).json({ status: 'Internal error logged' });
   }
 });
 
@@ -332,6 +429,28 @@ app.delete('/api/admin/purchases/:userId/:ebookId', adminAuth, async (req, res) 
   }
 });
 // -----------------------------
+
+// -- WEBHOOK LOGS --
+app.get('/api/admin/webhook-logs', adminAuth, async (req, res) => {
+  try {
+    const logs = await prisma.webhookLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch webhook logs' });
+  }
+});
+
+app.delete('/api/admin/webhook-logs', adminAuth, async (req, res) => {
+  try {
+    await prisma.webhookLog.deleteMany({});
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to clear logs' });
+  }
+});
 
 app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
   try {

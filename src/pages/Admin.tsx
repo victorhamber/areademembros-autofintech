@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Pencil, Trash2, Users, BookOpen, KeyRound, UserPlus } from 'lucide-react';
+import { Pencil, Trash2, Users, BookOpen, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash } from 'lucide-react';
 import './Admin.css';
 
 export const Admin: React.FC = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [masterPassword, setMasterPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'ebooks' | 'users'>('ebooks');
+  const [activeTab, setActiveTab] = useState<'ebooks' | 'users' | 'webhooks'>('ebooks');
 
   const [ebooks, setEbooks] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
   
   // -- EBOOK FORM STATE --
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,12 +60,20 @@ export const Admin: React.FC = () => {
     } catch (err) { console.error('Error fetching users'); }
   };
 
+  const fetchWebhookLogs = async (pwd: string) => {
+    try {
+      const res = await fetch('/api/admin/webhook-logs', { headers: { 'x-admin-password': pwd } });
+      if (res.ok) setWebhookLogs(await res.json());
+    } catch (err) { console.error('Error fetching webhook logs'); }
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (masterPassword) {
       fetchEbooks(masterPassword);
       fetchCategories(masterPassword);
       fetchUsers(masterPassword);
+      fetchWebhookLogs(masterPassword);
     }
   };
 
@@ -216,10 +225,13 @@ export const Admin: React.FC = () => {
         <h1>EbooksPro | Operações</h1>
         <div className="admin-tabs">
           <button className={activeTab === 'ebooks' ? 'active' : ''} onClick={() => setActiveTab('ebooks')}>
-            <BookOpen size={18} /> Livros Analógicos
+            <BookOpen size={18} /> Livros
           </button>
           <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>
-            <Users size={18} /> Clientes & Acessos
+            <Users size={18} /> Clientes
+          </button>
+          <button className={activeTab === 'webhooks' ? 'active' : ''} onClick={() => setActiveTab('webhooks')}>
+            <Webhook size={18} /> Webhook
           </button>
         </div>
       </header>
@@ -389,6 +401,103 @@ export const Admin: React.FC = () => {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: WEBHOOKS --- */}
+      {activeTab === 'webhooks' && (
+        <div className="admin-content">
+          <div className="admin-form">
+            <h3><Webhook size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }}/>Configuração do Webhook Hotmart</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
+              Cole a URL abaixo na sua plataforma de vendas (Hotmart, Kiwify, etc.) para liberação automática de acessos.
+            </p>
+
+            <label>URL do Webhook (cole na Hotmart)</label>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <input type="text" readOnly value={`${window.location.origin}/api/webhooks/hotmart`} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', cursor: 'text' }} />
+              <button 
+                type="button" className="btn-primary"
+                onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/hotmart`); alert('URL copiada!'); }}
+              >
+                <Copy size={16} /> Copiar
+              </button>
+            </div>
+
+            <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(212,175,55,0.08)', borderRadius: '8px', border: '1px solid rgba(212,175,55,0.2)' }}>
+              <h4 style={{ color: 'var(--accent-primary)', marginBottom: '12px' }}>📋 Como Configurar na Hotmart</h4>
+              <ol style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.8', paddingLeft: '20px' }}>
+                <li>Acesse <strong>Ferramentas → Webhook</strong> na sua conta Hotmart</li>
+                <li>Clique em <strong>"Configurar Webhook"</strong></li>
+                <li>Cole a <strong>URL acima</strong> no campo de URL</li>
+                <li>Selecione os eventos: <code>PURCHASE_APPROVED</code>, <code>PURCHASE_CANCELED</code>, <code>PURCHASE_REFUNDED</code>, <code>PURCHASE_CHARGEBACK</code></li>
+                <li>Copie o <strong>Hottok</strong> gerado e configure na variável de ambiente <code>HOTMART_HOTTOK</code> do seu servidor</li>
+                <li>Salve e faça uma <strong>compra teste</strong> para validar</li>
+              </ol>
+            </div>
+
+            <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(102,187,106,0.08)', borderRadius: '8px', border: '1px solid rgba(102,187,106,0.2)' }}>
+              <h4 style={{ color: '#66bb6a', marginBottom: '8px' }}>⚙️ Como Funciona</h4>
+              <ul style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.8', paddingLeft: '20px' }}>
+                <li><strong>Compra Aprovada:</strong> O sistema cria o usuário automaticamente e libera o livro correspondente ao <code>Código da Oferta</code></li>
+                <li><strong>Reembolso/Cancelamento:</strong> O acesso ao livro é revogado automaticamente</li>
+                <li>O <strong>Código da Oferta</strong> cadastrado no ebook deve ser igual ao ID do produto ou código da oferta na Hotmart</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="admin-table-container">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <h3>Log de Eventos ({webhookLogs.length})</h3>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="btn-icon" onClick={() => fetchWebhookLogs(masterPassword)} title="Atualizar">
+                  <RefreshCw size={16} />
+                </button>
+                <button className="btn-icon btn-danger" onClick={async () => {
+                  if (!window.confirm('Limpar todos os logs?')) return;
+                  await fetch('/api/admin/webhook-logs', { method: 'DELETE', headers: { 'x-admin-password': masterPassword } });
+                  setWebhookLogs([]);
+                }} title="Limpar Logs">
+                  <Trash size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Evento</th>
+                    <th>E-mail</th>
+                    <th>Produto</th>
+                    <th>Status</th>
+                    <th>Detalhes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {webhookLogs.length === 0 ? (
+                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>Nenhum evento recebido ainda. Configure o webhook na Hotmart e faça uma compra teste.</td></tr>
+                  ) : (
+                    webhookLogs.map(log => (
+                      <tr key={log.id}>
+                        <td style={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{new Date(log.createdAt).toLocaleString('pt-BR')}</td>
+                        <td><code>{log.event}</code></td>
+                        <td>{log.buyerEmail || '-'}</td>
+                        <td><code>{log.productId || '-'}</code></td>
+                        <td>
+                          <span className={`webhook-status webhook-status-${log.status}`}>
+                            {log.status === 'success' ? '✅' : log.status === 'error' ? '❌' : log.status === 'rejected' ? '🚫' : log.status === 'warning' ? '⚠️' : '📌'}
+                            {' '}{log.status}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '12px', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.details || '-'}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
