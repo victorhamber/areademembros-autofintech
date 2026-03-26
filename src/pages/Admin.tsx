@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pencil, Trash2, Users, BookOpen, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash } from 'lucide-react';
+import { Pencil, Trash2, Users, BookOpen, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search } from 'lucide-react';
 import './Admin.css';
 
 export const Admin: React.FC = () => {
@@ -32,6 +32,7 @@ export const Admin: React.FC = () => {
   const [newUserPass, setNewUserPass] = useState('');
   const [managingAccessFor, setManagingAccessFor] = useState<any | null>(null);
   const [grantEbookId, setGrantEbookId] = useState('');
+  const [userSearch, setUserSearch] = useState('');
 
   // -- FETCHERS --
   const fetchCategories = async (pwd: string) => {
@@ -277,42 +278,75 @@ export const Admin: React.FC = () => {
 
       {/* --- TAB: USERS --- */}
       {activeTab === 'users' && (
-        <div className="admin-content">
-          <form className="admin-form" onSubmit={handleCreateUser}>
-            <h3><UserPlus size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }}/>Cadastrar Usuário Manual</h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
-              Dê acesso VIP ou cadastre alunos antigos sem precisar vender na Hotmart.
-            </p>
-            <label>E-mail do Usuário *</label>
-            <input type="email" placeholder="email@aluno.com" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required />
-            <label>Senha Provisória *</label>
-            <input type="text" placeholder="Senha123" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} required />
-            <div className="admin-form-actions">
-              <button type="submit">Cadastrar e Conceder Conta</button>
+        <div className="admin-content" style={{ flexDirection: 'column' }}>
+          {/* Stats Row */}
+          <div className="admin-stats-row">
+            <div className="admin-stat-card">
+              <div><div className="stat-number">{users.length}</div><div className="stat-label">Usuários</div></div>
             </div>
-          </form>
+            <div className="admin-stat-card">
+              <div><div className="stat-number">{users.reduce((acc: number, u: any) => acc + u.purchases.length, 0)}</div><div className="stat-label">Acessos Ativos</div></div>
+            </div>
+            <div className="admin-stat-card">
+              <div><div className="stat-number">{users.filter((u: any) => !u.password).length}</div><div className="stat-label">Sem Senha</div></div>
+            </div>
+          </div>
 
-          <div className="admin-table-container">
-            <h3>Usuários Cadastrados ({users.length})</h3>
-            <div className="admin-table-scroll">
+          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <form className="admin-form" onSubmit={handleCreateUser}>
+              <h3><UserPlus size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }}/>Cadastrar Usuário</h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                Cadastre alunos ou dê acesso VIP manualmente.
+              </p>
+              <label>E-mail *</label>
+              <input type="email" placeholder="email@aluno.com" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required />
+              <label>Senha Provisória *</label>
+              <input type="text" placeholder="Senha123" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} required />
+              <div className="admin-form-actions">
+                <button type="submit">Cadastrar Usuário</button>
+              </div>
+            </form>
+
+            <div className="admin-table-container" style={{ flex: 2 }}>
+              <h3>Usuários Cadastrados ({users.length})</h3>
+              <div className="admin-search-bar">
+                <Search size={16} className="admin-search-icon" />
+                <input
+                  type="text"
+                  placeholder="Buscar por e-mail ou nome..."
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                />
+              </div>
+              <div className="admin-table-scroll">
               <table className="admin-table">
                 <thead>
                   <tr>
+                    <th>Nome</th>
                     <th>E-mail</th>
-                    <th>Senha Registrada</th>
-                    <th>Nº Compras</th>
-                    <th>Controle</th>
+                    <th>Nº Livros</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(u => (
+                  {users
+                    .filter((u: any) => {
+                      if (!userSearch.trim()) return true;
+                      const q = userSearch.toLowerCase();
+                      return u.email.toLowerCase().includes(q) || (u.name && u.name.toLowerCase().includes(q));
+                    })
+                    .map((u: any) => (
                     <tr key={u.id}>
-                      <td style={{ fontWeight: 500 }}>{u.email}</td>
-                      <td><code>{u.password || 'Sem Senha'}</code></td>
-                      <td>{u.purchases.length} Livro(s)</td>
+                      <td><span style={{ fontWeight: 500 }}>{u.name || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Sem nome</span>}</span></td>
+                      <td>{u.email}</td>
                       <td>
-                        <button className="btn-icon" onClick={() => setManagingAccessFor(u)} title="Gerenciar Acessos" style={{ background: 'var(--accent-primary)', color: '#000', padding: '6px 12px', borderRadius: '4px', fontSize: '13px', fontWeight: 'bold' }}>
-                          <KeyRound size={14} style={{ marginRight: '5px' }} /> Ver Acessos
+                        <span style={{ background: u.purchases.length > 0 ? 'rgba(76,175,80,0.15)' : 'rgba(158,158,158,0.15)', padding: '3px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 600, color: u.purchases.length > 0 ? '#66bb6a' : '#9e9e9e' }}>
+                          {u.purchases.length}
+                        </span>
+                      </td>
+                      <td>
+                        <button className="btn-primary" onClick={() => setManagingAccessFor(u)} style={{ fontSize: '12px', padding: '6px 14px' }}>
+                          <KeyRound size={14} /> Acessos
                         </button>
                       </td>
                     </tr>
@@ -320,6 +354,7 @@ export const Admin: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         </div>
       )}
