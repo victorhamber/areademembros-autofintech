@@ -10,6 +10,7 @@ RUN npm install
 COPY . .
 
 # Generate Prisma Database Client
+RUN apk add --no-cache openssl
 RUN npx prisma generate
 
 # Build the React Frontend into /dist

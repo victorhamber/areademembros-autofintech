@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Home as HomeIcon, Library as LibraryIcon, Settings as SettingsIcon } from 'lucide-react'
 import { Home } from './pages/Home'
 import { Library } from './pages/Library'
