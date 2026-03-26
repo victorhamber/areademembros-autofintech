@@ -6,6 +6,7 @@ interface BookCardProps {
   id: string;
   title: string;
   author: string;
+  description?: string;
   coverUrl: string;
   hasAccess?: boolean;
   isWishlisted?: boolean;
@@ -17,6 +18,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   id, 
   title, 
   author, 
+  description,
   coverUrl, 
   hasAccess = false, 
   isWishlisted = false,
@@ -56,7 +58,11 @@ export const BookCard: React.FC<BookCardProps> = ({
       </div>
       <div className="book-info">
         <h3 className="book-title">{title}</h3>
-        <p className="book-author">{author}</p>
+        {description ? (
+          <p className="book-description">{description}</p>
+        ) : (
+          <p className="book-author">{author}</p>
+        )}
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ export const Admin: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
+  const [description, setDescription] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [coverUrl, setCoverUrl] = useState('');
@@ -162,13 +163,13 @@ export const Admin: React.FC = () => {
   };
 
   const clearForm = () => {
-    setEditingId(null); setTitle(''); setAuthor(''); setCoverFile(null); setPdfFile(null);
+    setEditingId(null); setTitle(''); setAuthor(''); setDescription(''); setCoverFile(null); setPdfFile(null);
     setCoverUrl(''); setPdfUrl(''); setSalesUrl(''); setHotmartOffer('');
     setCategoryId(''); setFeaturedList('');
   };
 
   const handleEdit = (eb: any) => {
-    setEditingId(eb.id); setTitle(eb.title); setAuthor(eb.author || '');
+    setEditingId(eb.id); setTitle(eb.title); setAuthor(eb.author || ''); setDescription(eb.description || '');
     setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl); setSalesUrl(eb.salesUrl);
     setHotmartOffer(eb.hotmartOffer); setCategoryId(eb.categoryId || '');
     setFeaturedList(eb.featuredList || ''); setCoverFile(null); setPdfFile(null);
@@ -193,7 +194,7 @@ export const Admin: React.FC = () => {
         alert('Capa e PDF são obrigatórios!'); setIsSubmitting(false); return;
       }
 
-      const payload = { title, author, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl, salesUrl, hotmartOffer, categoryId, featuredList };
+      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl, salesUrl, hotmartOffer, categoryId, featuredList };
       const res = await fetch(editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks', {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
@@ -367,8 +368,16 @@ export const Admin: React.FC = () => {
             <h3>{editingId ? 'Editar Ebook' : 'Adicionar Novo Ebook'}</h3>
             <label>Título do Livro *</label>
             <input placeholder="Ex: O Poder do Hábito" value={title} onChange={e => setTitle(e.target.value)} required />
-            <label>Autor (Opcional)</label>
-            <input placeholder="Ex: Charles Duhigg" value={author} onChange={e => setAuthor(e.target.value)} />
+            
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{flex: 1}}>
+                <label>Autor (Opcional)</label>
+                <input placeholder="Ex: Charles Duhigg" value={author} onChange={e => setAuthor(e.target.value)} />
+              </div>
+            </div>
+
+            <label>Descrição Curta / Subtítulo (Opcional)</label>
+            <input placeholder="Aparecerá abaixo do título na Biblioteca" value={description} onChange={e => setDescription(e.target.value)} />
             
             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
               <div style={{flex: 1}}>

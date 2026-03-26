@@ -3,9 +3,21 @@
 }
 
 .row-title {
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 700;
   padding: 0 var(--spacing-md);
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+.row-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 20px;
+  background-color: var(--accent-primary);
+  margin-right: 10px;
+  border-radius: 2px;
 }
 
 .row-scroll {

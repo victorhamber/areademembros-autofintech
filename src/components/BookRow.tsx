@@ -62,9 +62,15 @@ export const BookRow: React.FC<BookRowProps> = ({ title, books, onBookClick, onT
       >
         {books.map(book => (
           <BookCard 
-            key={book.id} 
-            {...book} 
-            onClick={handleClick} 
+            key={book.id}
+            id={book.id}
+            title={book.title}
+            author={book.author || ''}
+            description={book.description || ''}
+            coverUrl={book.coverUrl}
+            hasAccess={book.hasAccess}
+            isWishlisted={book.isWishlisted}
+            onClick={handleClick}
             onToggleWishlist={handleWishlist}
           />
         ))}

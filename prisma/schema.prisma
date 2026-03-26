@@ -27,6 +27,7 @@ model Ebook {
   id            String    @id @default(uuid())
   title         String
   author        String?
+  description   String?
   coverUrl      String
   pdfUrl        String            
   salesUrl      String            

@@ -159,7 +159,7 @@
   padding-top: 16px;
   border-top: 1px solid var(--border-subtle);
 }
-.admin-form .btn-cancel {
+.btn-cancel {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
