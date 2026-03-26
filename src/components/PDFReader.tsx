@@ -12,12 +12,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 interface PDFReaderProps {
   url: string;
   title: string;
+  initialPage?: number;
   onClose: (lastPage?: number) => void;
 }
 
-export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, onClose }) => {
+export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 1, onClose }) => {
   const [numPages, setNumPages] = useState<number>();
-  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [pageNumber, setPageNumber] = useState<number>(initialPage);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(window.innerWidth - 32);
 

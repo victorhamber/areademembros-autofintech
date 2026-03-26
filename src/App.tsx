@@ -16,7 +16,7 @@ function App() {
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('ebookpro_userEmail'))
   const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('ebookpro_userName'))
   const [activeTab, setActiveTab] = useState('home')
-  const [readerData, setReaderData] = useState<{url: string, title: string, ebookId: string} | null>(null)
+  const [readerData, setReaderData] = useState<{url: string, title: string, ebookId: string, initialPage: number} | null>(null)
   
   const [catalog, setCatalog] = useState<any[]>([])
   const [myBooksData, setMyBooksData] = useState<any[]>([])
@@ -77,7 +77,7 @@ function App() {
         headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
         body: JSON.stringify({ ebookId: book.id, page: book.lastPage || 1 })
       }).catch(console.error)
-      setReaderData({ url: book.pdfUrl, title, ebookId: book.id });
+      setReaderData({ url: book.pdfUrl, title, ebookId: book.id, initialPage: book.lastPage || 1 });
     } else {
       alert("Arquivo PDF não encontrado para este livro.");
     }
@@ -121,6 +121,7 @@ function App() {
         <PDFReader 
           url={readerData.url} 
           title={readerData.title} 
+          initialPage={readerData.initialPage}
           onClose={handleCloseReader}
         />
       ) : (
