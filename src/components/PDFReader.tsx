@@ -42,6 +42,9 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
   const [showHighlightPanel, setShowHighlightPanel] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   
+  // PDF Loading Progress
+  const [loadProgress, setLoadProgress] = useState<number>(0);
+
   // Highlight Lock Mode
   const [activeHighlightColor, setActiveHighlightColor] = useState<string | null>(null);
 
@@ -262,7 +265,18 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
             <Document 
               file={url} 
               onLoadSuccess={onDocumentLoadSuccess} 
-              loading={<div className="pdf-loading">Carregando livro...</div>}
+              onLoadProgress={({ loaded, total }) => {
+                if (total) setLoadProgress(Math.round((loaded / total) * 100));
+              }}
+              loading={
+                <div className="pdf-loading-container">
+                  <span className="pdf-progress-text">Baixando livro da nuvem...</span>
+                  <div className="pdf-progress-track">
+                    <div className="pdf-progress-fill" style={{ width: `${loadProgress}%` }}></div>
+                  </div>
+                  <span style={{ fontSize: '13px' }}>{loadProgress}% concluído</span>
+                </div>
+              }
             >
               <Page 
                 pageNumber={pageNumber} 

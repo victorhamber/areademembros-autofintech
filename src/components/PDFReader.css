@@ -144,6 +144,37 @@
   font-size: 12px;
 }
 
+/* ========== PDF LOADING PROGRESS ========== */
+.pdf-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  width: 100%;
+  color: var(--text-secondary);
+}
+.pdf-progress-track {
+  width: 80%;
+  max-width: 300px;
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-full);
+  margin: 16px 0 8px 0;
+  overflow: hidden;
+}
+.pdf-progress-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+.pdf-progress-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
 /* ========== HIGHLIGHT TOOLBAR ========== */
 .highlight-toolbar {
   display: flex;

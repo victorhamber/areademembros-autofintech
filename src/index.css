@@ -41,8 +41,7 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   width: 100vw;
   height: 100vh;
-  overflow: hidden; /* App shell handles scroll */
-  overscroll-behavior-y: none; /* Prevent pull-to-refresh on browser UI */
+  /* Allow natural scrolling/pull-to-refresh on the body if needed, or handled by inner containers */
 }
 
 /* Base typography */

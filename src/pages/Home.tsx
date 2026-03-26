@@ -54,8 +54,10 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
   // 1. Meus Livros
   const myBooks = books.filter(b => b.hasAccess);
   
-  // 2. Mais Lidos (Sorted by actual sales)
-  const mostRead = [...books].sort((a,b) => (b._count?.purchases || 0) - (a._count?.purchases || 0));
+  // 2. Mais Lidos (Sorted by actual sales, strictly > 0)
+  const mostRead = [...books]
+    .filter(b => (b._count?.purchases || 0) > 0)
+    .sort((a,b) => (b._count?.purchases || 0) - (a._count?.purchases || 0));
   
   // 3. Lançamentos (Newest first — BUG FIX: removed .reverse())
   const newReleases = [...books].sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).slice(0, 10);

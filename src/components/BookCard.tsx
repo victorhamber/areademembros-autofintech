@@ -28,7 +28,14 @@ export const BookCard: React.FC<BookCardProps> = ({
   return (
     <div className="book-card fade-in" onClick={() => onClick(id, hasAccess)}>
       <div className="cover-container">
-        <img src={coverUrl} alt={title} className="book-cover" loading="lazy" draggable={false} />
+        <img 
+          src={coverUrl} 
+          alt={title} 
+          className="book-cover" 
+          loading="lazy" 
+          draggable={false} 
+          style={{ filter: !hasAccess ? 'grayscale(100%)' : 'none' }}
+        />
         
         {hasAccess && <div className="badge-access">Comprado</div>}
         
