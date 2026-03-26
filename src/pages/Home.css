@@ -76,7 +76,7 @@
 }
 .search-input:focus {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+  box-shadow: 0 0 0 3px rgba(69, 196, 176, 0.15);
 }
 .search-input::placeholder {
   color: var(--text-secondary);
@@ -89,6 +89,7 @@
   gap: 12px;
   padding: 0 var(--spacing-md) var(--spacing-md);
   margin-top: -8px;
+  margin-bottom: var(--spacing-md);
   position: relative;
   z-index: 5;
 }

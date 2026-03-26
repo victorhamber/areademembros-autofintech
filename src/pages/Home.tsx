@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BookRow } from '../components/BookRow';
 import { Search } from 'lucide-react';
 import './Home.css';
@@ -40,8 +40,19 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     return `Boa noite, ${name}!`;
   };
 
-  // DYNAMIC HERO BANNER
-  const heroCover = books.length > 0 ? books[0].coverUrl : null;
+  // DYNAMIC HERO BANNER - Auto-rotating carousel
+  const [heroIndex, setHeroIndex] = useState(0);
+  const booksWithCovers = books.filter(b => b.coverUrl);
+  
+  useEffect(() => {
+    if (booksWithCovers.length <= 1) return;
+    const interval = setInterval(() => {
+      setHeroIndex(prev => (prev + 1) % booksWithCovers.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [booksWithCovers.length]);
+  
+  const heroBook = booksWithCovers.length > 0 ? booksWithCovers[heroIndex % booksWithCovers.length] : null;
 
   // SEARCH FILTER
   const filteredBooks = searchQuery.trim()
@@ -59,8 +70,13 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     .filter(b => (b._count?.purchases || 0) > 0)
     .sort((a,b) => (b._count?.purchases || 0) - (a._count?.purchases || 0));
   
-  // 3. Lançamentos (Newest first — BUG FIX: removed .reverse())
-  const newReleases = [...books].sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).slice(0, 10);
+  // 3. Lançamentos (Newest first, limited to last 30 days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const newReleases = [...books]
+    .filter(b => new Date(b.createdAt || 0).getTime() > thirtyDaysAgo.getTime())
+    .sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 10);
   
   // 4. Lista de Desejos
   const wishlisted = books.filter(b => b.isWishlisted);
@@ -115,10 +131,16 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
 
   return (
     <div style={{ paddingBottom: 'var(--spacing-lg)' }}>
-      <div className="hero-banner" style={heroCover ? { backgroundImage: `url(${heroCover})` } : undefined}>
+      <div 
+        className="hero-banner" 
+        onClick={() => heroBook && handleBookClick(heroBook.id, heroBook.hasAccess)}
+        style={{ cursor: heroBook ? 'pointer' : 'default', ...(heroBook ? { backgroundImage: `url(${heroBook.coverUrl})` } : {}) }}
+      >
         <div className="hero-content">
           <h1 className="hero-greeting">{getGreeting()}</h1>
-          <p className="hero-subtitle">Sua próxima grande leitura te espera.</p>
+          <p className="hero-subtitle">
+            {heroBook ? `Destaque: ${heroBook.title}` : 'Sua próxima grande leitura te espera.'}
+          </p>
         </div>
         <div className="hero-overlay"></div>
       </div>
@@ -167,7 +189,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
             {Array.from(featuredMap.entries()).map(([listName, lstBooks]) => {
               const displayFeatured = lstBooks.filter(isCategoryMatch);
               if (displayFeatured.length === 0) return null;
-              return <BookRow key={`featured-${listName}`} title={`✨ ${listName}`} books={displayFeatured} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
+              return <BookRow key={`featured-${listName}`} title={listName} books={displayFeatured} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
             })}
 
             {displayNewReleases.length > 0 && <BookRow title="Lançamentos" books={displayNewReleases} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
@@ -175,7 +197,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
             
             {Array.from(categoriesMap.entries()).map(([catName, catBooks]) => {
               if (selectedCategory !== 'Tudo' && catName !== selectedCategory) return null;
-              return <BookRow key={`cat-${catName}`} title={`📚 ${catName}`} books={catBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
+              return <BookRow key={`cat-${catName}`} title={catName} books={catBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
             })}
 
             {displayWishlisted.length > 0 && <BookRow title="Lista de Desejos" books={displayWishlisted} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}

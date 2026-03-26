@@ -152,7 +152,7 @@
   justify-content: center;
   height: 60vh;
   width: 100%;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 .pdf-progress-track {
   width: 80%;
@@ -170,9 +170,10 @@
   transition: width 0.3s ease;
 }
 .pdf-progress-text {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.01em;
 }
 
 /* ========== HIGHLIGHT TOOLBAR ========== */
