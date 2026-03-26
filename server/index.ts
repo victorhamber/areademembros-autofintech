@@ -74,9 +74,11 @@ app.post('/api/auth/login', async (req, res) => {
       return res.json({ id: user.id, email: user.email, name: user.name });
     }
     
-    // For development/MVP: if user doesn't exist, block them (they must buy via Hotmart first)
-    // To test locally without webhook, uncomment the next line to auto-create users:
-    // user = await prisma.user.create({ data: { email, password } }); return res.json(user);
+    // MVP Access: Auto-create user if they don't exist in the system yet.
+    if (!user) {
+      user = await prisma.user.create({ data: { email, password } });
+      return res.json({ id: user.id, email: user.email, name: user.name });
+    }
 
     return res.status(401).json({ error: 'E-mail ou senha incorretos. Acesso negado.' });
   } catch (err) {
@@ -112,7 +114,7 @@ app.get('/api/ebooks', async (req, res) => {
 
 app.post('/api/webhooks/hotmart', async (req, res) => {
   try {
-    const hottok = req.headers['x-hotmart-hottok'] || req.query.hottok;
+    const hottok = (req.headers['x-hotmart-hottok'] || req.query.hottok) as string;
     if (process.env.HOTMART_HOTTOK && hottok !== process.env.HOTMART_HOTTOK) {
       return res.status(401).json({ error: 'Invalid Hotmart Token' });
     }
