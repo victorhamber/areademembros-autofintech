@@ -365,7 +365,27 @@ export const Admin: React.FC = () => {
       {activeTab === 'ebooks' && (
         <div className="admin-content">
           <form className="admin-form" onSubmit={handleSubmit}>
-            <h3>{editingId ? 'Editar Ebook' : 'Adicionar Novo Ebook'}</h3>
+            {!editingId ? (
+              <>
+                <h3>Adicionar Novo Ebook</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
+                  Preencha os dados para criar um novo registro na biblioteca.
+                </p>
+              </>
+            ) : (
+              <div style={{ background: 'rgba(212, 175, 55, 0.15)', border: '1px solid var(--accent-primary)', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
+                <h3 style={{ color: 'var(--accent-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Pencil size={18} /> Editando Ebook
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', marginBottom: '12px' }}>
+                  Atenção: Você está modificando um ebook existente. Para cadastrar um novo, cancele esta edição.
+                </p>
+                <button type="button" onClick={clearForm} style={{ background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                  ❌ CANCELAR E CADASTRAR NOVO
+                </button>
+              </div>
+            )}
+            
             <label>Título do Livro *</label>
             <input placeholder="Ex: O Poder do Hábito" value={title} onChange={e => setTitle(e.target.value)} required />
             
@@ -410,9 +430,15 @@ export const Admin: React.FC = () => {
             <label>Código da Oferta (Hotmart) *</label>
             <input placeholder="Letras e Números da Oferta" value={hotmartOffer} onChange={e => setHotmartOffer(e.target.value)} required />
             
-            <div className="admin-form-actions">
-              <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Enviando...' : (editingId ? 'Salvar Alterações' : 'Cadastrar Ebook')}</button>
-              {editingId && <button type="button" className="btn-cancel" onClick={clearForm} disabled={isSubmitting}>Cancelar Edição</button>}
+            <div className="admin-form-actions" style={{ flexDirection: 'column' }}>
+              <button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Enviando...' : (editingId ? '💾 Atualizar Ebook Existente' : 'Cadastrar Novo Ebook')}
+              </button>
+              {editingId && (
+                <button type="button" className="btn-cancel" onClick={clearForm} disabled={isSubmitting}>
+                  Cancelar Edição
+                </button>
+              )}
             </div>
           </form>
 
