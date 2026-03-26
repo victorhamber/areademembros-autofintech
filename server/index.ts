@@ -91,7 +91,7 @@ if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
   
   // Client side routing fallback
-  app.get('*', (req, res) => {
+  app.use((req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 } else {
