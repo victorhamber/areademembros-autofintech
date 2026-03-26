@@ -16,16 +16,25 @@ model User {
   createdAt DateTime   @default(now())
 }
 
+model Category {
+  id     String  @id @default(uuid())
+  name   String  @unique
+  ebooks Ebook[]
+}
+
 model Ebook {
-  id            String     @id @default(uuid())
+  id            String    @id @default(uuid())
   title         String
   author        String?
   coverUrl      String
-  pdfUrl        String
-  salesUrl      String
-  hotmartOffer  String     @unique
+  pdfUrl        String            
+  salesUrl      String            
+  hotmartOffer  String    @unique 
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id])
+  featuredList  String?
   purchases     Purchase[]
-  createdAt     DateTime   @default(now())
+  createdAt     DateTime  @default(now())
 }
 
 model Purchase {

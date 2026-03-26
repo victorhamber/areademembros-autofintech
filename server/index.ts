@@ -105,7 +105,13 @@ app.get('/api/ebooks/my', async (req, res) => {
 
 app.get('/api/ebooks', async (req, res) => {
   try {
-    const ebooks = await prisma.ebook.findMany({ orderBy: { createdAt: 'desc' } });
+    const ebooks = await prisma.ebook.findMany({ 
+      orderBy: { createdAt: 'desc' },
+      include: {
+        category: true,
+        _count: { select: { purchases: true } }
+      }
+    });
     res.json(ebooks);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch catalog' });
@@ -137,6 +143,25 @@ const adminAuth = (req: express.Request, res: express.Response, next: express.Ne
   next();
 };
 
+app.get('/api/admin/categories', adminAuth, async (req, res) => {
+  try {
+    const cats = await prisma.category.findMany({ orderBy: { name: 'asc' } });
+    res.json(cats);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.post('/api/admin/categories', adminAuth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    const cat = await prisma.category.create({ data: { name } });
+    res.json(cat);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create Category' });
+  }
+});
+
 app.post('/api/admin/upload', adminAuth, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const fileUrl = `/uploads/${req.file.filename}`;
@@ -145,7 +170,10 @@ app.post('/api/admin/upload', adminAuth, upload.single('file'), (req, res) => {
 
 app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
   try {
-    const ebooks = await prisma.ebook.findMany({ orderBy: { createdAt: 'desc' } });
+    const ebooks = await prisma.ebook.findMany({ 
+      orderBy: { createdAt: 'desc' },
+      include: { category: true }
+    });
     res.json(ebooks);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch eBooks' });
@@ -154,9 +182,9 @@ app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
 
 app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
   try {
-    const { title, author, coverUrl, pdfUrl, salesUrl, hotmartOffer } = req.body;
+    const { title, author, coverUrl, pdfUrl, salesUrl, hotmartOffer, categoryId, featuredList } = req.body;
     const newEbook = await prisma.ebook.create({
-      data: { title, author: author || null, coverUrl, pdfUrl, salesUrl, hotmartOffer }
+      data: { title, author: author || null, coverUrl, pdfUrl, salesUrl, hotmartOffer, categoryId: categoryId || null, featuredList: featuredList || null }
     });
     res.json(newEbook);
   } catch (error) {
@@ -167,10 +195,10 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
 app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, author, coverUrl, pdfUrl, salesUrl, hotmartOffer } = req.body;
+    const { title, author, coverUrl, pdfUrl, salesUrl, hotmartOffer, categoryId, featuredList } = req.body;
     const updatedEbook = await prisma.ebook.update({
-      where: { id },
-      data: { title, author: author || null, coverUrl, pdfUrl, salesUrl, hotmartOffer }
+      where: { id: String(id) },
+      data: { title, author: author || null, coverUrl, pdfUrl, salesUrl, hotmartOffer, categoryId: categoryId || null, featuredList: featuredList || null }
     });
     res.json(updatedEbook);
   } catch (error) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import './Admin.css';
 
@@ -6,6 +6,7 @@ export const Admin: React.FC = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [masterPassword, setMasterPassword] = useState('');
   const [ebooks, setEbooks] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -17,31 +18,58 @@ export const Admin: React.FC = () => {
   const [pdfUrl, setPdfUrl] = useState('');
   const [salesUrl, setSalesUrl] = useState('');
   const [hotmartOffer, setHotmartOffer] = useState('');
+  
+  // Phase 5: Categories & Featured Lists
+  const [categoryId, setCategoryId] = useState('');
+  const [featuredList, setFeaturedList] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const fetchCategories = async (password: string) => {
+    try {
+      const res = await fetch('/api/admin/categories', { headers: { 'x-admin-password': password } });
+      if (res.ok) setCategories(await res.json());
+    } catch(err) { console.error('Error fetching categories', err); }
+  };
+
   const fetchEbooks = async (password: string) => {
     try {
-      const res = await fetch('/api/admin/ebooks', {
-        headers: { 'x-admin-password': password }
-      });
+      const res = await fetch('/api/admin/ebooks', { headers: { 'x-admin-password': password } });
       if (res.ok) {
-        const data = await res.json();
-        setEbooks(data);
+        setEbooks(await res.json());
         setIsAdminLoggedIn(true);
       } else {
         alert('Senha incorreta ou erro no servidor');
         setIsAdminLoggedIn(false);
       }
     } catch (err) {
-      console.error(err);
-      alert('Servidor Backend ainda não está online ou inacessível.');
+      alert('Servidor Backend inavegável.');
     }
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (masterPassword) fetchEbooks(masterPassword);
+    if (masterPassword) {
+      fetchEbooks(masterPassword);
+      fetchCategories(masterPassword);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
+        body: JSON.stringify({ name: newCategoryName })
+      });
+      const data = await res.json();
+      setCategories([...categories, data]);
+      setCategoryId(data.id);
+      setNewCategoryName('');
+      alert('Categoria criada com sucesso!');
+    } catch(err) { alert('Erro ao criar categoria.'); }
   };
 
   const uploadFile = async (file: File) => {
@@ -52,7 +80,7 @@ export const Admin: React.FC = () => {
       headers: { 'x-admin-password': masterPassword },
       body: formData
     });
-    if (!res.ok) throw new Error('Falha no upload do arquivo.');
+    if (!res.ok) throw new Error('Falha no upload');
     const data = await res.json();
     return data.url;
   };
@@ -61,6 +89,7 @@ export const Admin: React.FC = () => {
     setEditingId(null);
     setTitle(''); setAuthor(''); setCoverFile(null); setPdfFile(null);
     setCoverUrl(''); setPdfUrl(''); setSalesUrl(''); setHotmartOffer('');
+    setCategoryId(''); setFeaturedList('');
   };
 
   const handleEdit = (eb: any) => {
@@ -71,23 +100,21 @@ export const Admin: React.FC = () => {
     setPdfUrl(eb.pdfUrl);
     setSalesUrl(eb.salesUrl);
     setHotmartOffer(eb.hotmartOffer);
+    setCategoryId(eb.categoryId || '');
+    setFeaturedList(eb.featuredList || '');
     setCoverFile(null);
     setPdfFile(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este ebook? Ele será removido permanentemente.')) return;
+    if (!window.confirm('Excluir este ebook permanentemente?')) return;
     try {
       const res = await fetch(`/api/admin/ebooks/${id}`, {
-        method: 'DELETE',
-        headers: { 'x-admin-password': masterPassword }
+        method: 'DELETE', headers: { 'x-admin-password': masterPassword }
       });
       if (res.ok) fetchEbooks(masterPassword);
-      else alert('Erro ao excluir Ebook.');
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,40 +123,34 @@ export const Admin: React.FC = () => {
     try {
       let finalCoverUrl = coverUrl;
       let finalPdfUrl = pdfUrl;
-
-      // Realiza upload de novos arquivos caso tenham sido selecionados
       if (coverFile) finalCoverUrl = await uploadFile(coverFile);
       if (pdfFile) finalPdfUrl = await uploadFile(pdfFile);
 
       if (!finalCoverUrl || !finalPdfUrl) {
-        alert('Você precisa fornecer tanto a Capa quanto o PDF do Livro.');
-        setIsSubmitting(false);
-        return;
+        alert('Capa e PDF são obrigatórios!');
+        setIsSubmitting(false); return;
       }
 
-      const payload = { title, author, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl, salesUrl, hotmartOffer };
-      const url = editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks';
-      const method = editingId ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-admin-password': masterPassword 
-        },
+      const payload = { 
+        title, author, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl, 
+        salesUrl, hotmartOffer, categoryId, featuredList 
+      };
+      
+      const res = await fetch(editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks', {
+        method: editingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
         body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        alert(editingId ? 'Ebook atualizado com sucesso!' : 'Ebook cadastrado com sucesso!');
+        alert('Salvo com sucesso!');
         fetchEbooks(masterPassword);
         clearForm();
       } else {
-        alert('Erro ao salvar ebook no servidor.');
+        alert('Erro ao salvar no servidor.');
       }
     } catch (err) {
-      console.error(err);
-      alert('Erro de comunicação ou falha no envio do arquivo.');
+      alert('Erro de envio.');
     } finally {
       setIsSubmitting(false);
     }
@@ -141,13 +162,7 @@ export const Admin: React.FC = () => {
         <form onSubmit={handleLogin} className="admin-login-box">
           <h2>Painel de Controle</h2>
           <p>Acesso Restrito ao Administrador</p>
-          <input 
-            type="password" 
-            placeholder="Senha Master" 
-            value={masterPassword}
-            onChange={(e) => setMasterPassword(e.target.value)}
-            required
-          />
+          <input type="password" placeholder="Senha Master" value={masterPassword} onChange={e => setMasterPassword(e.target.value)} required />
           <button type="submit">Entrar no Painel</button>
         </form>
       </div>
@@ -170,10 +185,39 @@ export const Admin: React.FC = () => {
           <label>Autor (Opcional)</label>
           <input placeholder="Ex: Charles Duhigg" value={author} onChange={e => setAuthor(e.target.value)} />
           
-          <label>Capa do Ebook (Imagem) {editingId && !coverFile && coverUrl ? ' - Usando Atual' : '*'}</label>
+          {/* CATEGORIES AND LISTS SECTION */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+            <div style={{flex: 1}}>
+              <label>Categoria (Opcional)</label>
+              <select 
+                value={categoryId} 
+                onChange={e => setCategoryId(e.target.value)}
+                style={{ width: '100%', padding: '12px', background: 'var(--bg-main)', border: '1px solid var(--text-secondary)', color: 'var(--text-primary)', borderRadius: '4px', marginTop: '8px' }}
+              >
+                <option value="">Sem Categoria</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            
+            <div style={{flex: 1}}>
+              <label>Nova Categoria Rápida</label>
+              <div style={{ display: 'flex', gap: '5px', marginTop: '8px' }}>
+                <input placeholder="Ex: Ficção" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} style={{ marginTop: 0 }} />
+                <button type="button" onClick={handleCreateCategory} style={{ padding: '0 12px', background: 'rgba(255,255,255,0.1)' }}>+</button>
+              </div>
+            </div>
+          </div>
+
+          <label>Lista Especial / Destaque (Opcional)</label>
+          <input placeholder="Ex: Recomendados pelo Autor" value={featuredList} onChange={e => setFeaturedList(e.target.value)} />
+          
+          <hr style={{ borderColor: 'var(--border-subtle)', margin: '15px 0' }} />
+
+          {/* FILES */}
+          <label>Capa do Ebook {editingId && !coverFile && coverUrl ? ' - Atual' : '*'}</label>
           <input type="file" accept="image/*" onChange={e => setCoverFile(e.target?.files?.[0] || null)} required={!editingId && !coverUrl} />
           
-          <label>Arquivo PDF do Ebook {editingId && !pdfFile && pdfUrl ? ' - Usando Atual' : '*'}</label>
+          <label>Arquivo PDF {editingId && !pdfFile && pdfUrl ? ' - Atual' : '*'}</label>
           <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target?.files?.[0] || null)} required={!editingId && !pdfUrl} />
           
           <label>Link da Página de Vendas *</label>
@@ -187,9 +231,7 @@ export const Admin: React.FC = () => {
               {isSubmitting ? 'Enviando arquivos...' : (editingId ? 'Salvar Alterações' : 'Cadastrar Ebook')}
             </button>
             {editingId && (
-              <button type="button" className="btn-cancel" onClick={clearForm} disabled={isSubmitting}>
-                Cancelar Edição
-              </button>
+              <button type="button" className="btn-cancel" onClick={clearForm} disabled={isSubmitting}>Cancelar Edição</button>
             )}
           </div>
         </form>
@@ -202,6 +244,8 @@ export const Admin: React.FC = () => {
                 <tr>
                   <th>Capa</th>
                   <th>Título</th>
+                  <th>Categoria</th>
+                  <th>Lista Especial</th>
                   <th>Cód. Hotmart</th>
                   <th>Ações</th>
                 </tr>
@@ -209,8 +253,10 @@ export const Admin: React.FC = () => {
               <tbody>
                 {ebooks.map(eb => (
                   <tr key={eb.id}>
-                    <td><img src={eb.coverUrl} alt={eb.title} width="40" /></td>
+                    <td><img src={eb.coverUrl} alt={eb.title} /></td>
                     <td>{eb.title}</td>
+                    <td>{eb.category?.name || '-'}</td>
+                    <td><span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{eb.featuredList || '-'}</span></td>
                     <td><code>{eb.hotmartOffer}</code></td>
                     <td>
                       <div className="admin-actions">
@@ -220,11 +266,6 @@ export const Admin: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-                {ebooks.length === 0 && (
-                  <tr>
-                    <td colSpan={4} style={{ textAlign: 'center' }}>Nenhum livro cadastrado ainda.</td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
