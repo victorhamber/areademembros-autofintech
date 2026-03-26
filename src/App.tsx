@@ -41,23 +41,19 @@ function App() {
       setIsLoading(true)
       Promise.all([
         fetch('/api/ebooks').then(r => r.json()),
-        fetch('/api/ebooks/my', { headers: { 'x-user-id': userId } }).then(r => r.json())
-      ]).then(([catalogData, myBooks]) => {
+        fetch('/api/ebooks/my', { headers: { 'x-user-id': userId } }).then(r => r.json()),
+        fetch('/api/wishlist', { headers: { 'x-user-id': userId } }).then(r => r.json())
+      ]).then(([catalogData, myBooks, wishlistData]) => {
         if (Array.isArray(catalogData)) setCatalog(catalogData)
         if (Array.isArray(myBooks)) setMyBooksData(myBooks)
+        if (Array.isArray(wishlistData)) setWishlistIds(wishlistData)
       }).catch(console.error)
         .finally(() => setIsLoading(false))
     }
   }, [userId])
 
   // Merge the catalog with user access and local wishlist states
-  const [wishlistIds, setWishlistIds] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('ebookpro_wishlist') || '[]') } catch { return [] }
-  })
-
-  useEffect(() => {
-    localStorage.setItem('ebookpro_wishlist', JSON.stringify(wishlistIds))
-  }, [wishlistIds])
+  const [wishlistIds, setWishlistIds] = useState<string[]>([])
   
   const books = catalog.map(book => ({
     ...book,
@@ -75,9 +71,16 @@ function App() {
   }
 
   const handleToggleWishlist = (id: string) => {
+    // Optimistic UI update
     setWishlistIds(current => 
       current.includes(id) ? current.filter(wId => wId !== id) : [...current, id]
     )
+    // Sync with server
+    fetch('/api/wishlist/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
+      body: JSON.stringify({ ebookId: id })
+    }).catch(console.error)
   }
 
   if (!userId) {

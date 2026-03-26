@@ -13,6 +13,7 @@ model User {
   password  String?
   name      String?
   purchases Purchase[]
+  wishlists Wishlist[]
   createdAt DateTime   @default(now())
 }
 
@@ -34,6 +35,7 @@ model Ebook {
   category      Category? @relation(fields: [categoryId], references: [id])
   featuredList  String?
   purchases     Purchase[]
+  wishlists     Wishlist[]
   createdAt     DateTime  @default(now())
 }
 
@@ -46,4 +48,15 @@ model Purchase {
   createdAt DateTime @default(now())
 
   @@unique([userId, ebookId]) 
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  ebookId   String
+  user      User     @relation(fields: [userId], references: [id])
+  ebook     Ebook    @relation(fields: [ebookId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, ebookId])
 }

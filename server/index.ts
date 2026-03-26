@@ -103,6 +103,37 @@ app.get('/api/ebooks/my', async (req, res) => {
   }
 });
 
+// WISHLIST (synced across devices)
+app.get('/api/wishlist', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const items = await prisma.wishlist.findMany({ where: { userId }, select: { ebookId: true } });
+    res.json(items.map(i => i.ebookId));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.post('/api/wishlist/toggle', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { ebookId } = req.body;
+    
+    const existing = await prisma.wishlist.findUnique({ where: { userId_ebookId: { userId, ebookId } } });
+    if (existing) {
+      await prisma.wishlist.delete({ where: { id: existing.id } });
+      return res.json({ wishlisted: false });
+    } else {
+      await prisma.wishlist.create({ data: { userId, ebookId } });
+      return res.json({ wishlisted: true });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to toggle wishlist' });
+  }
+});
+
 app.get('/api/ebooks', async (req, res) => {
   try {
     const ebooks = await prisma.ebook.findMany({ 
