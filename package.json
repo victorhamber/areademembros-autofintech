@@ -8,8 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "tsx server/index.ts",
-    "start": "tsx server/index.ts"
+    "server": "npx prisma db push --accept-data-loss && tsx server/index.ts",
+    "start": "npx prisma db push --accept-data-loss && tsx server/index.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
