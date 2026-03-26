@@ -168,6 +168,52 @@ app.post('/api/admin/upload', adminAuth, upload.single('file'), (req, res) => {
   res.json({ url: fileUrl });
 });
 
+// -- USER & ACCESS MANAGEMENT --
+app.get('/api/admin/users', adminAuth, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        purchases: { include: { ebook: true } }
+      }
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.post('/api/admin/users', adminAuth, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await prisma.user.create({ data: { email, password } });
+    res.json(user);
+  } catch(error) {
+    res.status(400).json({ error: 'Erro. Talvez e-mail já exista.' });
+  }
+});
+
+app.post('/api/admin/purchases', adminAuth, async (req, res) => {
+  try {
+    const { userId, ebookId } = req.body;
+    const purchase = await prisma.purchase.create({ data: { userId, ebookId } });
+    res.json(purchase);
+  } catch (error) {
+    res.status(400).json({ error: 'Falha ao conceder acesso ou o usuário já o possui.' });
+  }
+});
+
+app.delete('/api/admin/purchases/:userId/:ebookId', adminAuth, async (req, res) => {
+  try {
+    const { userId, ebookId } = req.params;
+    await prisma.purchase.deleteMany({ where: { userId, ebookId } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Falha ao revogar acesso' });
+  }
+});
+// -----------------------------
+
 app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
   try {
     const ebooks = await prisma.ebook.findMany({ 

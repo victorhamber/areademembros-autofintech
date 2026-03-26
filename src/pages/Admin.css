@@ -173,3 +173,106 @@
 .btn-icon.btn-danger:hover {
   background: rgba(255, 77, 79, 0.2);
 }
+
+/* -- TABS & USER MANAGEMENT -- */
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+}
+.admin-tabs button {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.admin-tabs button.active {
+  background: var(--accent-primary);
+  color: #000;
+  border-color: var(--accent-primary);
+  font-weight: 500;
+}
+
+.admin-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center; justify-content: center;
+  z-index: 9999;
+}
+.admin-modal {
+  background: var(--bg-secondary);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 500px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+.admin-modal h2 { margin-bottom: 5px; }
+.admin-modal .access-list {
+  background: var(--bg-main);
+  padding: 15px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+  margin-top: 15px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.admin-modal .grant-access-box {
+  background: var(--bg-main);
+  padding: 15px;
+  border-radius: var(--radius-sm);
+}
+.admin-modal select {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+.btn-primary {
+  background: var(--accent-primary);
+  color: #000;
+  font-weight: 600;
+  border: none;
+  padding: 10px 15px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-danger-sm {
+  background: rgba(255, 77, 79, 0.1);
+  color: #ff4d4f;
+  border: 1px solid rgba(255, 77, 79, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.badge-highlight {
+  font-size: 11px;
+  background: rgba(255,255,255,0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.admin-input-styled {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-main);
+  border: 1px solid var(--text-secondary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  margin-top: 8px;
+}
+.btn-add {
+  padding: 0 12px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+}
