@@ -14,6 +14,7 @@ interface HomeProps {
 
 export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isLoading, userEmail, userName }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Tudo');
 
   const handleBookClick = (id: string, hasAccess: boolean) => {
     const book = books.find(b => b.id === id);
@@ -77,6 +78,16 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     }
   });
 
+  const categoryNames = ['Tudo', ...Array.from(categoriesMap.keys()).sort()];
+
+  // FILTER LOGIC FOR CHIPS
+  const isCategoryMatch = (b: any) => selectedCategory === 'Tudo' || b.category?.name === selectedCategory;
+
+  const displayMyBooks = myBooks.filter(isCategoryMatch);
+  const displayMostRead = mostRead.filter(isCategoryMatch);
+  const displayNewReleases = newReleases.filter(isCategoryMatch);
+  const displayWishlisted = wishlisted.filter(isCategoryMatch);
+
   // Loading skeleton
   if (isLoading) {
     return (
@@ -122,6 +133,21 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
         />
       </div>
 
+      {/* CATEGORY PILLS */}
+      {!searchQuery && categoryNames.length > 1 && (
+        <div className="category-pills-container">
+          {categoryNames.map(cat => (
+            <button
+              key={cat}
+              className={`category-pill ${selectedCategory === cat ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="home-content">
         {/* SEARCH RESULTS MODE */}
         {filteredBooks !== null ? (
@@ -134,20 +160,23 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
           )
         ) : (
           <>
-            {myBooks.length > 0 && <BookRow title="Meus Livros" books={myBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayMyBooks.length > 0 && <BookRow title="Meus Livros" books={displayMyBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
             
-            {Array.from(featuredMap.entries()).map(([listName, lstBooks]) => (
-              <BookRow key={`featured-${listName}`} title={`✨ ${listName}`} books={lstBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />
-            ))}
+            {Array.from(featuredMap.entries()).map(([listName, lstBooks]) => {
+              const displayFeatured = lstBooks.filter(isCategoryMatch);
+              if (displayFeatured.length === 0) return null;
+              return <BookRow key={`featured-${listName}`} title={`✨ ${listName}`} books={displayFeatured} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
+            })}
 
-            <BookRow title="Lançamentos" books={newReleases} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />
-            <BookRow title="Mais Lidos" books={mostRead} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />
+            {displayNewReleases.length > 0 && <BookRow title="Lançamentos" books={displayNewReleases} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayMostRead.length > 0 && <BookRow title="Mais Lidos" books={displayMostRead} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
             
-            {Array.from(categoriesMap.entries()).map(([catName, catBooks]) => (
-              <BookRow key={`cat-${catName}`} title={`📚 ${catName}`} books={catBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />
-            ))}
+            {Array.from(categoriesMap.entries()).map(([catName, catBooks]) => {
+              if (selectedCategory !== 'Tudo' && catName !== selectedCategory) return null;
+              return <BookRow key={`cat-${catName}`} title={`📚 ${catName}`} books={catBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
+            })}
 
-            {wishlisted.length > 0 && <BookRow title="Lista de Desejos" books={wishlisted} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayWishlisted.length > 0 && <BookRow title="Lista de Desejos" books={displayWishlisted} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
           </>
         )}
       </div>
