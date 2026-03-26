@@ -12,7 +12,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 interface PDFReaderProps {
   url: string;
   title: string;
-  onClose: () => void;
+  onClose: (lastPage?: number) => void;
 }
 
 export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, onClose }) => {
@@ -36,7 +36,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, onClose }) => 
   return (
     <div className="pdf-reader-container">
       <header className="pdf-header">
-        <button className="back-btn" onClick={onClose}>
+        <button className="back-btn" onClick={() => onClose(pageNumber)}>
           <ArrowLeft size={24} />
         </button>
         <h2 className="pdf-title">{title}</h2>

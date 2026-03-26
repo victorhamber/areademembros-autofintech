@@ -40,12 +40,14 @@ model Ebook {
 }
 
 model Purchase {
-  id        String   @id @default(uuid())
-  userId    String
-  ebookId   String
-  user      User     @relation(fields: [userId], references: [id])
-  ebook     Ebook    @relation(fields: [ebookId], references: [id])
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  userId     String
+  ebookId    String
+  user       User     @relation(fields: [userId], references: [id])
+  ebook      Ebook    @relation(fields: [ebookId], references: [id])
+  lastReadAt DateTime?
+  lastPage   Int      @default(0)
+  createdAt  DateTime @default(now())
 
   @@unique([userId, ebookId]) 
 }

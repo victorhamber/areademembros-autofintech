@@ -9,9 +9,10 @@ interface HomeProps {
   onToggleWishlist: (id: string) => void;
   isLoading?: boolean;
   userEmail?: string | null;
+  userName?: string | null;
 }
 
-export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isLoading, userEmail }) => {
+export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isLoading, userEmail, userName }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleBookClick = (id: string, hasAccess: boolean) => {
@@ -32,7 +33,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
   // DYNAMIC GREETING
   const getGreeting = () => {
     const hour = new Date().getHours();
-    const name = userEmail ? userEmail.split('@')[0].charAt(0).toUpperCase() + userEmail.split('@')[0].slice(1) : '';
+    const name = userName || (userEmail ? userEmail.split('@')[0].charAt(0).toUpperCase() + userEmail.split('@')[0].slice(1) : '');
     if (hour < 12) return `Bom dia, ${name}!`;
     if (hour < 18) return `Boa tarde, ${name}!`;
     return `Boa noite, ${name}!`;

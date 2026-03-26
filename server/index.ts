@@ -96,11 +96,64 @@ app.get('/api/ebooks/my', async (req, res) => {
       include: { ebook: true }
     });
 
-    const myBooks = purchases.map(p => p.ebook);
+    const myBooks = purchases.map(p => ({
+      ...p.ebook,
+      lastReadAt: p.lastReadAt,
+      lastPage: p.lastPage
+    }));
     res.json(myBooks);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch your library' });
   }
+});
+
+// PROFILE
+app.get('/api/profile', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, name: true } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.put('/api/profile', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { name } = req.body;
+    const user = await prisma.user.update({ where: { id: userId }, data: { name } });
+    res.json({ id: user.id, email: user.email, name: user.name });
+  } catch (error) { res.status(500).json({ error: 'Failed to update profile' }); }
+});
+
+app.put('/api/profile/password', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { currentPassword, newPassword } = req.body;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.password !== currentPassword) {
+      return res.status(400).json({ error: 'Senha atual incorreta.' });
+    }
+    await prisma.user.update({ where: { id: userId }, data: { password: newPassword } });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// READING PROGRESS
+app.post('/api/reading-progress', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { ebookId, page } = req.body;
+    await prisma.purchase.updateMany({
+      where: { userId, ebookId },
+      data: { lastReadAt: new Date(), lastPage: page || 1 }
+    });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 // WISHLIST (synced across devices)

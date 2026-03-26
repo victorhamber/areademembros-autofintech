@@ -12,7 +12,10 @@ interface LibraryProps {
 
 export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlist, isLoading }) => {
   const purchasedBooks = books.filter(b => b.hasAccess);
-  const currentlyReading = purchasedBooks.filter(b => b.isReading);
+  // Continue Reading: books that have been opened at least once (have lastReadAt set)
+  const currentlyReading = purchasedBooks
+    .filter(b => b.lastReadAt)
+    .sort((a, b) => new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime());
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -82,10 +85,7 @@ export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlis
                 <img src={book.coverUrl} alt={book.title} className="continue-cover" draggable={false} />
                 <div className="continue-info">
                   <h3>{book.title}</h3>
-                  <p>Capítulo 4 • 45% concluído</p>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: '45%' }}></div>
-                  </div>
+                  <p>Página {book.lastPage || 1}</p>
                 </div>
                 <button className="play-btn">
                   <PlayCircle size={32} strokeWidth={1.5} />

@@ -185,6 +185,40 @@
 .logout-btn:hover {
   background: rgba(255, 77, 79, 0.15);
 }
+.profile-edit-input {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+}
+.profile-edit-input:focus {
+  border-color: var(--accent-primary);
+}
+.profile-save-btn {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent-primary);
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.profile-cancel-btn {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+}
 
 /* ========== LIBRARY EMPTY STATE ========== */
 .library-empty {
