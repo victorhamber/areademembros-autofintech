@@ -40,7 +40,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1 className="login-logo">Ebooks<span>Pro</span></h1>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <img src="/logo.png" alt="Readlyme Logo" style={{ maxWidth: '180px', height: 'auto' }} />
+        </div>
         <p className="login-subtitle">Faça login com seu E-mail da compra</p>
 
         <form onSubmit={handleSubmit} className="login-form">
