@@ -16,7 +16,11 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist }) =
     if (hasAccess) {
       onRead(book.title, book.coverUrl);
     } else {
-      alert(`Redirecionando para a página de vendas do livro ${book.title}`);
+      if (book.salesUrl) {
+        window.open(book.salesUrl, '_blank');
+      } else {
+        alert('Este livro ainda não possui uma página de vendas cadastrada.');
+      }
     }
   };
 
