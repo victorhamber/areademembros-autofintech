@@ -1,0 +1,56 @@
+.hero-banner {
+  position: relative;
+  height: 280px;
+  background-image: url('https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=1200');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: flex-end;
+  padding: var(--spacing-lg) var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg-main) 0%, rgba(15, 17, 21, 0.4) 50%, rgba(15, 17, 21, 0.1) 100%);
+  z-index: 1;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  margin-bottom: var(--spacing-sm);
+}
+
+.hero-greeting {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.hero-subtitle {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.home-content {
+  margin-top: calc(-1 * var(--spacing-sm)); /* pulls the content up smoothly */
+  position: relative;
+  z-index: 3;
+}
+
+@media (min-width: 768px) {
+  .hero-banner {
+    height: 360px;
+    border-radius: var(--radius-lg);
+    margin: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+  }
+}

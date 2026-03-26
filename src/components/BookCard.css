@@ -1,0 +1,108 @@
+.book-card {
+  display: flex;
+  flex-direction: column;
+  width: 140px;
+  flex-shrink: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform 0.2s ease;
+}
+
+.book-card:active {
+  transform: scale(0.96);
+}
+
+.cover-container {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+  background-color: var(--bg-secondary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.book-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.badge-access {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: var(--accent-primary);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  z-index: 5;
+}
+
+.wishlist-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: transform 0.2s, background-color 0.2s;
+  z-index: 10;
+}
+
+.wishlist-btn:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
+}
+
+.wishlist-btn:active {
+  transform: scale(0.9);
+}
+
+.book-info {
+  margin-top: var(--spacing-sm);
+}
+
+.book-title {
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.book-author {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media (min-width: 768px) {
+  .book-card {
+    width: 180px;
+  }
+  
+  .book-title {
+    font-size: 16px;
+  }
+  
+  .book-author {
+    font-size: 14px;
+  }
+  
+  .badge-access {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}

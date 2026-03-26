@@ -1,0 +1,103 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Fallback */
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  width: 100vw;
+  position: relative;
+  background-color: var(--bg-main);
+}
+
+.app-main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + var(--spacing-md)); /* Space for bottom nav */
+  scroll-behavior: smooth;
+}
+
+/* Bottom Navigation Shell */
+.bottom-nav {
+  height: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(15, 17, 21, 0.85); /* Slightly transparent for blur */
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  height: 100%;
+  flex: 1;
+  transition: color 0.2s ease;
+}
+
+.bottom-nav-item.active {
+  color: var(--accent-primary);
+}
+
+.bottom-nav-item svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2px;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bottom-nav-item.active svg {
+  transform: scale(1.1);
+}
+
+/* =========================================
+   Responsive Adjustments for Desktop
+   ========================================= */
+@media (min-width: 768px) {
+  .app-main {
+    padding-bottom: var(--spacing-md);
+    padding-top: calc(var(--nav-height) + var(--spacing-md));
+  }
+  
+  /* Restrain the maximum width of the inner pages to feel like a high-end web app */
+  .app-main > div {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .bottom-nav {
+    top: 0;
+    bottom: auto;
+    border-top: none;
+    border-bottom: 1px solid var(--border-subtle);
+    justify-content: center;
+    gap: 40px;
+    background: rgba(15, 17, 21, 0.95); /* Slightly darker for top nav */
+  }
+
+  .bottom-nav-item {
+    flex: 0 0 auto;
+    flex-direction: row;
+    font-size: 14px;
+    gap: 10px;
+  }
+
+  .bottom-nav-item svg {
+    width: 20px;
+    height: 20px;
+  }
+}

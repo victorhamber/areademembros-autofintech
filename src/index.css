@@ -1,0 +1,65 @@
+:root {
+  /* Premium Dark Navy & Gold Theme Palette */
+  --bg-main: #0B1121;
+  --bg-secondary: #131A2B;
+  --bg-card: rgba(19, 26, 43, 0.8);
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --accent-primary: #D4AF37; /* Premium Gold */
+  --accent-primary-hover: #F2C94C;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  
+  --font-main: 'Inter', sans-serif;
+  
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  
+  --nav-height: 64px;
+  --header-height: 60px;
+}
+
+/* Reset and PWA specific fixes */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent; /* Remove tap blink on mobile */
+}
+
+html, body {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden; /* App shell handles scroll */
+  overscroll-behavior-y: none; /* Prevent pull-to-refresh on browser UI */
+}
+
+/* Base typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: none;
+}
