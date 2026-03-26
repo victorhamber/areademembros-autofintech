@@ -64,11 +64,18 @@
 }
 
 /* ========== DASHBOARD SHELL ========== */
+.admin-dashboard-wrapper {
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: var(--bg-main);
+}
 .admin-dashboard {
   padding: 24px;
   padding-bottom: 60px;
-  min-height: 100vh;
-  background-color: var(--bg-main);
+  min-height: 100%;
   color: var(--text-primary);
   max-width: 1400px;
   margin: 0 auto;

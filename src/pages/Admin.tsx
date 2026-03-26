@@ -221,8 +221,9 @@ export const Admin: React.FC = () => {
   }
 
   return (
-    <div className="admin-dashboard">
-      <header className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="admin-dashboard-wrapper">
+      <div className="admin-dashboard">
+        <header className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>EbooksPro | Operações</h1>
         <div className="admin-tabs">
           <button className={activeTab === 'ebooks' ? 'active' : ''} onClick={() => setActiveTab('ebooks')}>
@@ -539,6 +540,7 @@ export const Admin: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
