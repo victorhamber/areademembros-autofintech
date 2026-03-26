@@ -376,7 +376,7 @@ export const Admin: React.FC = () => {
                 </p>
               </>
             ) : (
-              <div style={{ background: 'rgba(212, 175, 55, 0.15)', border: '1px solid var(--accent-primary)', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
+              <div style={{ background: 'rgba(69, 196, 176, 0.15)', border: '1px solid var(--accent-primary)', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
                 <h3 style={{ color: 'var(--accent-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Pencil size={18} /> Editando Ebook
                 </h3>

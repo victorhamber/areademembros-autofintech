@@ -47,7 +47,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="input-group">
-            <label>E-mail (usado na Hotmart)</label>
+            <label>E-mail</label>
             <input 
               type="email" 
               placeholder="seu@email.com" 

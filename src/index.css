@@ -1,12 +1,12 @@
 :root {
-  /* Premium Dark Navy & Gold Theme Palette */
+  /* Premium Dark Navy & Readlyme Teal Theme Palette */
   --bg-main: #0B1121;
   --bg-secondary: #131A2B;
   --bg-card: rgba(19, 26, 43, 0.8);
   --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
-  --accent-primary: #D4AF37; /* Premium Gold */
-  --accent-primary-hover: #F2C94C;
+  --accent-primary: #45C4B0; /* Readlyme Teal */
+  --accent-primary-hover: #5AD3C0;
   --border-subtle: rgba(255, 255, 255, 0.08);
   
   --font-main: 'Inter', sans-serif;
