@@ -62,7 +62,7 @@
   overflow-y: auto;
   display: flex;
   justify-content: center;
-  background-color: #f0f0f0;
+  background-color: var(--bg-main);
   padding-top: var(--spacing-md);
   padding-bottom: var(--spacing-md);
 }
