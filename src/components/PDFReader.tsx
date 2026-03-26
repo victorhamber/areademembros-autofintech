@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import './PDFReader.css';
@@ -22,10 +23,8 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, onClose }) => 
 
   useEffect(() => {
     const observer = new ResizeObserver(entries => {
-      // 32px to account for some padding margin on mobile
       setContainerWidth(entries[0].contentRect.width - 32);
     });
-
     if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
@@ -45,18 +44,28 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, onClose }) => 
       </header>
 
       <div className="pdf-content" ref={containerRef}>
-        <Document 
-          file={url} 
-          onLoadSuccess={onDocumentLoadSuccess} 
-          loading={<div className="pdf-loading">Carregando livro...</div>}
+        <TransformWrapper
+          initialScale={1}
+          minScale={0.5}
+          maxScale={4}
+          centerOnInit={true}
+          wheel={{ step: 0.1 }}
         >
-          <Page 
-            pageNumber={pageNumber} 
-            width={Math.min(containerWidth, 800)} 
-            renderTextLayer={false} 
-            renderAnnotationLayer={false} 
-          />
-        </Document>
+          <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
+            <Document 
+              file={url} 
+              onLoadSuccess={onDocumentLoadSuccess} 
+              loading={<div className="pdf-loading">Carregando livro...</div>}
+            >
+              <Page 
+                pageNumber={pageNumber} 
+                width={Math.min(containerWidth, 800)} 
+                renderTextLayer={false} 
+                renderAnnotationLayer={false} 
+              />
+            </Document>
+          </TransformComponent>
+        </TransformWrapper>
       </div>
 
       <div className="pdf-controls">
