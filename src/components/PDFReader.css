@@ -184,6 +184,12 @@
   color: var(--text-secondary);
 }
 
+/* Mark.js highlight classes */
+.mark-highlight-yellow { background-color: rgba(255, 235, 59, 0.4); color: inherit; border-radius: 2px; }
+.mark-highlight-green  { background-color: rgba(102, 187, 106, 0.4); color: inherit; border-radius: 2px; }
+.mark-highlight-blue   { background-color: rgba(66, 165, 245, 0.4); color: inherit; border-radius: 2px; }
+.mark-highlight-pink   { background-color: rgba(240, 98, 146, 0.4); color: inherit; border-radius: 2px; }
+
 .highlight-lock-banner {
   display: flex;
   align-items: center;

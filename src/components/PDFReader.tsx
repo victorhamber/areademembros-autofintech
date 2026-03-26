@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ArrowLeft, ChevronLeft, ChevronRight, Highlighter, Trash2, X } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import Mark from 'mark.js';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import './PDFReader.css';
@@ -63,23 +64,24 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
   // Apply highlights on the text layer after page renders
   const applyHighlightsToTextLayer = useCallback(() => {
     const pageHighlights = highlights.filter(h => h.pageNumber === pageNumber);
-    if (pageHighlights.length === 0) return;
 
-    // Get all text spans in the text layer
-    const textLayer = document.querySelector('.react-pdf__Page__textContent');
+    const textLayer = document.querySelector('.react-pdf__Page__textContent') as HTMLElement;
     if (!textLayer) return;
 
-    const spans = textLayer.querySelectorAll('span');
-    
-    spans.forEach(span => {
-      const spanText = span.textContent || '';
-      pageHighlights.forEach(h => {
-        if (spanText.includes(h.text) || h.text.includes(spanText)) {
-          const color = HIGHLIGHT_COLORS.find(c => c.value === h.color);
-          span.style.backgroundColor = color?.bg || 'rgba(255, 235, 59, 0.4)';
-          span.style.borderRadius = '2px';
-        }
-      });
+    // Use Mark.js to intelligently highlight text across multiple spans
+    const instance = new Mark(textLayer);
+    instance.unmark({
+      done: () => {
+        if (pageHighlights.length === 0) return;
+        pageHighlights.forEach(h => {
+          instance.mark(h.text, {
+            className: `mark-highlight-${h.color}`,
+            acrossElements: true,
+            separateWordSearch: false,
+            accuracy: "partially"
+          });
+        });
+      }
     });
   }, [highlights, pageNumber]);
 
