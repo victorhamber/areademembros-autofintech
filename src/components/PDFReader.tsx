@@ -150,7 +150,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
   const pageHighlightsCount = highlights.filter(h => h.pageNumber === pageNumber).length;
 
   return (
-    <div className="pdf-reader-container">
+    <div className={`pdf-reader-container ${activeHighlightColor ? 'is-highlight-mode' : ''}`}>
       <header className="pdf-header">
         <button className="back-btn" onClick={() => onClose(pageNumber)}>
           <ArrowLeft size={24} />
@@ -251,6 +251,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
           maxScale={4}
           centerOnInit={true}
           wheel={{ step: 0.1 }}
+          disabled={!!activeHighlightColor}
           panning={{ disabled: !!activeHighlightColor }}
           pinch={{ disabled: !!activeHighlightColor }}
           doubleClick={{ disabled: !!activeHighlightColor }}

@@ -73,6 +73,21 @@
   -webkit-user-select: text !important;
 }
 
+/* Force text selection on mobile when in highlight mode */
+.is-highlight-mode .react-transform-component {
+  touch-action: pan-y !important;
+}
+.is-highlight-mode .react-pdf__Page__textContent {
+  pointer-events: auto !important;
+  z-index: 10 !important;
+}
+.is-highlight-mode .react-pdf__Page__canvas {
+  pointer-events: none !important;
+}
+.is-highlight-mode .react-pdf__Page {
+  touch-action: auto !important;
+}
+
 .react-pdf__Page__textContent span::selection {
   background: rgba(212, 175, 55, 0.4);
 }
