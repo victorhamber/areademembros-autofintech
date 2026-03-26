@@ -37,11 +37,12 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(window.innerWidth - 32);
 
-  // Highlight state
   const [highlights, setHighlights] = useState<HighlightData[]>([]);
-  const [selectedText, setSelectedText] = useState('');
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const [showHighlightPanel, setShowHighlightPanel] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  
+  // Highlight Lock Mode
+  const [activeHighlightColor, setActiveHighlightColor] = useState<string | null>(null);
 
   useEffect(() => {
     const observer = new ResizeObserver(entries => {
@@ -88,18 +89,34 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
     return () => clearTimeout(timer);
   }, [applyHighlightsToTextLayer]);
 
-  // Listen for text selection
+  // Listen for text selection (only triggers save if in Highlight Mode)
   useEffect(() => {
-    const handleSelection = () => {
-      const selection = window.getSelection();
-      const text = selection?.toString().trim();
-      if (text && text.length > 0) {
-        setSelectedText(text);
-        setShowColorPicker(true);
-      } else {
-        setSelectedText('');
-        setShowColorPicker(false);
-      }
+    const handleSelection = async () => {
+      // Small delay to ensure the browser has registered the selection correctly
+      setTimeout(async () => {
+        const selection = window.getSelection();
+        const text = selection?.toString().trim();
+        
+        if (text && text.length > 0 && activeHighlightColor) {
+          // WE HAVE TEXT + WE ARE IN HIGHLIGHT MODE = Auto Save
+          try {
+            const res = await fetch('/api/highlights', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+              body: JSON.stringify({ ebookId, pageNumber, text, color: activeHighlightColor })
+            });
+            const newHighlight = await res.json();
+            setHighlights(prev => [...prev, newHighlight]);
+            
+            // Unlock screen
+            setActiveHighlightColor(null);
+            window.getSelection()?.removeAllRanges();
+            
+            // Re-apply after a short delay
+            setTimeout(applyHighlightsToTextLayer, 200);
+          } catch (err) { console.error(err); }
+        }
+      }, 100);
     };
 
     document.addEventListener('mouseup', handleSelection);
@@ -108,24 +125,12 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
       document.removeEventListener('mouseup', handleSelection);
       document.removeEventListener('touchend', handleSelection);
     };
-  }, []);
+  }, [activeHighlightColor, ebookId, pageNumber, userId, applyHighlightsToTextLayer]);
 
+  // Deprecated manual save function
   const saveHighlight = async (color: string) => {
-    if (!selectedText) return;
-    try {
-      const res = await fetch('/api/highlights', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
-        body: JSON.stringify({ ebookId, pageNumber, text: selectedText, color })
-      });
-      const newHighlight = await res.json();
-      setHighlights(prev => [...prev, newHighlight]);
-      setShowColorPicker(false);
-      setSelectedText('');
-      window.getSelection()?.removeAllRanges();
-      // Re-apply after a short delay
-      setTimeout(applyHighlightsToTextLayer, 200);
-    } catch (err) { console.error(err); }
+    setActiveHighlightColor(color);
+    setShowColorPicker(false);
   };
 
   const deleteHighlight = async (id: string) => {
@@ -151,22 +156,39 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
           <ArrowLeft size={24} />
         </button>
         <h2 className="pdf-title">{title}</h2>
-        <button 
-          className="back-btn" 
-          onClick={() => setShowHighlightPanel(!showHighlightPanel)}
-          style={{ position: 'relative' }}
-        >
-          <Highlighter size={20} />
-          {highlights.length > 0 && (
-            <span className="highlight-badge">{highlights.length}</span>
-          )}
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            className="back-btn" 
+            onClick={() => {
+              if (activeHighlightColor) {
+                setActiveHighlightColor(null);
+              } else {
+                setShowColorPicker(!showColorPicker);
+                setShowHighlightPanel(false);
+              }
+            }}
+            style={{ color: activeHighlightColor ? 'var(--accent-primary)' : 'inherit' }}
+          >
+            <Highlighter size={20} />
+          </button>
+
+          <button 
+            className="back-btn" 
+            onClick={() => { setShowHighlightPanel(!showHighlightPanel); setShowColorPicker(false); }}
+            style={{ position: 'relative' }}
+          >
+            <span style={{ fontSize: '18px' }}>📝</span>
+            {highlights.length > 0 && (
+              <span className="highlight-badge">{highlights.length}</span>
+            )}
+          </button>
+        </div>
       </header>
 
       {/* Color Picker Toolbar */}
-      {showColorPicker && selectedText && (
+      {showColorPicker && !activeHighlightColor && (
         <div className="highlight-toolbar">
-          <span className="highlight-toolbar-label">Destacar:</span>
+          <span className="highlight-toolbar-label">Escolher cor:</span>
           {HIGHLIGHT_COLORS.map(c => (
             <button 
               key={c.value} 
@@ -176,9 +198,18 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
               title={c.name}
             />
           ))}
-          <button className="color-btn cancel-btn" onClick={() => { setShowColorPicker(false); window.getSelection()?.removeAllRanges(); }}>
+          <button className="color-btn cancel-btn" onClick={() => setShowColorPicker(false)}>
             <X size={14} />
           </button>
+        </div>
+      )}
+
+      {/* Active Lock Mode Indicator */}
+      {activeHighlightColor && (
+        <div className="highlight-lock-banner">
+          <span className="highlight-lock-dot" style={{ backgroundColor: HIGHLIGHT_COLORS.find(c => c.value === activeHighlightColor)?.bg }}></span>
+          Modo Marca-texto ativado: Selecione o texto na tela
+          <button className="highlight-lock-cancel" onClick={() => setActiveHighlightColor(null)}>Cancelar</button>
         </div>
       )}
 
@@ -220,6 +251,9 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
           maxScale={4}
           centerOnInit={true}
           wheel={{ step: 0.1 }}
+          panning={{ disabled: !!activeHighlightColor }}
+          pinch={{ disabled: !!activeHighlightColor }}
+          doubleClick={{ disabled: !!activeHighlightColor }}
         >
           <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
             <Document 
