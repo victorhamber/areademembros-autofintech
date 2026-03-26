@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -17,6 +17,18 @@ interface PDFReaderProps {
 export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, onClose }) => {
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(window.innerWidth - 32);
+
+  useEffect(() => {
+    const observer = new ResizeObserver(entries => {
+      // 32px to account for some padding margin on mobile
+      setContainerWidth(entries[0].contentRect.width - 32);
+    });
+
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
     setNumPages(numPages);
@@ -32,7 +44,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, onClose }) => 
         <div style={{ width: 24 }}></div> {/* spacer */}
       </header>
 
-      <div className="pdf-content">
+      <div className="pdf-content" ref={containerRef}>
         <Document 
           file={url} 
           onLoadSuccess={onDocumentLoadSuccess} 
@@ -40,7 +52,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, onClose }) => 
         >
           <Page 
             pageNumber={pageNumber} 
-            width={Math.min(window.innerWidth - 32, 800)} 
+            width={Math.min(containerWidth, 800)} 
             renderTextLayer={false} 
             renderAnnotationLayer={false} 
           />
