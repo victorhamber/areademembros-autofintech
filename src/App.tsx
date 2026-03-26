@@ -1,11 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Home as HomeIcon, Library as LibraryIcon, Settings as SettingsIcon } from 'lucide-react'
 import { Home } from './pages/Home'
 import { Library } from './pages/Library'
 import { Login } from './pages/Login'
 import { Admin } from './pages/Admin'
 import { PDFReader } from './components/PDFReader'
-import { mockBooks as initialBooks } from './data/mockBooks'
 import './App.css'
 
 function App() {
@@ -13,28 +12,61 @@ function App() {
     return <Admin />
   }
 
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('home')
   const [readerData, setReaderData] = useState<{url: string, title: string} | null>(null)
   
-  // Make books stateful to allow tracking wishlist interactions
-  const [books, setBooks] = useState(initialBooks)
+  const [catalog, setCatalog] = useState<any[]>([])
+  const [myBooksData, setMyBooksData] = useState<any[]>([])
 
-  // Demo PDF using mozilla tracer test file
-  const dummyPdfUrl = 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf';
+  useEffect(() => {
+    if (userId) {
+      // Buscar catálogo completo
+      fetch('/api/ebooks')
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) setCatalog(data);
+        })
+        .catch(console.error);
+
+      // Buscar livros comprados pelo usuário
+      fetch('/api/ebooks/my', { headers: { 'x-user-id': userId } })
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) setMyBooksData(data);
+        })
+        .catch(console.error);
+    }
+  }, [userId])
+
+  // Merge the catalog with user access and local wishlist states
+  // In a real app wishlist might be stored in the DB, but we keep it local for MVP
+  const [wishlistIds, setWishlistIds] = useState<string[]>([])
+  
+  const books = catalog.map(book => ({
+    ...book,
+    hasAccess: myBooksData.some(mb => mb.id === book.id),
+    isWishlisted: wishlistIds.includes(book.id)
+  }))
 
   const handleOpenReader = (title: string, _coverUrl?: string) => {
-    setReaderData({ url: dummyPdfUrl, title });
+    // Determine the actual PDF URL from the book catalog
+    const book = books.find(b => b.title === title);
+    if (book && book.pdfUrl) {
+      setReaderData({ url: book.pdfUrl, title });
+    } else {
+      alert("Arquivo PDF não encontrado para este livro.");
+    }
   }
 
   const handleToggleWishlist = (id: string) => {
-    setBooks(current => 
-      current.map(b => b.id === id ? { ...b, isWishlisted: !b.isWishlisted } : b)
+    setWishlistIds(current => 
+      current.includes(id) ? current.filter(wId => wId !== id) : [...current, id]
     )
   }
 
-  if (!isAuthenticated) {
-    return <Login onLogin={() => setIsAuthenticated(true)} />
+  if (!userId) {
+    return <Login onLogin={(id) => setUserId(id)} />
   }
 
   return (
@@ -54,31 +86,28 @@ function App() {
               <div style={{ padding: 'var(--spacing-md)', paddingTop: 'var(--spacing-lg)' }}>
                 <h1 style={{ marginBottom: 'var(--spacing-md)' }}>Configurações</h1>
                 <p style={{ color: 'var(--text-secondary)' }}>Ajustes de conta e notificações.</p>
+                <button 
+                  onClick={() => setUserId(null)}
+                  style={{
+                    marginTop: '20px', padding: '10px 20px', background: 'rgba(255,255,255,0.1)', 
+                    color: 'white', border: '1px solid #333', borderRadius: '8px', cursor: 'pointer'
+                  }}
+                >
+                  Sair (Logout)
+                </button>
               </div>
             )}
           </main>
 
           <nav className="bottom-nav">
-            <button 
-              className={`bottom-nav-item ${activeTab === 'home' ? 'active' : ''}`}
-              onClick={() => setActiveTab('home')}
-            >
-              <HomeIcon />
-              <span>Vitrine</span>
+            <button className={`bottom-nav-item ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>
+              <HomeIcon /> <span>Vitrine</span>
             </button>
-            <button 
-              className={`bottom-nav-item ${activeTab === 'library' ? 'active' : ''}`}
-              onClick={() => setActiveTab('library')}
-            >
-              <LibraryIcon />
-              <span>Biblioteca</span>
+            <button className={`bottom-nav-item ${activeTab === 'library' ? 'active' : ''}`} onClick={() => setActiveTab('library')}>
+              <LibraryIcon /> <span>Biblioteca</span>
             </button>
-            <button 
-              className={`bottom-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => setActiveTab('settings')}
-            >
-              <SettingsIcon />
-              <span>Opções</span>
+            <button className={`bottom-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+              <SettingsIcon /> <span>Opções</span>
             </button>
           </nav>
         </>

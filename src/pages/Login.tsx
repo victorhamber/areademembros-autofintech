@@ -2,17 +2,38 @@ import React, { useState } from 'react';
 import './Login.css';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (userId: string) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
-      onLogin(); // Mock login logic
+    if (!email || !password) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        onLogin(data.id);
+      } else {
+        alert(data.error || 'Erro ao realizar login');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro de conexão com o servidor. Tente novamente mais tarde.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -20,11 +41,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     <div className="login-container">
       <div className="login-box">
         <h1 className="login-logo">Ebooks<span>Pro</span></h1>
-        <p className="login-subtitle">Faça login para acessar sua biblioteca de conteúdo premium</p>
+        <p className="login-subtitle">Faça login com seu E-mail da compra (A primeira senha que você digitar será registrada)</p>
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="input-group">
-            <label>E-mail</label>
+            <label>E-mail (usado na Hotmart)</label>
             <input 
               type="email" 
               placeholder="seu@email.com" 
@@ -44,8 +65,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             />
           </div>
           
-          <button type="submit" className="login-submit-btn">
-            Entrar na Plataforma
+          <button type="submit" className="login-submit-btn" disabled={loading}>
+            {loading ? 'Autenticando...' : 'Entrar na Plataforma'}
           </button>
         </form>
         

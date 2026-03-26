@@ -53,8 +53,63 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// HOTMART WEBHOOK ROUTE
+// USER AUTHENTICATION & ACCESS ROUTES
 // ==========================================
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    let user = await prisma.user.findUnique({ where: { email } });
+    
+    // First-Time Login Logic: If user exists from Hotmart but has no password yet
+    if (user && !user.password) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { password } // In a real app, hash this with bcrypt!
+      });
+      return res.json({ id: user.id, email: user.email, name: user.name });
+    }
+    
+    // Validate Existing User
+    if (user && user.password === password) {
+      return res.json({ id: user.id, email: user.email, name: user.name });
+    }
+    
+    // For development/MVP: if user doesn't exist, block them (they must buy via Hotmart first)
+    // To test locally without webhook, uncomment the next line to auto-create users:
+    // user = await prisma.user.create({ data: { email, password } }); return res.json(user);
+
+    return res.status(401).json({ error: 'E-mail ou senha incorretos. Acesso negado.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+});
+
+app.get('/api/ebooks/my', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const purchases = await prisma.purchase.findMany({
+      where: { userId },
+      include: { ebook: true }
+    });
+
+    const myBooks = purchases.map(p => p.ebook);
+    res.json(myBooks);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch your library' });
+  }
+});
+
+app.get('/api/ebooks', async (req, res) => {
+  try {
+    const ebooks = await prisma.ebook.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json(ebooks);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch catalog' });
+  }
+});
+
 app.post('/api/webhooks/hotmart', async (req, res) => {
   try {
     const hottok = req.headers['x-hotmart-hottok'] || req.query.hottok;
