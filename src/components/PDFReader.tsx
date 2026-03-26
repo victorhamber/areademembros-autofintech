@@ -1,26 +1,47 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Highlighter, Trash2, X } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import './PDFReader.css';
 
-// Set up worker globally
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+interface HighlightData {
+  id: string;
+  pageNumber: number;
+  text: string;
+  color: string;
+}
 
 interface PDFReaderProps {
   url: string;
   title: string;
   initialPage?: number;
+  ebookId: string;
+  userId: string;
   onClose: (lastPage?: number) => void;
 }
 
-export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 1, onClose }) => {
+const HIGHLIGHT_COLORS = [
+  { name: 'Amarelo', value: 'yellow', bg: 'rgba(255, 235, 59, 0.4)' },
+  { name: 'Verde', value: 'green', bg: 'rgba(102, 187, 106, 0.4)' },
+  { name: 'Azul', value: 'blue', bg: 'rgba(66, 165, 245, 0.4)' },
+  { name: 'Rosa', value: 'pink', bg: 'rgba(240, 98, 146, 0.4)' },
+];
+
+export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 1, ebookId, userId, onClose }) => {
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(window.innerWidth - 32);
+
+  // Highlight state
+  const [highlights, setHighlights] = useState<HighlightData[]>([]);
+  const [selectedText, setSelectedText] = useState('');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showHighlightPanel, setShowHighlightPanel] = useState(false);
 
   useEffect(() => {
     const observer = new ResizeObserver(entries => {
@@ -30,9 +51,98 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
     return () => observer.disconnect();
   }, []);
 
+  // Fetch highlights from DB
+  useEffect(() => {
+    fetch(`/api/highlights/${ebookId}`, { headers: { 'x-user-id': userId } })
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setHighlights(data); })
+      .catch(console.error);
+  }, [ebookId, userId]);
+
+  // Apply highlights on the text layer after page renders
+  const applyHighlightsToTextLayer = useCallback(() => {
+    const pageHighlights = highlights.filter(h => h.pageNumber === pageNumber);
+    if (pageHighlights.length === 0) return;
+
+    // Get all text spans in the text layer
+    const textLayer = document.querySelector('.react-pdf__Page__textContent');
+    if (!textLayer) return;
+
+    const spans = textLayer.querySelectorAll('span');
+    
+    spans.forEach(span => {
+      const spanText = span.textContent || '';
+      pageHighlights.forEach(h => {
+        if (spanText.includes(h.text) || h.text.includes(spanText)) {
+          const color = HIGHLIGHT_COLORS.find(c => c.value === h.color);
+          span.style.backgroundColor = color?.bg || 'rgba(255, 235, 59, 0.4)';
+          span.style.borderRadius = '2px';
+        }
+      });
+    });
+  }, [highlights, pageNumber]);
+
+  // Re-apply highlights when page changes or highlights update
+  useEffect(() => {
+    const timer = setTimeout(applyHighlightsToTextLayer, 300);
+    return () => clearTimeout(timer);
+  }, [applyHighlightsToTextLayer]);
+
+  // Listen for text selection
+  useEffect(() => {
+    const handleSelection = () => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      if (text && text.length > 0) {
+        setSelectedText(text);
+        setShowColorPicker(true);
+      } else {
+        setSelectedText('');
+        setShowColorPicker(false);
+      }
+    };
+
+    document.addEventListener('mouseup', handleSelection);
+    document.addEventListener('touchend', handleSelection);
+    return () => {
+      document.removeEventListener('mouseup', handleSelection);
+      document.removeEventListener('touchend', handleSelection);
+    };
+  }, []);
+
+  const saveHighlight = async (color: string) => {
+    if (!selectedText) return;
+    try {
+      const res = await fetch('/api/highlights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        body: JSON.stringify({ ebookId, pageNumber, text: selectedText, color })
+      });
+      const newHighlight = await res.json();
+      setHighlights(prev => [...prev, newHighlight]);
+      setShowColorPicker(false);
+      setSelectedText('');
+      window.getSelection()?.removeAllRanges();
+      // Re-apply after a short delay
+      setTimeout(applyHighlightsToTextLayer, 200);
+    } catch (err) { console.error(err); }
+  };
+
+  const deleteHighlight = async (id: string) => {
+    try {
+      await fetch(`/api/highlights/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-user-id': userId }
+      });
+      setHighlights(prev => prev.filter(h => h.id !== id));
+    } catch (err) { console.error(err); }
+  };
+
   function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
     setNumPages(numPages);
   }
+
+  const pageHighlightsCount = highlights.filter(h => h.pageNumber === pageNumber).length;
 
   return (
     <div className="pdf-reader-container">
@@ -41,8 +151,67 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
           <ArrowLeft size={24} />
         </button>
         <h2 className="pdf-title">{title}</h2>
-        <div style={{ width: 24 }}></div> {/* spacer */}
+        <button 
+          className="back-btn" 
+          onClick={() => setShowHighlightPanel(!showHighlightPanel)}
+          style={{ position: 'relative' }}
+        >
+          <Highlighter size={20} />
+          {highlights.length > 0 && (
+            <span className="highlight-badge">{highlights.length}</span>
+          )}
+        </button>
       </header>
+
+      {/* Color Picker Toolbar */}
+      {showColorPicker && selectedText && (
+        <div className="highlight-toolbar">
+          <span className="highlight-toolbar-label">Destacar:</span>
+          {HIGHLIGHT_COLORS.map(c => (
+            <button 
+              key={c.value} 
+              className="color-btn" 
+              style={{ backgroundColor: c.bg }}
+              onClick={() => saveHighlight(c.value)}
+              title={c.name}
+            />
+          ))}
+          <button className="color-btn cancel-btn" onClick={() => { setShowColorPicker(false); window.getSelection()?.removeAllRanges(); }}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Highlights Panel */}
+      {showHighlightPanel && (
+        <div className="highlights-panel">
+          <div className="highlights-panel-header">
+            <h3>Destaques ({highlights.length})</h3>
+            <button onClick={() => setShowHighlightPanel(false)}><X size={18} /></button>
+          </div>
+          {highlights.length === 0 ? (
+            <p className="highlights-empty">Selecione um texto no livro para destacar.</p>
+          ) : (
+            <div className="highlights-list">
+              {highlights.map(h => {
+                const color = HIGHLIGHT_COLORS.find(c => c.value === h.color);
+                return (
+                  <div key={h.id} className="highlight-item">
+                    <div className="highlight-color-bar" style={{ backgroundColor: color?.bg || '#ffeb3b' }} />
+                    <div className="highlight-item-content">
+                      <p className="highlight-text">"{h.text}"</p>
+                      <span className="highlight-meta">Pág. {h.pageNumber}</span>
+                    </div>
+                    <button className="highlight-delete" onClick={() => deleteHighlight(h.id)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="pdf-content" ref={containerRef}>
         <TransformWrapper
@@ -61,8 +230,9 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
               <Page 
                 pageNumber={pageNumber} 
                 width={Math.min(containerWidth, 800)} 
-                renderTextLayer={false} 
-                renderAnnotationLayer={false} 
+                renderTextLayer={true}
+                renderAnnotationLayer={false}
+                onRenderSuccess={applyHighlightsToTextLayer}
               />
             </Document>
           </TransformComponent>
@@ -79,6 +249,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
         </button>
         <span className="page-indicator">
           {pageNumber} / {numPages || '--'}
+          {pageHighlightsCount > 0 && <span className="page-highlights-count"> • {pageHighlightsCount} destaque(s)</span>}
         </span>
         <button 
           disabled={pageNumber >= (numPages || 1)} 

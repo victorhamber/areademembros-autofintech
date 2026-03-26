@@ -122,6 +122,8 @@ function App() {
           url={readerData.url} 
           title={readerData.title} 
           initialPage={readerData.initialPage}
+          ebookId={readerData.ebookId}
+          userId={userId || ''}
           onClose={handleCloseReader}
         />
       ) : (

@@ -156,6 +156,41 @@ app.post('/api/reading-progress', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
+// HIGHLIGHTS
+app.get('/api/highlights/:ebookId', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { ebookId } = req.params;
+    const highlights = await prisma.highlight.findMany({
+      where: { userId, ebookId },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.json(highlights);
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.post('/api/highlights', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const { ebookId, pageNumber, text, color } = req.body;
+    const highlight = await prisma.highlight.create({
+      data: { userId, ebookId, pageNumber, text, color: color || 'yellow' }
+    });
+    res.json(highlight);
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.delete('/api/highlights/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    await prisma.highlight.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
+});
+
 // WISHLIST (synced across devices)
 app.get('/api/wishlist', async (req, res) => {
   try {

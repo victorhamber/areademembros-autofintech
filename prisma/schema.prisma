@@ -62,3 +62,13 @@ model Wishlist {
 
   @@unique([userId, ebookId])
 }
+
+model Highlight {
+  id          String   @id @default(uuid())
+  userId      String
+  ebookId     String
+  pageNumber  Int
+  text        String
+  color       String   @default("yellow")
+  createdAt   DateTime @default(now())
+}
