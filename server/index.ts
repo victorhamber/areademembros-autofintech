@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 
@@ -83,16 +84,18 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
 });
 
 // ==========================================
-// SERVE STATIC PWA IN PRODUCTION
+// SERVE STATIC PWA
 // ==========================================
-if (process.env.NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
-  const distPath = path.join(__dirname, '../dist');
+const distPath = path.join(__dirname, '../dist');
+if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
   
   // Client side routing fallback
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
+} else {
+  console.warn(`[WARN] Static directory not found at ${distPath}. Build the frontend first.`);
 }
 
 // ==========================================
