@@ -1,32 +1,22 @@
-# Stage 1: Build the React Application
-FROM node:22-alpine AS build
+FROM node:22-alpine
 
 WORKDIR /app
 
-# Install dependencies first for Docker caching
+# Install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy all the source code
+# Copy application source
 COPY . .
 
-# Build the Vite application
+# Generate Prisma Database Client
+RUN npx prisma generate
+
+# Build the React Frontend into /dist
 RUN npm run build
 
-# Stage 2: Serve the Built Application with NGINX
-FROM nginx:alpine
+# Expose Express server port
+EXPOSE 3000
 
-# Remove default nginx static assets
-RUN rm -rf /usr/share/nginx/html/*
-
-# Copy built assets from builder stage
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Replace default NGINX configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port (Easypanel dynamically maps this)
-EXPOSE 80
-
-# Start NGINX
-CMD ["nginx", "-g", "daemon off;"]
+# Start the Node Express Server
+CMD ["npm", "run", "server"]

@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Home as HomeIcon, Library as LibraryIcon, Settings as SettingsIcon } from 'lucide-react'
 import { Home } from './pages/Home'
 import { Library } from './pages/Library'
 import { Login } from './pages/Login'
+import { Admin } from './pages/Admin'
 import { PDFReader } from './components/PDFReader'
 import { mockBooks as initialBooks } from './data/mockBooks'
 import './App.css'
 
 function App() {
+  if (window.location.pathname === '/admin') {
+    return <Admin />
+  }
+
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
   const [readerData, setReaderData] = useState<{url: string, title: string} | null>(null)

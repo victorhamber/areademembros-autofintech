@@ -1,0 +1,114 @@
+.admin-login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+}
+.admin-login-box {
+  background: var(--bg-secondary);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  width: 100%;
+  max-width: 400px;
+  border: 1px solid var(--border-subtle);
+}
+.admin-login-box input, .admin-form input {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-main);
+  border: 1px solid var(--text-secondary);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+.admin-login-box input:focus, .admin-form input:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+}
+.admin-login-box button, .admin-form button {
+  background: var(--accent-primary);
+  color: #000;
+  font-weight: bold;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.admin-login-box button:hover, .admin-form button:hover {
+  opacity: 0.9;
+}
+
+.admin-dashboard {
+  padding: var(--spacing-xl);
+  min-height: 100vh;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+}
+.admin-header h1 {
+  font-size: 24px;
+}
+.admin-header {
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.admin-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xl);
+}
+.admin-form {
+  flex: 1;
+  min-width: 300px;
+  background: var(--bg-secondary);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--border-subtle);
+  height: max-content;
+}
+.admin-form h3 {
+  margin-bottom: 8px;
+}
+.admin-table-container {
+  flex: 2;
+  min-width: 400px;
+  background: var(--bg-secondary);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--spacing-md);
+}
+.admin-table th, .admin-table td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.admin-table th {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 14px;
+}
+.admin-table img {
+  border-radius: 4px;
+  object-fit: cover;
+  height: 60px;
+  width: 40px;
+}
+.admin-table code {
+  background: rgba(255,255,255,0.1);
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
