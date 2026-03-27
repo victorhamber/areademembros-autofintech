@@ -458,15 +458,25 @@ export const Admin: React.FC = () => {
             {/* File type selector - stacked vertically to avoid overlap */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div>
-                <label>Arquivo PDF {editingId && !pdfFile && pdfUrl ? ' - Atual' : ''}</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label>Arquivo PDF {editingId && !pdfFile && pdfUrl ? ' - Atual' : ''}</label>
+                  {pdfUrl && !pdfFile && (
+                    <button type="button" onClick={() => setPdfUrl('')} style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remover Arquivo</button>
+                  )}
+                </div>
                 <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target?.files?.[0] || null)} />
               </div>
               <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  Arquivo HTML
-                  <span style={{ fontSize: '11px', background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>NOVO</span>
-                  {editingId && !htmlFile && htmlUrl ? ' - Atual' : ''}
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    Arquivo HTML
+                    <span style={{ fontSize: '11px', background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>NOVO</span>
+                    {editingId && !htmlFile && htmlUrl ? ' - Atual' : ''}
+                  </label>
+                  {htmlUrl && !htmlFile && (
+                    <button type="button" onClick={() => setHtmlUrl('')} style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remover Arquivo</button>
+                  )}
+                </div>
                 <input type="file" accept=".html,text/html" onChange={e => setHtmlFile(e.target?.files?.[0] || null)} />
               </div>
             </div>
