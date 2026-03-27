@@ -10,7 +10,8 @@ interface BookCardProps {
   coverUrl: string;
   hasAccess?: boolean;
   isWishlisted?: boolean;
-  onClick: (id: string, hasAccess: boolean) => void;
+  salesUrl?: string;
+  onClick: (e: React.MouseEvent, id: string, hasAccess: boolean) => void;
   onToggleWishlist?: (id: string) => void;
 }
 
@@ -22,11 +23,14 @@ export const BookCard: React.FC<BookCardProps> = ({
   coverUrl, 
   hasAccess = false, 
   isWishlisted = false,
+  salesUrl,
   onClick,
   onToggleWishlist
 }) => {
-  return (
-    <div className="book-card fade-in" onClick={() => onClick(id, hasAccess)}>
+  const isHotmart = !hasAccess && salesUrl && salesUrl.includes('pay.hotmart.com') && salesUrl.includes('checkoutMode=');
+
+  const content = (
+    <>
       <div className="cover-container">
         <img 
           src={coverUrl} 
@@ -51,6 +55,7 @@ export const BookCard: React.FC<BookCardProps> = ({
           className="wishlist-btn"
           onClick={(e) => {
             e.stopPropagation();
+            e.preventDefault();
             if (onToggleWishlist) onToggleWishlist(id);
           }}
           aria-label={isWishlisted ? "Remover dos favoritos" : "Adicionar aos favoritos"}
@@ -71,6 +76,20 @@ export const BookCard: React.FC<BookCardProps> = ({
           <p className="book-author">{author}</p>
         )}
       </div>
+    </>
+  );
+
+  if (isHotmart) {
+    return (
+      <a href={salesUrl} className="book-card fade-in hotmart-fb" onClick={(e) => onClick(e, id, hasAccess)} style={{ textDecoration: 'none' }}>
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div className="book-card fade-in" onClick={(e) => onClick(e, id, hasAccess)}>
+      {content}
     </div>
   );
 };

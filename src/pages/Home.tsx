@@ -24,21 +24,12 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
       onRead(book.title, book.coverUrl);
     } else {
       if (book.salesUrl) {
-        // If it's a Hotmart Widget Checkout URL, trigger the popup
+        // Native anchor tag <a className="hotmart-fb"> already handles Hotmart widget opening natively.
         if (book.salesUrl.includes('pay.hotmart.com') && book.salesUrl.includes('checkoutMode=')) {
-          const a = document.createElement('a');
-          a.href = book.salesUrl;
-          a.className = 'hotmart-fb';
-          a.style.display = 'none';
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(() => {
-            if (document.body.contains(a)) document.body.removeChild(a);
-          }, 1000);
-        } else {
-          // Standard external sales page
-          window.open(book.salesUrl, '_blank');
+          return;
         }
+        // Standard external sales page
+        window.open(book.salesUrl, '_blank');
       } else {
         alert('Este livro ainda não possui uma página de vendas cadastrada.');
       }
@@ -143,21 +134,40 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     );
   }
 
+  const isHeroHotmart = heroBook && !heroBook.hasAccess && heroBook.salesUrl?.includes('pay.hotmart.com') && heroBook.salesUrl?.includes('checkoutMode=');
+
+  const heroContent = (
+    <>
+      <div className="hero-content">
+        <h1 className="hero-greeting">{getGreeting()}</h1>
+        <p className="hero-subtitle">
+          {heroBook ? `Destaque: ${heroBook.title}` : 'Sua próxima grande leitura te espera.'}
+        </p>
+      </div>
+      <div className="hero-overlay"></div>
+    </>
+  );
+
   return (
     <div style={{ paddingBottom: 'var(--spacing-lg)' }}>
-      <div 
-        className="hero-banner" 
-        onClick={() => heroBook && handleBookClick(heroBook.id, heroBook.hasAccess)}
-        style={{ cursor: heroBook ? 'pointer' : 'default', ...(heroBook ? { backgroundImage: `url(${heroBook.coverUrl})` } : {}) }}
-      >
-        <div className="hero-content">
-          <h1 className="hero-greeting">{getGreeting()}</h1>
-          <p className="hero-subtitle">
-            {heroBook ? `Destaque: ${heroBook.title}` : 'Sua próxima grande leitura te espera.'}
-          </p>
+      {isHeroHotmart && heroBook ? (
+        <a 
+          href={heroBook.salesUrl}
+          className="hero-banner hotmart-fb" 
+          onClick={() => handleBookClick(heroBook.id, heroBook.hasAccess)}
+          style={{ cursor: 'pointer', backgroundImage: `url(${heroBook.coverUrl})`, display: 'flex', textDecoration: 'none' }}
+        >
+          {heroContent}
+        </a>
+      ) : (
+        <div 
+          className="hero-banner" 
+          onClick={() => heroBook && handleBookClick(heroBook.id, heroBook.hasAccess)}
+          style={{ cursor: heroBook ? 'pointer' : 'default', ...(heroBook ? { backgroundImage: `url(${heroBook.coverUrl})` } : {}) }}
+        >
+          {heroContent}
         </div>
-        <div className="hero-overlay"></div>
-      </div>
+      )}
 
       {/* SEARCH BAR */}
       <div className="search-container">

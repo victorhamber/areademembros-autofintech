@@ -39,8 +39,11 @@ export const BookRow: React.FC<BookRowProps> = ({ title, books, onBookClick, onT
     scrollRef.current.scrollLeft = scrollLeft - walk;
   };
 
-  const handleClick = (id: string, hasAccess: boolean) => {
-    if (isMoved) return; // Prevent triggering if it was a drag
+  const handleClick = (e: React.MouseEvent, id: string, hasAccess: boolean) => {
+    if (isMoved) {
+      e.preventDefault(); // Prevent native anchor navigation if dragging
+      return; 
+    }
     onBookClick(id, hasAccess);
   };
 
@@ -70,6 +73,7 @@ export const BookRow: React.FC<BookRowProps> = ({ title, books, onBookClick, onT
             coverUrl={book.coverUrl}
             hasAccess={book.hasAccess}
             isWishlisted={book.isWishlisted}
+            salesUrl={book.salesUrl}
             onClick={handleClick}
             onToggleWishlist={handleWishlist}
           />
