@@ -217,6 +217,9 @@ export const Admin: React.FC = () => {
 
       if (res.ok) {
         alert('Salvo com sucesso!'); fetchEbooks(masterPassword); clearForm();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(`Falha ao salvar. Verifique se o Código da Oferta já não está em uso por outro livro.\nDetalhes: ${data.error || 'Erro interno.'}`);
       }
     } catch (err) { alert('Erro de envio.'); } finally { setIsSubmitting(false); }
   };
