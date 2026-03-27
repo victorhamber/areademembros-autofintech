@@ -29,7 +29,8 @@ model Ebook {
   author        String?
   description   String?
   coverUrl      String
-  pdfUrl        String            
+  pdfUrl        String?           
+  htmlUrl       String?           
   salesUrl      String            
   hotmartOffer  String    @unique 
   categoryId    String?

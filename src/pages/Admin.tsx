@@ -19,8 +19,10 @@ export const Admin: React.FC = () => {
   const [description, setDescription] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [htmlFile, setHtmlFile] = useState<File | null>(null);
   const [coverUrl, setCoverUrl] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
+  const [htmlUrl, setHtmlUrl] = useState('');
   const [salesUrl, setSalesUrl] = useState('');
   const [hotmartOffer, setHotmartOffer] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -177,16 +179,16 @@ export const Admin: React.FC = () => {
   };
 
   const clearForm = () => {
-    setEditingId(null); setTitle(''); setAuthor(''); setDescription(''); setCoverFile(null); setPdfFile(null);
-    setCoverUrl(''); setPdfUrl(''); setSalesUrl(''); setHotmartOffer('');
+    setEditingId(null); setTitle(''); setAuthor(''); setDescription(''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
+    setCoverUrl(''); setPdfUrl(''); setHtmlUrl(''); setSalesUrl(''); setHotmartOffer('');
     setCategoryId(''); setFeaturedList('');
   };
 
   const handleEdit = (eb: any) => {
     setEditingId(eb.id); setTitle(eb.title); setAuthor(eb.author || ''); setDescription(eb.description || '');
-    setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl); setSalesUrl(eb.salesUrl);
+    setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl || ''); setHtmlUrl(eb.htmlUrl || ''); setSalesUrl(eb.salesUrl);
     setHotmartOffer(eb.hotmartOffer); setCategoryId(eb.categoryId || '');
-    setFeaturedList(eb.featuredList || ''); setCoverFile(null); setPdfFile(null);
+    setFeaturedList(eb.featuredList || ''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -200,15 +202,19 @@ export const Admin: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      let finalCoverUrl = coverUrl; let finalPdfUrl = pdfUrl;
+      let finalCoverUrl = coverUrl; let finalPdfUrl = pdfUrl; let finalHtmlUrl = htmlUrl;
       if (coverFile) finalCoverUrl = await uploadFile(coverFile);
       if (pdfFile) finalPdfUrl = await uploadFile(pdfFile);
+      if (htmlFile) finalHtmlUrl = await uploadFile(htmlFile);
 
-      if (!finalCoverUrl || !finalPdfUrl) {
-        alert('Capa e PDF são obrigatórios!'); setIsSubmitting(false); return;
+      if (!finalCoverUrl) {
+        alert('A capa é obrigatória!'); setIsSubmitting(false); return;
+      }
+      if (!finalPdfUrl && !finalHtmlUrl) {
+        alert('É obrigatório enviar pelo menos um arquivo: PDF ou HTML!'); setIsSubmitting(false); return;
       }
 
-      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl, salesUrl, hotmartOffer, categoryId, featuredList };
+      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, salesUrl, hotmartOffer, categoryId, featuredList };
       const res = await fetch(editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks', {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
@@ -448,8 +454,25 @@ export const Admin: React.FC = () => {
 
             <label>Capa do Ebook {editingId && !coverFile && coverUrl ? ' - Atual' : '*'}</label>
             <input type="file" accept="image/*" onChange={e => setCoverFile(e.target?.files?.[0] || null)} required={!editingId && !coverUrl} />
-            <label>Arquivo PDF {editingId && !pdfFile && pdfUrl ? ' - Atual' : '*'}</label>
-            <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target?.files?.[0] || null)} required={!editingId && !pdfUrl} />
+            
+            {/* File type selector row */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '180px' }}>
+                <label>Arquivo PDF {editingId && !pdfFile && pdfUrl ? ' - Atual' : ''}</label>
+                <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target?.files?.[0] || null)} />
+              </div>
+              <div style={{ flex: 1, minWidth: '180px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  Arquivo HTML
+                  <span style={{ fontSize: '11px', background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>NOVO</span>
+                  {editingId && !htmlFile && htmlUrl ? ' - Atual' : ''}
+                </label>
+                <input type="file" accept=".html,text/html" onChange={e => setHtmlFile(e.target?.files?.[0] || null)} />
+              </div>
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
+              ⚡ Envie pelo menos um arquivo (PDF ou HTML). Se enviar os dois, o leitor HTML terá prioridade.
+            </p>
             <label>Página de Vendas ou Código HTML (Hotmart) *</label>
             <textarea 
               placeholder="https://... ou cole aqui o script do Checkout Widget da Hotmart" 
@@ -493,6 +516,7 @@ export const Admin: React.FC = () => {
                   <tr>
                     <th>Capa</th>
                     <th>Título</th>
+                    <th>Tipo</th>
                     <th>Categoria</th>
                     <th>Destaque</th>
                     <th>Oferta</th>
@@ -504,6 +528,11 @@ export const Admin: React.FC = () => {
                     <tr key={eb.id}>
                       <td><img src={eb.coverUrl} alt={eb.title} /></td>
                       <td>{eb.title}</td>
+                      <td>
+                        {eb.htmlUrl && <span style={{ background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>HTML</span>}
+                        {eb.pdfUrl && <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>PDF</span>}
+                        {!eb.htmlUrl && !eb.pdfUrl && <span style={{ color: '#ef4444', fontSize: '12px' }}>⚠ Sem arquivo</span>}
+                      </td>
                       <td>{eb.category?.name || '-'}</td>
                       <td><span className="badge-highlight">{eb.featuredList || '-'}</span></td>
                       <td><code>{eb.hotmartOffer}</code></td>

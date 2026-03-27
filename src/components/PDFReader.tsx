@@ -3,6 +3,8 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import { ArrowLeft, ChevronLeft, ChevronRight, Highlighter, Trash2, X } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import Mark from 'mark.js';
+import { t } from '../i18n/translations';
+import type { Lang } from '../i18n/translations';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import './PDFReader.css';
@@ -22,6 +24,7 @@ interface PDFReaderProps {
   initialPage?: number;
   ebookId: string;
   userId: string;
+  lang: Lang;
   onClose: (lastPage?: number) => void;
 }
 
@@ -32,7 +35,8 @@ const HIGHLIGHT_COLORS = [
   { name: 'Rosa', value: 'pink', bg: 'rgba(240, 98, 146, 0.4)' },
 ];
 
-export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 1, ebookId, userId, onClose }) => {
+export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 1, ebookId, userId, lang, onClose }) => {
+  const tr = t(lang);
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -193,7 +197,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
       {/* Color Picker Toolbar */}
       {showColorPicker && !activeHighlightColor && (
         <div className="highlight-toolbar">
-          <span className="highlight-toolbar-label">Escolher cor:</span>
+          <span className="highlight-toolbar-label">{tr.pdf_choose_color}</span>
           {HIGHLIGHT_COLORS.map(c => (
             <button 
               key={c.value} 
@@ -213,8 +217,8 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
       {activeHighlightColor && (
         <div className="highlight-lock-banner">
           <span className="highlight-lock-dot" style={{ backgroundColor: HIGHLIGHT_COLORS.find(c => c.value === activeHighlightColor)?.bg }}></span>
-          Modo Marca-texto ativado: Selecione o texto na tela
-          <button className="highlight-lock-cancel" onClick={() => setActiveHighlightColor(null)}>Cancelar</button>
+          {tr.pdf_highlight_mode}
+          <button className="highlight-lock-cancel" onClick={() => setActiveHighlightColor(null)}>{tr.pdf_highlight_cancel}</button>
         </div>
       )}
 
@@ -222,11 +226,11 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
       {showHighlightPanel && (
         <div className="highlights-panel">
           <div className="highlights-panel-header">
-            <h3>Destaques ({highlights.length})</h3>
+            <h3>{tr.pdf_highlights_title} ({highlights.length})</h3>
             <button onClick={() => setShowHighlightPanel(false)}><X size={18} /></button>
           </div>
           {highlights.length === 0 ? (
-            <p className="highlights-empty">Selecione um texto no livro para destacar.</p>
+            <p className="highlights-empty">{tr.pdf_highlights_empty}</p>
           ) : (
             <div className="highlights-list">
               {highlights.map(h => {
@@ -236,7 +240,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
                     <div className="highlight-color-bar" style={{ backgroundColor: color?.bg || '#ffeb3b' }} />
                     <div className="highlight-item-content">
                       <p className="highlight-text">"{h.text}"</p>
-                      <span className="highlight-meta">Pág. {h.pageNumber}</span>
+                      <span className="highlight-meta">{tr.pdf_highlight_page} {h.pageNumber}</span>
                     </div>
                     <button className="highlight-delete" onClick={() => deleteHighlight(h.id)}>
                       <Trash2 size={14} />
@@ -270,11 +274,11 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
               }}
               loading={
                 <div className="pdf-loading-container">
-                  <span className="pdf-progress-text">Baixando livro da nuvem...</span>
+                  <span className="pdf-progress-text">{tr.pdf_loading}</span>
                   <div className="pdf-progress-track">
                     <div className="pdf-progress-fill" style={{ width: `${loadProgress}%` }}></div>
                   </div>
-                  <span style={{ fontSize: '13px' }}>{loadProgress}% concluído</span>
+                  <span style={{ fontSize: '13px' }}>{loadProgress}% {tr.pdf_complete}</span>
                 </div>
               }
             >
@@ -300,7 +304,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
         </button>
         <span className="page-indicator">
           {pageNumber} / {numPages || '--'}
-          {pageHighlightsCount > 0 && <span className="page-highlights-count"> • {pageHighlightsCount} destaque(s)</span>}
+          {pageHighlightsCount > 0 && <span className="page-highlights-count"> • {pageHighlightsCount} {tr.pdf_page_highlights}</span>}
         </span>
         <button 
           disabled={pageNumber >= (numPages || 1)} 

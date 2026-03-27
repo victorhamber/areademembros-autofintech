@@ -1,41 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
+import { t } from '../i18n/translations';
+import type { Lang } from '../i18n/translations';
 import './InstallPrompt.css';
 
-export const InstallPrompt: React.FC = () => {
+interface InstallPromptProps {
+  lang: Lang;
+}
+
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+
+export const InstallPrompt: React.FC<InstallPromptProps> = ({ lang }) => {
+  const tr = t(lang);
+
+  // deferredPrompt: set when Chrome/Edge fires beforeinstallprompt (app not yet installed)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+
+  // dismissed: user clicked "Agora não" — hide for this session only (no localStorage)
+  const [dismissed, setDismissed] = useState(false);
+
+  // iosReady: show iOS banner after short delay (only if iOS and not standalone)
+  const [iosReady, setIosReady] = useState(false);
+
   const [showInstructions, setShowInstructions] = useState(false);
 
   useEffect(() => {
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
-      setIsInstalled(true);
-      return;
+    // Already running as installed PWA → never show
+    if (isStandalone) return;
+
+    if (isIOS) {
+      // On iOS there's no beforeinstallprompt; show our manual instructions after a delay
+      const timer = setTimeout(() => setIosReady(true), 2500);
+      return () => clearTimeout(timer);
     }
 
-    // Delay visibility slightly to not be too aggressive immediately
-    const timer = setTimeout(() => setIsVisible(true), 2000);
-
+    // Chrome / Edge / Android: only show when the browser tells us it's installable
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setIsInstalled(false);
     };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     const handleAppInstalled = () => {
       setDeferredPrompt(null);
-      setIsInstalled(true);
-      setIsVisible(false);
     };
-
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
-      clearTimeout(timer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
@@ -46,18 +58,18 @@ export const InstallPrompt: React.FC = () => {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
-        setIsVisible(false);
+        setDeferredPrompt(null);
       }
-      setDeferredPrompt(null);
     } else {
-      // Browser is in cooldown or it's iOS Safari
+      // iOS: show manual instructions modal
       setShowInstructions(true);
     }
   };
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  // Determine whether to show the banner at all
+  const shouldShow = !dismissed && !isStandalone && (deferredPrompt !== null || (isIOS && iosReady));
 
-  if (isInstalled || !isVisible) return null;
+  if (!shouldShow) return null;
 
   return (
     <>
@@ -67,39 +79,44 @@ export const InstallPrompt: React.FC = () => {
             <Download size={20} />
           </div>
           <div className="install-text">
-            <strong>Instale o Aplicativo</strong>
-            <p>Acesse offline e mais rápido</p>
+            <strong>{tr.install_title}</strong>
+            <p>{tr.install_subtitle}</p>
           </div>
         </div>
-        <button className="btn-install" onClick={handleInstallClick}>INSTALAR</button>
+        <div className="install-actions">
+          <button className="btn-install" onClick={handleInstallClick}>{tr.install_btn}</button>
+          <button className="btn-dismiss" onClick={() => setDismissed(true)}>
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       {showInstructions && (
         <div className="install-modal-overlay fade-in" onClick={() => setShowInstructions(false)}>
           <div className="install-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Como Instalar o Aplicativo</h3>
+              <h3>{tr.install_modal_title}</h3>
               <button className="btn-close" onClick={() => setShowInstructions(false)}><X size={20} /></button>
             </div>
             <div className="modal-body">
               {isIOS ? (
                 <>
-                  <p>Para instalar no seu iPhone/iPad:</p>
+                  <p>{tr.install_ios_intro}</p>
                   <ol>
-                    <li>Toque no ícone de <strong>Compartilhar</strong> (quadrado com seta pra cima) na barra inferior do Safari.</li>
-                    <li>Role para baixo e toque em <strong>Adicionar à Tela de Início</strong> (Add to Home Screen).</li>
+                    <li>{tr.install_ios_step1}<strong>{tr.install_ios_step1_strong}</strong>{tr.install_ios_step1_suffix}</li>
+                    <li>{tr.install_ios_step2}<strong>{tr.install_ios_step2_strong}</strong>{tr.install_ios_step2_suffix}</li>
                   </ol>
                 </>
               ) : (
                 <>
-                  <p>Parece que o seu navegador não exibiu a janela automática de instalação.</p>
+                  <p>{tr.install_android_intro}</p>
                   <ol>
-                    <li>Abra o menu do seu navegador (os <strong>três pontinhos verticais</strong> no canto superior).</li>
-                    <li>Toque em <strong>Instalar Aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</li>
+                    <li>{tr.install_android_step1}<strong>{tr.install_android_step1_strong}</strong>{tr.install_android_step1_suffix}</li>
+                    <li>{tr.install_android_step2}<strong>{tr.install_android_step2_strong}</strong>{tr.install_android_step2_or}<strong>{tr.install_android_step2_strong2}</strong>{tr.install_android_step2_suffix}</li>
                   </ol>
                 </>
               )}
-              <button className="btn-primary" style={{ width: '100%', marginTop: '15px' }} onClick={() => setShowInstructions(false)}>Entendi</button>
+              <button className="btn-primary" style={{ width: '100%', marginTop: '15px' }} onClick={() => setShowInstructions(false)}>{tr.install_understood}</button>
             </div>
           </div>
         </div>

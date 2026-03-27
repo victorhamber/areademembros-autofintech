@@ -1,0 +1,221 @@
+export type Lang = 'pt' | 'es';
+
+const translations = {
+  pt: {
+    // ── Login ──
+    login_subtitle: 'Faça login com seu E-mail da compra',
+    login_email_label: 'E-mail',
+    login_email_placeholder: 'seu@email.com',
+    login_password_label: 'Senha',
+    login_btn: 'Entrar na Plataforma',
+    login_loading: 'Autenticando...',
+    login_footer: 'Ainda não tem acesso?',
+    login_footer_link: 'Ver vitrine de Ebooks',
+    login_error_fields: 'Preencha e-mail e senha.',
+    login_error_connection: 'Erro de conexão com o servidor. Tente novamente mais tarde.',
+
+    // ── Greeting ──
+    greeting_morning: 'Bom dia',
+    greeting_afternoon: 'Boa tarde',
+    greeting_evening: 'Boa noite',
+
+    // ── Home ──
+    hero_subtitle_default: 'Sua próxima grande leitura te espera.',
+    hero_subtitle_book: 'Destaque',
+    search_placeholder: 'Buscar por título ou autor...',
+    no_results: 'Nenhum livro encontrado para',
+    search_results_title: 'Resultados para',
+    no_sales_url: 'Este livro ainda não possui uma página de vendas cadastrada.',
+    section_my_books: 'Meus Livros',
+    section_new_releases: 'Lançamentos',
+    section_most_read: 'Mais Lidos',
+    section_wishlist: 'Lista de Desejos',
+    category_all: 'Tudo',
+
+    // ── Library ──
+    library_title: 'Sua Biblioteca',
+    library_empty_title: 'Sua biblioteca está vazia',
+    library_empty_desc: 'Os livros que você comprar vão aparecer aqui, prontos para leitura instantânea.',
+    continue_reading: 'Continuar Leitura',
+    all_books: 'Todos os Livros',
+    page_label: 'Página',
+
+    // ── Bottom nav ──
+    nav_home: 'Vitrine',
+    nav_library: 'Biblioteca',
+    nav_profile: 'Perfil',
+
+    // ── Profile ──
+    profile_books_count: 'livro(s) na sua biblioteca',
+    profile_section_account: 'Conta',
+    profile_section_about: 'Sobre',
+    profile_email: 'E-mail',
+    profile_name: 'Nome',
+    profile_name_undefined: 'Não definido',
+    profile_name_placeholder: 'Seu nome',
+    profile_change_password: 'Alterar Senha',
+    profile_save: 'Salvar',
+    profile_password_current: 'Senha atual',
+    profile_password_new: 'Nova senha',
+    profile_confirm_change: 'Confirmar Troca',
+    profile_saving: 'Salvando...',
+    profile_version: 'Versão',
+    profile_logout: 'Sair da Conta',
+    profile_name_updated: 'Nome atualizado!',
+    profile_save_error: 'Erro ao salvar.',
+    profile_password_changed: 'Senha alterada com sucesso!',
+    profile_password_error: 'Erro ao trocar senha.',
+    profile_fill_fields: 'Preencha ambos os campos.',
+    profile_connection_error: 'Erro de conexão.',
+    profile_user_fallback: 'Usuário',
+
+    // ── InstallPrompt ──
+    install_title: 'Instale o Aplicativo',
+    install_subtitle: 'Acesse offline e mais rápido',
+    install_btn: 'INSTALAR',
+    install_modal_title: 'Como Instalar o Aplicativo',
+    install_ios_intro: 'Para instalar no seu iPhone/iPad:',
+    install_ios_step1: 'Toque no ícone de ',
+    install_ios_step1_strong: 'Compartilhar',
+    install_ios_step1_suffix: ' (quadrado com seta pra cima) na barra inferior do Safari.',
+    install_ios_step2: 'Role para baixo e toque em ',
+    install_ios_step2_strong: 'Adicionar à Tela de Início',
+    install_ios_step2_suffix: ' (Add to Home Screen).',
+    install_android_intro: 'Parece que o seu navegador não exibiu a janela automática de instalação.',
+    install_android_step1: 'Abra o menu do seu navegador (os ',
+    install_android_step1_strong: 'três pontinhos verticais',
+    install_android_step1_suffix: ' no canto superior).',
+    install_android_step2: 'Toque em ',
+    install_android_step2_strong: 'Instalar Aplicativo',
+    install_android_step2_or: ' ou ',
+    install_android_step2_strong2: 'Adicionar à tela inicial',
+    install_android_step2_suffix: '.',
+    install_understood: 'Entendi',
+
+    // ── PDF Reader ──
+    pdf_loading: 'Baixando livro da nuvem...',
+    pdf_complete: 'concluído',
+    pdf_highlight_mode: 'Modo Marca-texto ativado: Selecione o texto na tela',
+    pdf_highlight_cancel: 'Cancelar',
+    pdf_choose_color: 'Escolher cor:',
+    pdf_highlights_title: 'Destaques',
+    pdf_highlights_empty: 'Selecione um texto no livro para destacar.',
+    pdf_highlight_page: 'Pág.',
+    pdf_page_highlights: 'destaque(s)',
+
+    // ── BookRow / BookCard ──
+    book_locked: 'Comprar',
+    pdf_not_found: 'Arquivo PDF não encontrado para este livro.',
+  },
+
+  es: {
+    // ── Login ──
+    login_subtitle: 'Inicia sesión con el E-mail de tu compra',
+    login_email_label: 'E-mail',
+    login_email_placeholder: 'tu@email.com',
+    login_password_label: 'Contraseña',
+    login_btn: 'Entrar a la Plataforma',
+    login_loading: 'Autenticando...',
+    login_footer: '¿Aún no tienes acceso?',
+    login_footer_link: 'Ver catálogo de Ebooks',
+    login_error_fields: 'Completa el e-mail y la contraseña.',
+    login_error_connection: 'Error de conexión con el servidor. Inténtalo más tarde.',
+
+    // ── Greeting ──
+    greeting_morning: 'Buenos días',
+    greeting_afternoon: 'Buenas tardes',
+    greeting_evening: 'Buenas noches',
+
+    // ── Home ──
+    hero_subtitle_default: 'Tu próxima gran lectura te espera.',
+    hero_subtitle_book: 'Destacado',
+    search_placeholder: 'Buscar por título o autor...',
+    no_results: 'Ningún libro encontrado para',
+    search_results_title: 'Resultados para',
+    no_sales_url: 'Este libro aún no tiene una página de ventas registrada.',
+    section_my_books: 'Mis Libros',
+    section_new_releases: 'Novedades',
+    section_most_read: 'Más Leídos',
+    section_wishlist: 'Lista de Deseos',
+    category_all: 'Todo',
+
+    // ── Library ──
+    library_title: 'Tu Biblioteca',
+    library_empty_title: 'Tu biblioteca está vacía',
+    library_empty_desc: 'Los libros que compres aparecerán aquí, listos para lectura instantánea.',
+    continue_reading: 'Continuar Leyendo',
+    all_books: 'Todos los Libros',
+    page_label: 'Página',
+
+    // ── Bottom nav ──
+    nav_home: 'Catálogo',
+    nav_library: 'Biblioteca',
+    nav_profile: 'Perfil',
+
+    // ── Profile ──
+    profile_books_count: 'libro(s) en tu biblioteca',
+    profile_section_account: 'Cuenta',
+    profile_section_about: 'Acerca de',
+    profile_email: 'E-mail',
+    profile_name: 'Nombre',
+    profile_name_undefined: 'No definido',
+    profile_name_placeholder: 'Tu nombre',
+    profile_change_password: 'Cambiar Contraseña',
+    profile_save: 'Guardar',
+    profile_password_current: 'Contraseña actual',
+    profile_password_new: 'Nueva contraseña',
+    profile_confirm_change: 'Confirmar Cambio',
+    profile_saving: 'Guardando...',
+    profile_version: 'Versión',
+    profile_logout: 'Cerrar Sesión',
+    profile_name_updated: '¡Nombre actualizado!',
+    profile_save_error: 'Error al guardar.',
+    profile_password_changed: '¡Contraseña cambiada con éxito!',
+    profile_password_error: 'Error al cambiar la contraseña.',
+    profile_fill_fields: 'Completa ambos campos.',
+    profile_connection_error: 'Error de conexión.',
+    profile_user_fallback: 'Usuario',
+
+    // ── InstallPrompt ──
+    install_title: 'Instala la Aplicación',
+    install_subtitle: 'Accede sin internet y más rápido',
+    install_btn: 'INSTALAR',
+    install_modal_title: 'Cómo Instalar la Aplicación',
+    install_ios_intro: 'Para instalar en tu iPhone/iPad:',
+    install_ios_step1: 'Toca el ícono de ',
+    install_ios_step1_strong: 'Compartir',
+    install_ios_step1_suffix: ' (cuadrado con flecha arriba) en la barra inferior de Safari.',
+    install_ios_step2: 'Desplázate hacia abajo y toca ',
+    install_ios_step2_strong: 'Agregar a Pantalla de Inicio',
+    install_ios_step2_suffix: ' (Add to Home Screen).',
+    install_android_intro: 'Parece que tu navegador no mostró la ventana automática de instalación.',
+    install_android_step1: 'Abre el menú de tu navegador (los ',
+    install_android_step1_strong: 'tres puntos verticales',
+    install_android_step1_suffix: ' en la esquina superior).',
+    install_android_step2: 'Toca ',
+    install_android_step2_strong: 'Instalar Aplicación',
+    install_android_step2_or: ' o ',
+    install_android_step2_strong2: 'Agregar a pantalla de inicio',
+    install_android_step2_suffix: '.',
+    install_understood: 'Entendido',
+
+    // ── PDF Reader ──
+    pdf_loading: 'Descargando libro de la nube...',
+    pdf_complete: 'completado',
+    pdf_highlight_mode: 'Modo Resaltado activado: Selecciona el texto en pantalla',
+    pdf_highlight_cancel: 'Cancelar',
+    pdf_choose_color: 'Elegir color:',
+    pdf_highlights_title: 'Resaltados',
+    pdf_highlights_empty: 'Selecciona un texto en el libro para resaltar.',
+    pdf_highlight_page: 'Pág.',
+    pdf_page_highlights: 'resaltado(s)',
+
+    // ── BookRow / BookCard ──
+    book_locked: 'Comprar',
+    pdf_not_found: 'Archivo PDF no encontrado para este libro.',
+  },
+} as const;
+
+export type TranslationKey = keyof typeof translations.pt;
+
+export const t = (lang: Lang): typeof translations.pt => translations[lang];

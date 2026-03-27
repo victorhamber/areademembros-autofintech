@@ -466,9 +466,9 @@ app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
 
 app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
   try {
-    const { title, author, description, coverUrl, pdfUrl, salesUrl, hotmartOffer, categoryId, featuredList } = req.body;
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, salesUrl, hotmartOffer, categoryId, featuredList } = req.body;
     const newEbook = await prisma.ebook.create({
-      data: { title, author: author || null, description: description || null, coverUrl, pdfUrl, salesUrl, hotmartOffer, categoryId: categoryId || null, featuredList: featuredList || null }
+      data: { title, author: author || null, description: description || null, coverUrl, pdfUrl: pdfUrl || null, htmlUrl: htmlUrl || null, salesUrl, hotmartOffer, categoryId: categoryId || null, featuredList: featuredList || null }
     });
     res.json(newEbook);
   } catch (error) {
@@ -479,10 +479,10 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
 app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, author, description, coverUrl, pdfUrl, salesUrl, hotmartOffer, categoryId, featuredList } = req.body;
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, salesUrl, hotmartOffer, categoryId, featuredList } = req.body;
     const updatedEbook = await prisma.ebook.update({
       where: { id: String(id) },
-      data: { title, author: author || null, description: description || null, coverUrl, pdfUrl, salesUrl, hotmartOffer, categoryId: categoryId || null, featuredList: featuredList || null }
+      data: { title, author: author || null, description: description || null, coverUrl, pdfUrl: pdfUrl || null, htmlUrl: htmlUrl || null, salesUrl, hotmartOffer, categoryId: categoryId || null, featuredList: featuredList || null }
     });
     res.json(updatedEbook);
   } catch (error) {

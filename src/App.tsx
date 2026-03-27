@@ -5,7 +5,11 @@ import { Library } from './pages/Library'
 import { Login } from './pages/Login'
 import { Admin } from './pages/Admin'
 import { PDFReader } from './components/PDFReader'
+import { HTMLReader } from './components/HTMLReader'
 import { InstallPrompt } from './components/InstallPrompt'
+import { useLanguage } from './i18n/useLanguage'
+import { t } from './i18n/translations'
+import type { Lang } from './i18n/translations'
 import './App.css'
 
 function App() {
@@ -13,11 +17,15 @@ function App() {
     return <Admin />
   }
 
+  const { lang, setLang } = useLanguage()
+  const tr = t(lang)
+
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('ebookpro_userId'))
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('ebookpro_userEmail'))
   const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('ebookpro_userName'))
   const [activeTab, setActiveTab] = useState('home')
   const [readerData, setReaderData] = useState<{url: string, title: string, ebookId: string, initialPage: number} | null>(null)
+  const [htmlReaderData, setHtmlReaderData] = useState<{url: string, title: string} | null>(null)
   
   const [catalog, setCatalog] = useState<any[]>([])
   const [myBooksData, setMyBooksData] = useState<any[]>([])
@@ -71,16 +79,23 @@ function App() {
 
   const handleOpenReader = (title: string, _coverUrl?: string) => {
     const book = books.find(b => b.title === title);
-    if (book && book.pdfUrl) {
-      // Mark as reading in the DB
-      fetch('/api/reading-progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
-        body: JSON.stringify({ ebookId: book.id, page: book.lastPage || 1 })
-      }).catch(console.error)
+    if (!book) return;
+
+    // Mark reading progress (works for both PDF and HTML)
+    fetch('/api/reading-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
+      body: JSON.stringify({ ebookId: book.id, page: book.lastPage || 1 })
+    }).catch(console.error)
+
+    if (book.htmlUrl) {
+      // HTML ebook
+      setHtmlReaderData({ url: book.htmlUrl, title });
+    } else if (book.pdfUrl) {
+      // PDF ebook
       setReaderData({ url: book.pdfUrl, title, ebookId: book.id, initialPage: book.lastPage || 1 });
     } else {
-      alert("Arquivo PDF não encontrado para este livro.");
+      alert(tr.pdf_not_found);
     }
   }
 
@@ -93,11 +108,16 @@ function App() {
       }).catch(console.error)
     }
     setReaderData(null)
-    fetchData() // Refresh data to update continue reading
+    fetchData()
+  }
+
+  const handleCloseHtmlReader = () => {
+    setHtmlReaderData(null)
+    fetchData()
   }
 
   const handleToggleWishlist = (id: string) => {
-    setWishlistIds(current => 
+    setWishlistIds(current =>
       current.includes(id) ? current.filter(wId => wId !== id) : [...current, id]
     )
     fetch('/api/wishlist/toggle', {
@@ -113,31 +133,40 @@ function App() {
   }
 
   if (!userId) {
-    return <Login onLogin={handleLogin} />
+    return <Login onLogin={handleLogin} lang={lang} setLang={setLang} />
   }
 
   return (
     <div className="app-container">
-      {readerData ? (
+      {htmlReaderData ? (
+        <HTMLReader
+          url={htmlReaderData.url}
+          title={htmlReaderData.title}
+          lang={lang}
+          onClose={handleCloseHtmlReader}
+        />
+      ) : readerData ? (
         <PDFReader 
           url={readerData.url} 
           title={readerData.title} 
           initialPage={readerData.initialPage}
           ebookId={readerData.ebookId}
           userId={userId || ''}
+          lang={lang}
           onClose={handleCloseReader}
         />
       ) : (
         <>
           <main className="app-main">
-            {activeTab === 'home' && <Home books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} isLoading={isLoading} userEmail={userEmail} userName={userName} />}
-            {activeTab === 'library' && <Library books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} isLoading={isLoading} />}
+            {activeTab === 'home' && <Home books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} isLoading={isLoading} userEmail={userEmail} userName={userName} lang={lang} setLang={setLang} />}
+            {activeTab === 'library' && <Library books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} isLoading={isLoading} lang={lang} />}
             {activeTab === 'profile' && (
               <ProfilePage
                 userId={userId}
                 userEmail={userEmail}
                 userName={userName}
                 bookCount={myBooksData.length}
+                lang={lang}
                 onLogout={handleLogout}
                 onProfileUpdate={handleProfileUpdate}
               />
@@ -146,27 +175,28 @@ function App() {
 
           <nav className="bottom-nav">
             <button className={`bottom-nav-item ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>
-              <HomeIcon /> <span>Vitrine</span>
+              <HomeIcon /> <span>{tr.nav_home}</span>
             </button>
             <button className={`bottom-nav-item ${activeTab === 'library' ? 'active' : ''}`} onClick={() => setActiveTab('library')}>
-              <LibraryIcon /> <span>Biblioteca</span>
+              <LibraryIcon /> <span>{tr.nav_library}</span>
             </button>
             <button className={`bottom-nav-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
-              <UserIcon /> <span>Perfil</span>
+              <UserIcon /> <span>{tr.nav_profile}</span>
             </button>
           </nav>
         </>
       )}
-      <InstallPrompt />
+      <InstallPrompt lang={lang} />
     </div>
   )
 }
 
 // ===== PROFILE PAGE COMPONENT =====
-function ProfilePage({ userId, userEmail, userName, bookCount, onLogout, onProfileUpdate }: {
+function ProfilePage({ userId, userEmail, userName, bookCount, lang, onLogout, onProfileUpdate }: {
   userId: string; userEmail: string | null; userName: string | null; bookCount: number;
-  onLogout: () => void; onProfileUpdate: (name: string) => void;
+  lang: Lang; onLogout: () => void; onProfileUpdate: (name: string) => void;
 }) {
+  const tr = t(lang)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(userName || '')
   const [changingPassword, setChangingPassword] = useState(false)
@@ -174,7 +204,7 @@ function ProfilePage({ userId, userEmail, userName, bookCount, onLogout, onProfi
   const [newPass, setNewPass] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const displayName = userName || userEmail?.split('@')[0] || 'Usuário'
+  const displayName = userName || userEmail?.split('@')[0] || tr.profile_user_fallback
 
   const handleSaveName = async () => {
     setSaving(true)
@@ -187,14 +217,14 @@ function ProfilePage({ userId, userEmail, userName, bookCount, onLogout, onProfi
       if (res.ok) {
         onProfileUpdate(nameValue)
         setEditingName(false)
-        alert('Nome atualizado!')
+        alert(tr.profile_name_updated)
       }
-    } catch { alert('Erro ao salvar.') }
+    } catch { alert(tr.profile_save_error) }
     finally { setSaving(false) }
   }
 
   const handleChangePassword = async () => {
-    if (!currentPass || !newPass) { alert('Preencha ambos os campos.'); return }
+    if (!currentPass || !newPass) { alert(tr.profile_fill_fields); return }
     setSaving(true)
     try {
       const res = await fetch('/api/profile/password', {
@@ -204,12 +234,12 @@ function ProfilePage({ userId, userEmail, userName, bookCount, onLogout, onProfi
       })
       const data = await res.json()
       if (res.ok) {
-        alert('Senha alterada com sucesso!')
+        alert(tr.profile_password_changed)
         setChangingPassword(false); setCurrentPass(''); setNewPass('')
       } else {
-        alert(data.error || 'Erro ao trocar senha.')
+        alert(data.error || tr.profile_password_error)
       }
-    } catch { alert('Erro de conexão.') }
+    } catch { alert(tr.profile_connection_error) }
     finally { setSaving(false) }
   }
 
@@ -223,9 +253,9 @@ function ProfilePage({ userId, userEmail, userName, bookCount, onLogout, onProfi
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '8px' }}>
             <input 
               className="profile-edit-input" value={nameValue} onChange={e => setNameValue(e.target.value)}
-              placeholder="Seu nome" autoFocus
+              placeholder={tr.profile_name_placeholder} autoFocus
             />
-            <button className="profile-save-btn" onClick={handleSaveName} disabled={saving}>Salvar</button>
+            <button className="profile-save-btn" onClick={handleSaveName} disabled={saving}>{tr.profile_save}</button>
             <button className="profile-cancel-btn" onClick={() => setEditingName(false)}>✕</button>
           </div>
         ) : (
@@ -233,44 +263,44 @@ function ProfilePage({ userId, userEmail, userName, bookCount, onLogout, onProfi
             {displayName} <span style={{ fontSize: '13px', color: 'var(--accent-primary)' }}>✏️</span>
           </h2>
         )}
-        <p className="profile-stats">{bookCount} livro(s) na sua biblioteca</p>
+        <p className="profile-stats">{bookCount} {tr.profile_books_count}</p>
       </div>
       
       <div className="profile-section">
-        <h3>Conta</h3>
+        <h3>{tr.profile_section_account}</h3>
         <div className="profile-item">
-          <span>E-mail</span>
+          <span>{tr.profile_email}</span>
           <span className="profile-value">{userEmail}</span>
         </div>
         <div className="profile-item">
-          <span>Nome</span>
-          <span className="profile-value">{userName || 'Não definido'}</span>
+          <span>{tr.profile_name}</span>
+          <span className="profile-value">{userName || tr.profile_name_undefined}</span>
         </div>
         <div className="profile-item" style={{ cursor: 'pointer' }} onClick={() => setChangingPassword(!changingPassword)}>
-          <span>Alterar Senha</span>
+          <span>{tr.profile_change_password}</span>
           <span className="profile-value" style={{ color: 'var(--accent-primary)' }}>{changingPassword ? '▲' : '▶'}</span>
         </div>
         {changingPassword && (
           <div style={{ padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <input className="profile-edit-input" type="password" placeholder="Senha atual" value={currentPass} onChange={e => setCurrentPass(e.target.value)} />
-            <input className="profile-edit-input" type="password" placeholder="Nova senha" value={newPass} onChange={e => setNewPass(e.target.value)} />
+            <input className="profile-edit-input" type="password" placeholder={tr.profile_password_current} value={currentPass} onChange={e => setCurrentPass(e.target.value)} />
+            <input className="profile-edit-input" type="password" placeholder={tr.profile_password_new} value={newPass} onChange={e => setNewPass(e.target.value)} />
             <button className="profile-save-btn" onClick={handleChangePassword} disabled={saving}>
-              {saving ? 'Salvando...' : 'Confirmar Troca'}
+              {saving ? tr.profile_saving : tr.profile_confirm_change}
             </button>
           </div>
         )}
       </div>
 
       <div className="profile-section">
-        <h3>Sobre</h3>
+        <h3>{tr.profile_section_about}</h3>
         <div className="profile-item">
-          <span>Versão</span>
+          <span>{tr.profile_version}</span>
           <span className="profile-value">1.0.0</span>
         </div>
       </div>
 
       <button className="logout-btn" onClick={onLogout}>
-        Sair da Conta
+        {tr.profile_logout}
       </button>
     </div>
   )

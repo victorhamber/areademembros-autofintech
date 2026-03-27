@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
+import { t } from '../i18n/translations';
+import type { Lang } from '../i18n/translations';
 import './Login.css';
 
 interface LoginProps {
   onLogin: (userId: string, email: string) => void;
+  lang: Lang;
+  setLang: (l: Lang) => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
+  const tr = t(lang);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,11 +32,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       if (res.ok) {
         onLogin(data.id, data.email);
       } else {
-        alert(data.error || 'Erro ao realizar login');
+        alert(data.error || tr.login_error_fields);
       }
     } catch (err) {
       console.error(err);
-      alert('Erro de conexão com o servidor. Tente novamente mais tarde.');
+      alert(tr.login_error_connection);
     } finally {
       setLoading(false);
     }
@@ -40,6 +45,20 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <div className="login-container">
       <div className="login-box">
+        {/* Language switcher */}
+        <div className="login-lang-switcher">
+          <button
+            className={`lang-btn ${lang === 'pt' ? 'active' : ''}`}
+            onClick={() => setLang('pt')}
+            title="Português"
+          >🇧🇷</button>
+          <button
+            className={`lang-btn ${lang === 'es' ? 'active' : ''}`}
+            onClick={() => setLang('es')}
+            title="Español"
+          >🇪🇸</button>
+        </div>
+
         <div style={{ textAlign: 'center', marginBottom: '24px', userSelect: 'none' }}>
           <img 
             src="/logo.png" 
@@ -48,21 +67,21 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             draggable={false} 
           />
         </div>
-        <p className="login-subtitle">Faça login com seu E-mail da compra</p>
+        <p className="login-subtitle">{tr.login_subtitle}</p>
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="input-group">
-            <label>E-mail</label>
+            <label>{tr.login_email_label}</label>
             <input 
               type="email" 
-              placeholder="seu@email.com" 
+              placeholder={tr.login_email_placeholder}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
           <div className="input-group">
-            <label>Senha</label>
+            <label>{tr.login_password_label}</label>
             <input 
               type="password" 
               placeholder="••••••••" 
@@ -73,12 +92,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
           
           <button type="submit" className="login-submit-btn" disabled={loading}>
-            {loading ? 'Autenticando...' : 'Entrar na Plataforma'}
+            {loading ? tr.login_loading : tr.login_btn}
           </button>
         </form>
         
         <p className="login-footer">
-          Ainda não tem acesso? <a href="#">Ver vitrine de Ebooks</a>
+          {tr.login_footer} <a href="#">{tr.login_footer_link}</a>
         </p>
       </div>
     </div>

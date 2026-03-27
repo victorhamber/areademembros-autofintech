@@ -173,6 +173,38 @@
   100% { opacity: 0.5; }
 }
 
+/* ========== LANGUAGE SWITCHER ========== */
+.lang-switcher {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  z-index: 10;
+  display: flex;
+  gap: 6px;
+}
+
+.lang-btn {
+  font-size: 22px;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s, background 0.2s;
+  backdrop-filter: blur(6px);
+}
+
+.lang-btn:hover {
+  background: rgba(0, 0, 0, 0.65);
+  transform: scale(1.08);
+}
+
+.lang-btn.active {
+  border-color: var(--accent-primary);
+  background: rgba(0, 0, 0, 0.65);
+}
+
 @media (min-width: 768px) {
   .hero-banner {
     height: 360px;

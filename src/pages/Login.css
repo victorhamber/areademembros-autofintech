@@ -109,3 +109,11 @@
 .login-footer a:hover {
   text-decoration: underline;
 }
+
+/* ── Language switcher on Login screen ── */
+.login-lang-switcher {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}

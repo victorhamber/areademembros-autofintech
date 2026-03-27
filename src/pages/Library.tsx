@@ -1,6 +1,8 @@
 import React from 'react';
 import { BookCard } from '../components/BookCard';
 import { PlayCircle, BookOpen } from 'lucide-react';
+import { t } from '../i18n/translations';
+import type { Lang } from '../i18n/translations';
 import './Library.css';
 
 interface LibraryProps {
@@ -8,11 +10,12 @@ interface LibraryProps {
   onRead: (title: string, coverUrl: string) => void;
   onToggleWishlist: (id: string) => void;
   isLoading?: boolean;
+  lang: Lang;
 }
 
-export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlist, isLoading }) => {
+export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlist, isLoading, lang }) => {
+  const tr = t(lang);
   const purchasedBooks = books.filter(b => b.hasAccess);
-  // Continue Reading: books that have been opened at least once (have lastReadAt set)
   const currentlyReading = purchasedBooks
     .filter(b => b.lastReadAt)
     .sort((a, b) => new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime());
@@ -58,19 +61,19 @@ export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlis
         <div className="empty-icon-wrapper">
           <BookOpen size={48} strokeWidth={1.2} />
         </div>
-        <h2>Sua biblioteca está vazia</h2>
-        <p>Os livros que você comprar vão aparecer aqui, prontos para leitura instantânea.</p>
+        <h2>{tr.library_empty_title}</h2>
+        <p>{tr.library_empty_desc}</p>
       </div>
     );
   }
 
   return (
     <div style={{ padding: 'var(--spacing-lg) var(--spacing-md)' }}>
-      <h1 style={{ marginBottom: 'var(--spacing-lg)' }}>Sua Biblioteca</h1>
+      <h1 style={{ marginBottom: 'var(--spacing-lg)' }}>{tr.library_title}</h1>
       
       {currentlyReading.length > 0 && (
         <div className="continue-reading-section">
-          <h2 style={{ fontSize: '18px', marginBottom: 'var(--spacing-sm)' }}>Continuar Leitura</h2>
+          <h2 style={{ fontSize: '18px', marginBottom: 'var(--spacing-sm)' }}>{tr.continue_reading}</h2>
           <div 
             className={`continue-reading-scroll ${isDragging ? 'dragging' : ''}`} 
             style={{ display: 'flex', gap: 'var(--spacing-md)', overflowX: 'auto', paddingBottom: 'var(--spacing-sm)' }}
@@ -85,7 +88,7 @@ export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlis
                 <img src={book.coverUrl} alt={book.title} className="continue-cover" draggable={false} />
                 <div className="continue-info">
                   <h3>{book.title}</h3>
-                  <p>Página {book.lastPage || 1}</p>
+                  <p>{tr.page_label} {book.lastPage || 1}</p>
                 </div>
                 <button className="play-btn">
                   <PlayCircle size={32} strokeWidth={1.5} />
@@ -96,7 +99,7 @@ export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlis
         </div>
       )}
 
-      <h2 style={{ fontSize: '18px', marginBottom: 'var(--spacing-md)' }}>Todos os Livros</h2>
+      <h2 style={{ fontSize: '18px', marginBottom: 'var(--spacing-md)' }}>{tr.all_books}</h2>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--spacing-md)' }}>
         {purchasedBooks.map(book => (
           <BookCard 

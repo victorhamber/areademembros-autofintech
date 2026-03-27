@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BookRow } from '../components/BookRow';
 import { Search } from 'lucide-react';
+import { t } from '../i18n/translations';
+import type { Lang } from '../i18n/translations';
 import './Home.css';
 
 interface HomeProps {
@@ -10,11 +12,17 @@ interface HomeProps {
   isLoading?: boolean;
   userEmail?: string | null;
   userName?: string | null;
+  lang: Lang;
+  setLang: (l: Lang) => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isLoading, userEmail, userName }) => {
+export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isLoading, userEmail, userName, lang, setLang }) => {
+  const tr = t(lang);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Tudo');
+  const [selectedCategory, setSelectedCategory] = useState('');
+
+  // Reset category pill when lang changes so label matches
+  useEffect(() => { setSelectedCategory(''); }, [lang]);
 
   const handleBookClick = (id: string, hasAccess: boolean) => {
     const book = books.find(b => b.id === id);
@@ -24,14 +32,12 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
       onRead(book.title, book.coverUrl);
     } else {
       if (book.salesUrl) {
-        // Native anchor tag <a className="hotmart-fb"> already handles Hotmart widget opening natively.
         if (book.salesUrl.includes('pay.hotmart.com')) {
           return;
         }
-        // Standard external sales page
         window.open(book.salesUrl, '_blank');
       } else {
-        alert('Este livro ainda não possui uma página de vendas cadastrada.');
+        alert(tr.no_sales_url);
       }
     }
   };
@@ -40,9 +46,9 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
   const getGreeting = () => {
     const hour = new Date().getHours();
     const name = userName || (userEmail ? userEmail.split('@')[0].charAt(0).toUpperCase() + userEmail.split('@')[0].slice(1) : '');
-    if (hour < 12) return `Bom dia, ${name}!`;
-    if (hour < 18) return `Boa tarde, ${name}!`;
-    return `Boa noite, ${name}!`;
+    if (hour < 12) return `${tr.greeting_morning}, ${name}!`;
+    if (hour < 18) return `${tr.greeting_afternoon}, ${name}!`;
+    return `${tr.greeting_evening}, ${name}!`;
   };
 
   // DYNAMIC HERO BANNER - Auto-rotating carousel
@@ -58,8 +64,6 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
   }, [booksWithCovers.length]);
   
   // HOTMART WIDGET SPA RACE CONDITION FIX
-  // We must inject the widget script *after* React has mounted the transparent <a> tags.
-  // Otherwise, Hotmart scans an empty DOM and native redirect fallback triggers.
   useEffect(() => {
     if (!isLoading && books.length > 0) {
       const timer = setTimeout(() => {
@@ -72,7 +76,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
         script.src = 'https://static.hotmart.com/checkout/widget.min.js';
         script.async = true;
         document.body.appendChild(script);
-      }, 300); // slight delay to guarantee DOM paint
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [isLoading, books.length]);
@@ -87,26 +91,19 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
       )
     : null;
 
-  // 1. Meus Livros
+  // Sections
   const myBooks = books.filter(b => b.hasAccess);
-  
-  // 2. Mais Lidos (Sorted by actual sales, strictly > 0)
   const mostRead = [...books]
     .filter(b => (b._count?.purchases || 0) > 0)
     .sort((a,b) => (b._count?.purchases || 0) - (a._count?.purchases || 0));
-  
-  // 3. Lançamentos (Newest first, limited to last 30 days)
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const newReleases = [...books]
     .filter(b => new Date(b.createdAt || 0).getTime() > thirtyDaysAgo.getTime())
     .sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 10);
-  
-  // 4. Lista de Desejos
   const wishlisted = books.filter(b => b.isWishlisted);
 
-  // 5. Categories & Featured Lists
   const categoriesMap = new Map<string, any[]>();
   const featuredMap = new Map<string, any[]>();
 
@@ -121,10 +118,12 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     }
   });
 
-  const categoryNames = ['Tudo', ...Array.from(categoriesMap.keys()).sort()];
+  // "All" pill label comes from translations
+  const allLabel = tr.category_all;
+  const categoryNames = [allLabel, ...Array.from(categoriesMap.keys()).sort()];
+  const activeCategory = selectedCategory || allLabel;
 
-  // FILTER LOGIC FOR CHIPS
-  const isCategoryMatch = (b: any) => selectedCategory === 'Tudo' || b.category?.name === selectedCategory;
+  const isCategoryMatch = (b: any) => activeCategory === allLabel || b.category?.name === activeCategory;
 
   const displayMyBooks = myBooks.filter(isCategoryMatch);
   const displayMostRead = mostRead.filter(isCategoryMatch);
@@ -161,10 +160,30 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
       <div className="hero-content">
         <h1 className="hero-greeting">{getGreeting()}</h1>
         <p className="hero-subtitle">
-          {heroBook ? `Destaque: ${heroBook.title}` : 'Sua próxima grande leitura te espera.'}
+          {heroBook ? `${tr.hero_subtitle_book}: ${heroBook.title}` : tr.hero_subtitle_default}
         </p>
       </div>
       <div className="hero-overlay"></div>
+
+      {/* ── Language Switcher ── */}
+      <div className="lang-switcher" onClick={e => e.stopPropagation()}>
+        <button
+          className={`lang-btn ${lang === 'pt' ? 'active' : ''}`}
+          onClick={() => setLang('pt')}
+          title="Português"
+          aria-label="Português"
+        >
+          🇧🇷
+        </button>
+        <button
+          className={`lang-btn ${lang === 'es' ? 'active' : ''}`}
+          onClick={() => setLang('es')}
+          title="Español"
+          aria-label="Español"
+        >
+          🇪🇸
+        </button>
+      </div>
     </>
   );
 
@@ -194,7 +213,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
         <Search size={18} className="search-icon" />
         <input 
           type="text" 
-          placeholder="Buscar por título ou autor..." 
+          placeholder={tr.search_placeholder}
           value={searchQuery} 
           onChange={e => setSearchQuery(e.target.value)} 
           className="search-input"
@@ -207,7 +226,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
           {categoryNames.map(cat => (
             <button
               key={cat}
-              className={`category-pill ${selectedCategory === cat ? 'active' : ''}`}
+              className={`category-pill ${activeCategory === cat ? 'active' : ''}`}
               onClick={() => setSelectedCategory(cat)}
             >
               {cat}
@@ -220,15 +239,15 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
         {/* SEARCH RESULTS MODE */}
         {filteredBooks !== null ? (
           filteredBooks.length > 0 ? (
-            <BookRow title={`Resultados para "${searchQuery}"`} books={filteredBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />
+            <BookRow title={`${tr.search_results_title} "${searchQuery}"`} books={filteredBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />
           ) : (
             <div className="empty-search">
-              <p>Nenhum livro encontrado para "<strong>{searchQuery}</strong>"</p>
+              <p>{tr.no_results} "<strong>{searchQuery}</strong>"</p>
             </div>
           )
         ) : (
           <>
-            {displayMyBooks.length > 0 && <BookRow title="Meus Livros" books={displayMyBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayMyBooks.length > 0 && <BookRow title={tr.section_my_books} books={displayMyBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
             
             {Array.from(featuredMap.entries()).map(([listName, lstBooks]) => {
               const displayFeatured = lstBooks.filter(isCategoryMatch);
@@ -236,15 +255,15 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
               return <BookRow key={`featured-${listName}`} title={listName} books={displayFeatured} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
             })}
 
-            {displayNewReleases.length > 0 && <BookRow title="Lançamentos" books={displayNewReleases} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
-            {displayMostRead.length > 0 && <BookRow title="Mais Lidos" books={displayMostRead} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayNewReleases.length > 0 && <BookRow title={tr.section_new_releases} books={displayNewReleases} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayMostRead.length > 0 && <BookRow title={tr.section_most_read} books={displayMostRead} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
             
             {Array.from(categoriesMap.entries()).map(([catName, catBooks]) => {
-              if (selectedCategory !== 'Tudo' && catName !== selectedCategory) return null;
+              if (activeCategory !== allLabel && catName !== activeCategory) return null;
               return <BookRow key={`cat-${catName}`} title={catName} books={catBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
             })}
 
-            {displayWishlisted.length > 0 && <BookRow title="Lista de Desejos" books={displayWishlisted} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayWishlisted.length > 0 && <BookRow title={tr.section_wishlist} books={displayWishlisted} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
           </>
         )}
       </div>
