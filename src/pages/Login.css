@@ -137,3 +137,17 @@
   gap: 6px;
   margin-bottom: 8px;
 }
+.showcase-link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.showcase-link-btn:hover {
+  text-decoration: underline;
+}

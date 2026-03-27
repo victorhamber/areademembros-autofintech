@@ -4,6 +4,7 @@ import { Home } from './pages/Home'
 import { Library } from './pages/Library'
 import { Login } from './pages/Login'
 import { Admin } from './pages/Admin'
+import { Showcase } from './pages/Showcase'
 import { PDFReader } from './components/PDFReader'
 import { HTMLReader } from './components/HTMLReader'
 import { InstallPrompt } from './components/InstallPrompt'
@@ -26,6 +27,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('home')
   const [readerData, setReaderData] = useState<{url: string, title: string, ebookId: string, initialPage: number} | null>(null)
   const [htmlReaderData, setHtmlReaderData] = useState<{url: string, title: string} | null>(null)
+  const [showShowcase, setShowShowcase] = useState(false)
   
   const [catalog, setCatalog] = useState<any[]>([])
   const [myBooksData, setMyBooksData] = useState<any[]>([])
@@ -145,7 +147,10 @@ function App() {
   }
 
   if (!userId) {
-    return <Login onLogin={handleLogin} lang={lang} setLang={setLang} />
+    if (showShowcase) {
+      return <Showcase lang={lang} onBack={() => setShowShowcase(false)} />
+    }
+    return <Login onLogin={handleLogin} lang={lang} setLang={setLang} onShowcase={() => setShowShowcase(true)} />
   }
 
   return (

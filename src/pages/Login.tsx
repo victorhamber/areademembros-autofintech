@@ -7,11 +7,12 @@ interface LoginProps {
   onLogin: (userId: string, email: string) => void;
   lang: Lang;
   setLang: (l: Lang) => void;
+  onShowcase: () => void;
 }
 
 type View = 'login' | 'forgot' | 'reset';
 
-export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
+export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang, onShowcase }) => {
   const tr = t(lang);
   const [view, setView] = useState<View>('login');
   const [email, setEmail] = useState('');
@@ -182,7 +183,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
             </form>
             
             <p className="login-footer">
-              {tr.login_footer} <a href="#">{tr.login_footer_link}</a>
+              {tr.login_footer} <button type="button" onClick={onShowcase} className="showcase-link-btn">{tr.login_footer_link}</button>
             </p>
           </>
         )}

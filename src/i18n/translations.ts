@@ -14,6 +14,13 @@ const translations = {
     login_error_fields: 'Preencha e-mail e senha.',
     login_error_connection: 'Erro de conexão com o servidor. Tente novamente mais tarde.',
 
+    // ── Showcase ──
+    showcase_title: 'Nossa Vitrine',
+    showcase_description: 'Explore nossos ebooks disponíveis para você.',
+    showcase_buy_btn: 'Comprar Agora',
+    showcase_back_btn: 'Voltar ao Login',
+    showcase_details_title: 'Detalhes do Ebook',
+
     // ── Greeting ──
     greeting_morning: 'Bom dia',
     greeting_afternoon: 'Boa tarde',
@@ -137,6 +144,13 @@ const translations = {
     login_footer_link: 'Ver catálogo de Ebooks',
     login_error_fields: 'Completa el e-mail y la contraseña.',
     login_error_connection: 'Error de conexión con el servidor. Inténtalo más tarde.',
+
+    // ── Showcase ──
+    showcase_title: 'Nuestro Catálogo',
+    showcase_description: 'Explora nuestros ebooks disponibles para ti.',
+    showcase_buy_btn: 'Comprar Ahora',
+    showcase_back_btn: 'Volver al Login',
+    showcase_details_title: 'Detalles del Ebook',
 
     // ── Greeting ──
     greeting_morning: 'Buenos días',

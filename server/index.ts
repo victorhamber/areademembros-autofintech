@@ -148,6 +148,18 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'Platform API is active', time: new Date() });
 });
 
+app.get('/api/public/ebooks', async (req, res) => {
+  try {
+    const ebooks = await prisma.ebook.findMany({ 
+      orderBy: { createdAt: 'desc' },
+      include: { category: true }
+    });
+    res.json(ebooks);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
 // ==========================================
 // USER AUTHENTICATION & ACCESS ROUTES
 // ==========================================
@@ -170,13 +182,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.json({ id: user.id, email: user.email, name: user.name });
     }
     
-    // MVP Access: Auto-create user if they don't exist in the system yet.
-    if (!user) {
-      user = await prisma.user.create({ data: { email, password } });
-      return res.json({ id: user.id, email: user.email, name: user.name });
-    }
-
-    return res.status(401).json({ error: 'E-mail ou senha incorretos. Acesso negado.' });
+    return res.status(401).json({ error: 'E-mail ou senha incorretos. Acesso negado. Apenas usuários que já efetuaram uma compra podem acessar.' });
   } catch (err) {
     res.status(500).json({ error: 'Server Error' });
   }
