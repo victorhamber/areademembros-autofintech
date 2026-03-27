@@ -218,4 +218,4 @@ const translations = {
 
 export type TranslationKey = keyof typeof translations.pt;
 
-export const t = (lang: Lang): typeof translations.pt => translations[lang];
+export const t = (lang: Lang): typeof translations.pt => translations[lang] as typeof translations.pt;
