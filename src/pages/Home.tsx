@@ -157,7 +157,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
 
   return (
     <div style={{ paddingBottom: 'var(--spacing-lg)' }}>
-      <div style={{ position: 'relative' }}>
+      <div className="hero-wrapper">
         {/* ── Language Switcher (Moved outside banner to avoid click bubbling) ── */}
         <div className="lang-switcher">
           <button

@@ -206,11 +206,21 @@
   box-shadow: 0 0 0 2px var(--accent-primary), 0 2px 8px rgba(0,0,0,0.45);
 }
 
+.hero-wrapper {
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .hero-wrapper {
+    margin: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+  }
+}
+
 @media (min-width: 768px) {
   .hero-banner {
     height: 360px;
     border-radius: var(--radius-lg);
-    margin: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
+    margin: 0; /* Wrapper handles margins now */
   }
 }
