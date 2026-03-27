@@ -724,59 +724,65 @@ export const Admin: React.FC = () => {
 
               <hr style={{ borderColor: 'var(--border-subtle)', margin: '20px 0' }} />
 
-              <h4>Template: Boas-vindas (Português)</h4>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
-                Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
-              </p>
-              <textarea
-                rows={6}
-                placeholder="HTML do e-mail de boas-vindas em PT (deixe vazio para usar o template padrão)"
-                value={emailSettings.welcome_template_pt}
-                onChange={e => setEmailSettings(p => ({ ...p, welcome_template_pt: e.target.value }))}
-                style={{ fontFamily: 'monospace', fontSize: '12px' }}
-              />
+              <div style={{ background: 'rgba(69, 196, 176, 0.05)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(69, 196, 176, 0.1)', marginBottom: '20px' }}>
+                <h4 style={{ margin: '0 0 15px 0', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇧🇷 Português (Brasil)</h4>
+                
+                <label>E-mail de Boas-vindas</label>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px' }}>
+                  Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
+                </p>
+                <textarea
+                  rows={5}
+                  placeholder="HTML do e-mail em PT (vazio = padrão)"
+                  value={emailSettings.welcome_template_pt}
+                  onChange={e => setEmailSettings(p => ({ ...p, welcome_template_pt: e.target.value }))}
+                  style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '15px' }}
+                />
 
-              <h4>Template: Boas-vindas (Español)</h4>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
-                Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
-              </p>
-              <textarea
-                rows={6}
-                placeholder="HTML del correo de bienvenida en ES (deje vacío para usar la plantilla predeterminada)"
-                value={emailSettings.welcome_template_es}
-                onChange={e => setEmailSettings(p => ({ ...p, welcome_template_es: e.target.value }))}
-                style={{ fontFamily: 'monospace', fontSize: '12px' }}
-              />
+                <label>Recuperação de Senha</label>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px' }}>
+                  Placeholders: {'{{name}}'}, {'{{reset_link}}'}
+                </p>
+                <textarea
+                  rows={5}
+                  placeholder="HTML do e-mail de reset em PT (vazio = padrão)"
+                  value={emailSettings.reset_template_pt}
+                  onChange={e => setEmailSettings(p => ({ ...p, reset_template_pt: e.target.value }))}
+                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                />
+              </div>
 
-              <hr style={{ borderColor: 'var(--border-subtle)', margin: '20px 0' }} />
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '25px' }}>
+                <h4 style={{ margin: '0 0 15px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇪🇸 Español</h4>
+                
+                <label>Correo de Bienvenida</label>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px' }}>
+                  Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
+                </p>
+                <textarea
+                  rows={5}
+                  placeholder="HTML del correo en ES (vacio = predeterminado)"
+                  value={emailSettings.welcome_template_es}
+                  onChange={e => setEmailSettings(p => ({ ...p, welcome_template_es: e.target.value }))}
+                  style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '15px' }}
+                />
 
-              <h4>Template: Recuperação de Senha (Português)</h4>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
-                Placeholders: {'{{name}}'}, {'{{reset_link}}'}
-              </p>
-              <textarea
-                rows={6}
-                placeholder="HTML do e-mail de reset em PT (deixe vazio para usar o template padrão)"
-                value={emailSettings.reset_template_pt}
-                onChange={e => setEmailSettings(p => ({ ...p, reset_template_pt: e.target.value }))}
-                style={{ fontFamily: 'monospace', fontSize: '12px' }}
-              />
-
-              <h4>Template: Recuperação de Senha (Español)</h4>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
-                Placeholders: {'{{name}}'}, {'{{reset_link}}'}
-              </p>
-              <textarea
-                rows={6}
-                placeholder="HTML del correo de reset en ES (deje vacío para usar la plantilla predeterminada)"
-                value={emailSettings.reset_template_es}
-                onChange={e => setEmailSettings(p => ({ ...p, reset_template_es: e.target.value }))}
-                style={{ fontFamily: 'monospace', fontSize: '12px' }}
-              />
+                <label>Recuperación de Contraseña</label>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px' }}>
+                  Placeholders: {'{{name}}'}, {'{{reset_link}}'}
+                </p>
+                <textarea
+                  rows={5}
+                  placeholder="HTML del correo de reset en ES (vacio = predeterminado)"
+                  value={emailSettings.reset_template_es}
+                  onChange={e => setEmailSettings(p => ({ ...p, reset_template_es: e.target.value }))}
+                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                />
+              </div>
 
               <button
                 type="button"
-                className="btn-submit"
+                className="login-submit-btn"
                 disabled={emailSaving}
                 onClick={async () => {
                   setEmailSaving(true);
@@ -794,7 +800,17 @@ export const Admin: React.FC = () => {
                     }
                   } catch { alert('Erro de conexão.'); } finally { setEmailSaving(false); }
                 }}
-                style={{ marginTop: '16px' }}
+                style={{ 
+                  marginTop: '10px', 
+                  background: 'var(--accent-primary)', 
+                  color: '#fff',
+                  width: '100%',
+                  fontWeight: 'bold',
+                  padding: '14px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  border: 'none'
+                }}
               >
                 {emailSaving ? 'Salvando...' : 'Salvar Configurações'}
               </button>

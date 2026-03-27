@@ -59,8 +59,38 @@ async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name:
   // Fallback default template
   if (!template) {
     template = lang === 'es'
-      ? '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h1 style="color:#45c4b0;">¡Bienvenido(a), {{name}}!</h1><p>Tu acceso a la plataforma <b>Readlyme</b> está listo.</p><p><b>E-mail:</b> {{email}}<br/><b>Contraseña temporal:</b> {{password}}</p><p>Recomendamos que cambies tu contraseña después de iniciar sesión.</p><p style="margin-top:24px;"><a href="{{app_url}}" style="background:#45c4b0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Acceder Ahora</a></p></div>'
-      : '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h1 style="color:#45c4b0;">Bem-vindo(a), {{name}}!</h1><p>Seu acesso à plataforma <b>Readlyme</b> está pronto.</p><p><b>E-mail:</b> {{email}}<br/><b>Senha temporária:</b> {{password}}</p><p>Recomendamos que troque sua senha após o primeiro login.</p><p style="margin-top:24px;"><a href="{{app_url}}" style="background:#45c4b0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Acessar Agora</a></p></div>';
+      ? `<div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:20px auto;padding:40px;border-radius:16px;background-color:#ffffff;box-shadow:0 4px 20px rgba(0,0,0,0.05);border:1px solid #f0f0f0;">
+          <div style="text-align:center;margin-bottom:30px;">
+            <img src="https://readlyme.com/logo.png" alt="Readlyme" style="width:180px;">
+          </div>
+          <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">¡Bienvenido(a), {{name}}!</h1>
+          <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Estamos felices de tenerte con nosotros. Tu acceso a la biblioteca premium de <strong>Readlyme</strong> ya está activo.</p>
+          <div style="background-color:#f9f9f9;padding:20px;border-radius:12px;margin-bottom:30px;">
+            <p style="margin:0 0 10px 0;color:#666;font-size:14px;">Tus datos de acceso:</p>
+            <p style="margin:0;color:#1a1a1a;font-size:16px;"><strong>E-mail:</strong> {{email}}</p>
+            <p style="margin:5px 0 0 0;color:#1a1a1a;font-size:16px;"><strong>Contraseña temporal:</strong> <code style="background:#eee;padding:2px 6px;border-radius:4px;">{{password}}</code></p>
+          </div>
+          <div style="text-align:center;">
+            <a href="{{app_url}}" style="display:inline-block;background-color:#45c4b0;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Entrar a la Biblioteca</a>
+          </div>
+          <p style="color:#888;font-size:13px;text-align:center;margin-top:30px;">Recomendamos que cambies tu contraseña después de tu primer inicio de sesión.</p>
+        </div>`
+      : `<div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:20px auto;padding:40px;border-radius:16px;background-color:#ffffff;box-shadow:0 4px 20px rgba(0,0,0,0.05);border:1px solid #f0f0f0;">
+          <div style="text-align:center;margin-bottom:30px;">
+            <img src="https://readlyme.com/logo.png" alt="Readlyme" style="width:180px;">
+          </div>
+          <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">Bem-vindo(a), {{name}}!</h1>
+          <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Ficamos felizes em ter você conosco. Seu acesso à biblioteca premium da <strong>Readlyme</strong> já está liberado.</p>
+          <div style="background-color:#f9f9f9;padding:20px;border-radius:12px;margin-bottom:30px;">
+            <p style="margin:0 0 10px 0;color:#666;font-size:14px;">Seus dados de acesso:</p>
+            <p style="margin:0;color:#1a1a1a;font-size:16px;"><strong>E-mail:</strong> {{email}}</p>
+            <p style="margin:5px 0 0 0;color:#1a1a1a;font-size:16px;"><strong>Senha temporária:</strong> <code style="background:#eee;padding:2px 6px;border-radius:4px;">{{password}}</code></p>
+          </div>
+          <div style="text-align:center;">
+            <a href="{{app_url}}" style="display:inline-block;background-color:#45c4b0;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Acessar Biblioteca</a>
+          </div>
+          <p style="color:#888;font-size:13px;text-align:center;margin-top:30px;">Recomendamos que troque sua senha após o primeiro login.</p>
+        </div>`;
   }
 
   const appUrl = process.env.APP_URL || 'https://readlyme.com';
@@ -182,8 +212,28 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     if (!template) {
       template = lang === 'es'
-        ? '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h1 style="color:#45c4b0;">Recuperación de Contraseña</h1><p>Hola {{name}},</p><p>Haz clic en el botón para crear una nueva contraseña:</p><p style="margin-top:24px;"><a href="{{reset_link}}" style="background:#45c4b0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Cambiar Contraseña</a></p><p style="margin-top:16px;font-size:12px;color:#888;">Este enlace expira en 1 hora. Si no solicitaste este cambio, ignora este correo.</p></div>'
-        : '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h1 style="color:#45c4b0;">Recuperação de Senha</h1><p>Olá {{name}},</p><p>Clique no botão abaixo para criar uma nova senha:</p><p style="margin-top:24px;"><a href="{{reset_link}}" style="background:#45c4b0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Trocar Senha</a></p><p style="margin-top:16px;font-size:12px;color:#888;">Este link expira em 1 hora. Se você não solicitou essa mudança, ignore este e-mail.</p></div>';
+        ? `<div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:20px auto;padding:40px;border-radius:16px;background-color:#ffffff;box-shadow:0 4px 20px rgba(0,0,0,0.05);border:1px solid #f0f0f0;">
+            <div style="text-align:center;margin-bottom:30px;">
+              <img src="https://readlyme.com/logo.png" alt="Readlyme" style="width:180px;">
+            </div>
+            <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">Recuperación de Contraseña</h1>
+            <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Hola {{name}}, recibimos una solicitud para restablecer tu contraseña. Si no fuiste tú, puedes ignorar este correo.</p>
+            <div style="text-align:center;margin:30px 0;">
+              <a href="{{reset_link}}" style="display:inline-block;background-color:#45c4b0;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Cambiar mi Contraseña</a>
+            </div>
+            <p style="color:#888;font-size:12px;text-align:center;margin-top:30px;">Este enlace caducará en 1 hora por motivos de seguridad.</p>
+          </div>`
+        : `<div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:20px auto;padding:40px;border-radius:16px;background-color:#ffffff;box-shadow:0 4px 20px rgba(0,0,0,0.05);border:1px solid #f0f0f0;">
+            <div style="text-align:center;margin-bottom:30px;">
+              <img src="https://readlyme.com/logo.png" alt="Readlyme" style="width:180px;">
+            </div>
+            <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">Recuperação de Senha</h1>
+            <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Olá {{name}}, recebemos uma solicitação para redefinir sua senha. Se não foi você, pode ignorar este e-mail.</p>
+            <div style="text-align:center;margin:30px 0;">
+              <a href="{{reset_link}}" style="display:inline-block;background-color:#45c4b0;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Alterar minha Senha</a>
+            </div>
+            <p style="color:#888;font-size:12px;text-align:center;margin-top:30px;">Este link expirará em 1 hora por motivos de segurança.</p>
+          </div>`;
     }
 
     const html = template
