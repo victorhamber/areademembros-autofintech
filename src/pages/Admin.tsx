@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Pencil, Trash2, Users, BookOpen, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search } from 'lucide-react';
 import './Admin.css';
 
@@ -49,8 +49,10 @@ export const Admin: React.FC = () => {
       if (res.ok) {
         setEbooks(await res.json());
         setIsAdminLoggedIn(true);
+        localStorage.setItem('adminToken', pwd);
       } else {
         alert('Senha incorreta.'); setIsAdminLoggedIn(false);
+        localStorage.removeItem('adminToken');
       }
     } catch (err) { alert('Servidor offline.'); }
   };
@@ -68,6 +70,18 @@ export const Admin: React.FC = () => {
       if (res.ok) setWebhookLogs(await res.json());
     } catch (err) { console.error('Error fetching webhook logs'); }
   };
+
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken');
+    if (token) {
+      setMasterPassword(token);
+      fetchEbooks(token).then(() => {
+        fetchUsers(token);
+        fetchCategories(token);
+        fetchWebhookLogs(token);
+      });
+    }
+  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,6 +252,11 @@ export const Admin: React.FC = () => {
           </button>
           <button className={activeTab === 'webhooks' ? 'active' : ''} onClick={() => setActiveTab('webhooks')}>
             <Webhook size={18} /> Webhook
+          </button>
+          
+          <div style={{ width: '1px', height: '24px', background: 'var(--border-subtle)', margin: '0 8px' }}></div>
+          <button onClick={() => { localStorage.removeItem('adminToken'); window.location.reload(); }} style={{ color: '#ef4444' }}>
+            Sair
           </button>
         </div>
       </header>
