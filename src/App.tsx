@@ -59,6 +59,18 @@ function App() {
       if (Array.isArray(myBooks)) setMyBooksData(myBooks)
       if (Array.isArray(wishlistData)) setWishlistIds(wishlistData)
       if (profile?.name) { setUserName(profile.name); localStorage.setItem('ebookpro_userName', profile.name) }
+      
+      // Auto-set language based on user's country if not manually set recently
+      if (profile?.country) {
+        const isSpanishCountry = ['AR','BO','CL','CO','CR','CU','DO','EC','SV','GT','HN','MX','NI','PA','PY','PE','PR','ES','UY','VE','GQ'].includes(profile.country);
+        const targetLang: Lang = isSpanishCountry ? 'es' : 'pt';
+        
+        // If current language is different, update it
+        if (lang !== targetLang) {
+          console.log(`[i18n] Auto-detecting lang from country ${profile.country} -> ${targetLang}`);
+          setLang(targetLang);
+        }
+      }
     }).catch(console.error)
       .finally(() => setIsLoading(false))
   }

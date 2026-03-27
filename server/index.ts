@@ -303,7 +303,7 @@ app.get('/api/profile', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'] as string;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, name: true } });
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, name: true, country: true } });
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (error) { res.status(500).json({ error: 'Failed' }); }

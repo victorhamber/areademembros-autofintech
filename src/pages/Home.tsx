@@ -155,58 +155,60 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
 
   const isHeroHotmart = heroBook && !heroBook.hasAccess && heroBook.salesUrl?.includes('pay.hotmart.com');
 
-  const heroContent = (
-    <>
-      <div className="hero-content">
-        <h1 className="hero-greeting">{getGreeting()}</h1>
-        <p className="hero-subtitle">
-          {heroBook ? `${tr.hero_subtitle_book}: ${heroBook.title}` : tr.hero_subtitle_default}
-        </p>
-      </div>
-      <div className="hero-overlay"></div>
-
-      {/* ── Language Switcher ── */}
-      <div className="lang-switcher" onClick={e => e.stopPropagation()}>
-        <button
-          className={`lang-btn ${lang === 'pt' ? 'active' : ''}`}
-          onClick={() => setLang('pt')}
-          title="Português"
-          aria-label="Português"
-        >
-          🇧🇷
-        </button>
-        <button
-          className={`lang-btn ${lang === 'es' ? 'active' : ''}`}
-          onClick={() => setLang('es')}
-          title="Español"
-          aria-label="Español"
-        >
-          🇪🇸
-        </button>
-      </div>
-    </>
-  );
-
   return (
     <div style={{ paddingBottom: 'var(--spacing-lg)' }}>
-      {isHeroHotmart && heroBook ? (
-        <a 
-          href={heroBook.salesUrl}
-          className="hero-banner hotmart-fb" 
-          onClick={() => handleBookClick(heroBook.id, heroBook.hasAccess)}
-          style={{ cursor: 'pointer', backgroundImage: `url(${heroBook.coverUrl})`, display: 'flex', textDecoration: 'none' }}
-        >
-          {heroContent}
-        </a>
-      ) : (
-        <div 
-          className="hero-banner" 
-          onClick={() => heroBook && handleBookClick(heroBook.id, heroBook.hasAccess)}
-          style={{ cursor: heroBook ? 'pointer' : 'default', ...(heroBook ? { backgroundImage: `url(${heroBook.coverUrl})` } : {}) }}
-        >
-          {heroContent}
+      <div style={{ position: 'relative' }}>
+        {/* ── Language Switcher (Moved outside banner to avoid click bubbling) ── */}
+        <div className="lang-switcher">
+          <button
+            className={`lang-btn ${lang === 'pt' ? 'active' : ''}`}
+            onClick={() => setLang('pt')}
+            title="Português"
+            aria-label="Português"
+          >
+            🇧🇷
+          </button>
+          <button
+            className={`lang-btn ${lang === 'es' ? 'active' : ''}`}
+            onClick={() => setLang('es')}
+            title="Español"
+            aria-label="Español"
+          >
+            🇪🇸
+          </button>
         </div>
-      )}
+
+        {isHeroHotmart && heroBook ? (
+          <a 
+            href={heroBook.salesUrl}
+            className="hero-banner hotmart-fb" 
+            onClick={() => handleBookClick(heroBook.id, heroBook.hasAccess)}
+            style={{ cursor: 'pointer', backgroundImage: `url(${heroBook.coverUrl})`, display: 'flex', textDecoration: 'none' }}
+          >
+            <div className="hero-content">
+              <h1 className="hero-greeting">{getGreeting()}</h1>
+              <p className="hero-subtitle">
+                {heroBook ? `${tr.hero_subtitle_book}: ${heroBook.title}` : tr.hero_subtitle_default}
+              </p>
+            </div>
+            <div className="hero-overlay"></div>
+          </a>
+        ) : (
+          <div 
+            className="hero-banner" 
+            onClick={() => heroBook && handleBookClick(heroBook.id, heroBook.hasAccess)}
+            style={{ cursor: heroBook ? 'pointer' : 'default', ...(heroBook ? { backgroundImage: `url(${heroBook.coverUrl})` } : {}) }}
+          >
+            <div className="hero-content">
+              <h1 className="hero-greeting">{getGreeting()}</h1>
+              <p className="hero-subtitle">
+                {heroBook ? `${tr.hero_subtitle_book}: ${heroBook.title}` : tr.hero_subtitle_default}
+              </p>
+            </div>
+            <div className="hero-overlay"></div>
+          </div>
+        )}
+      </div>
 
       {/* SEARCH BAR */}
       <div className="search-container">

@@ -178,7 +178,7 @@
   position: absolute;
   top: var(--spacing-md);
   right: var(--spacing-md);
-  z-index: 10;
+  z-index: 100; /* Garante que fique acima de tudo no banner */
   display: flex;
   gap: 6px;
 }
