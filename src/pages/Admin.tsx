@@ -724,25 +724,38 @@ export const Admin: React.FC = () => {
 
               <hr style={{ borderColor: 'var(--border-subtle)', margin: '20px 0' }} />
 
-              <div style={{ background: 'rgba(69, 196, 176, 0.05)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(69, 196, 176, 0.1)', marginBottom: '20px' }}>
-                <h4 style={{ margin: '0 0 15px 0', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇧🇷 Português (Brasil)</h4>
+              <div style={{ 
+                background: 'rgba(69, 196, 176, 0.05)', 
+                padding: '20px', 
+                borderRadius: '12px', 
+                border: '1px solid rgba(69, 196, 176, 0.1)', 
+                marginBottom: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <h4 style={{ margin: '0 0 5px 0', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇧🇷 Português (Brasil)</h4>
                 
-                <label>E-mail de Boas-vindas</label>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px' }}>
-                  Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
-                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ marginTop: '0' }}>E-mail de Boas-vindas</label>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
+                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
+                  </p>
+                </div>
                 <textarea
                   rows={5}
                   placeholder="HTML do e-mail em PT (vazio = padrão)"
                   value={emailSettings.welcome_template_pt}
                   onChange={e => setEmailSettings(p => ({ ...p, welcome_template_pt: e.target.value }))}
-                  style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '15px' }}
+                  style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '10px' }}
                 />
 
-                <label>Recuperação de Senha</label>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px' }}>
-                  Placeholders: {'{{name}}'}, {'{{reset_link}}'}
-                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ marginTop: '0' }}>Recuperação de Senha</label>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
+                    Placeholders: {'{{name}}'}, {'{{reset_link}}'}
+                  </p>
+                </div>
                 <textarea
                   rows={5}
                   placeholder="HTML do e-mail de reset em PT (vazio = padrão)"
@@ -752,25 +765,38 @@ export const Admin: React.FC = () => {
                 />
               </div>
 
-              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '25px' }}>
-                <h4 style={{ margin: '0 0 15px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇪🇸 Español</h4>
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.03)', 
+                padding: '20px', 
+                borderRadius: '12px', 
+                border: '1px solid var(--border-subtle)', 
+                marginBottom: '25px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <h4 style={{ margin: '0 0 5px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇪🇸 Español</h4>
                 
-                <label>Correo de Bienvenida</label>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px' }}>
-                  Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
-                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ marginTop: '0' }}>Correo de Bienvenida</label>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
+                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
+                  </p>
+                </div>
                 <textarea
                   rows={5}
                   placeholder="HTML del correo en ES (vacio = predeterminado)"
                   value={emailSettings.welcome_template_es}
                   onChange={e => setEmailSettings(p => ({ ...p, welcome_template_es: e.target.value }))}
-                  style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '15px' }}
+                  style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '10px' }}
                 />
 
-                <label>Recuperación de Contraseña</label>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px' }}>
-                  Placeholders: {'{{name}}'}, {'{{reset_link}}'}
-                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ marginTop: '0' }}>Recuperación de Contraseña</label>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
+                    Placeholders: {'{{name}}'}, {'{{reset_link}}'}
+                  </p>
+                </div>
                 <textarea
                   rows={5}
                   placeholder="HTML del correo de reset en ES (vacio = predeterminado)"
