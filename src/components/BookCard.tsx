@@ -27,7 +27,7 @@ export const BookCard: React.FC<BookCardProps> = ({
   onClick,
   onToggleWishlist
 }) => {
-  const isHotmart = !hasAccess && salesUrl && salesUrl.includes('pay.hotmart.com') && salesUrl.includes('checkoutMode=');
+  const isHotmart = !hasAccess && salesUrl && salesUrl.includes('pay.hotmart.com');
 
   const content = (
     <>

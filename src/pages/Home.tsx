@@ -25,7 +25,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     } else {
       if (book.salesUrl) {
         // Native anchor tag <a className="hotmart-fb"> already handles Hotmart widget opening natively.
-        if (book.salesUrl.includes('pay.hotmart.com') && book.salesUrl.includes('checkoutMode=')) {
+        if (book.salesUrl.includes('pay.hotmart.com')) {
           return;
         }
         // Standard external sales page
@@ -134,7 +134,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     );
   }
 
-  const isHeroHotmart = heroBook && !heroBook.hasAccess && heroBook.salesUrl?.includes('pay.hotmart.com') && heroBook.salesUrl?.includes('checkoutMode=');
+  const isHeroHotmart = heroBook && !heroBook.hasAccess && heroBook.salesUrl?.includes('pay.hotmart.com');
 
   const heroContent = (
     <>
