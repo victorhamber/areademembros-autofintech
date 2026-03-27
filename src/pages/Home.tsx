@@ -24,7 +24,21 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
       onRead(book.title, book.coverUrl);
     } else {
       if (book.salesUrl) {
-        window.open(book.salesUrl, '_blank');
+        // If it's a Hotmart Widget Checkout URL, trigger the popup
+        if (book.salesUrl.includes('pay.hotmart.com') && book.salesUrl.includes('checkoutMode=')) {
+          const a = document.createElement('a');
+          a.href = book.salesUrl;
+          a.className = 'hotmart-fb';
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            if (document.body.contains(a)) document.body.removeChild(a);
+          }, 1000);
+        } else {
+          // Standard external sales page
+          window.open(book.salesUrl, '_blank');
+        }
       } else {
         alert('Este livro ainda não possui uma página de vendas cadastrada.');
       }

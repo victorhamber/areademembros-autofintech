@@ -447,8 +447,26 @@ export const Admin: React.FC = () => {
             <input type="file" accept="image/*" onChange={e => setCoverFile(e.target?.files?.[0] || null)} required={!editingId && !coverUrl} />
             <label>Arquivo PDF {editingId && !pdfFile && pdfUrl ? ' - Atual' : '*'}</label>
             <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target?.files?.[0] || null)} required={!editingId && !pdfUrl} />
-            <label>Link da Página de Vendas *</label>
-            <input placeholder="https://..." type="url" value={salesUrl} onChange={e => setSalesUrl(e.target.value)} required />
+            <label>Página de Vendas ou Código HTML (Hotmart) *</label>
+            <textarea 
+              placeholder="https://... ou cole aqui o script do Checkout Widget da Hotmart" 
+              value={salesUrl} 
+              onChange={e => {
+                const val = e.target.value;
+                if (val.includes('<script') && val.includes('hotmart-fb')) {
+                  const match = val.match(/href=["'](https:\/\/pay\.hotmart\.com\/[^"']+)["']/);
+                  if (match) {
+                    setSalesUrl(match[1]);
+                    alert('Código Hotmart Detectado! A URL do Checkout (Pop-up) foi extraída e convertida automaticamente.');
+                    return;
+                  }
+                }
+                setSalesUrl(val);
+              }} 
+              rows={3}
+              required 
+              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+            />
             <label>Código da Oferta (Hotmart) *</label>
             <input placeholder="Letras e Números da Oferta" value={hotmartOffer} onChange={e => setHotmartOffer(e.target.value)} required />
             
