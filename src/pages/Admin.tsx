@@ -795,7 +795,7 @@ export const Admin: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ marginTop: '0' }}>Correo de Bienvenida</label>
                   <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
-                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
+                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{country}}'}, {'{{app_url}}'}
                   </p>
                 </div>
                 <textarea
@@ -809,7 +809,7 @@ export const Admin: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ marginTop: '0' }}>Recuperación de Contraseña</label>
                   <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
-                    Placeholders: {'{{name}}'}, {'{{reset_link}}'}
+                    Placeholders: {'{{name}}'}, {'{{reset_link}}'}, {'{{country}}'}
                   </p>
                 </div>
                 <textarea

@@ -98,6 +98,7 @@ async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name:
     .replace(/\{\{name\}\}/g, name || (lang === 'es' ? 'Lector(a)' : 'Leitor(a)'))
     .replace(/\{\{email\}\}/g, email)
     .replace(/\{\{password\}\}/g, password)
+    .replace(/\{\{country\}\}/g, country || '-')
     .replace(/\{\{app_url\}\}/g, appUrl);
 
   const subject = lang === 'es' ? '¡Bienvenido(a) a Readlyme! Tu acceso está listo' : 'Bem-vindo(a) à Readlyme! Seu acesso está pronto';
@@ -238,6 +239,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     const html = template
       .replace(/\{\{name\}\}/g, user.name || (lang === 'es' ? 'Usuario' : 'Usuário'))
+      .replace(/\{\{email\}\}/g, user.email)
+      .replace(/\{\{country\}\}/g, user.country || '-')
       .replace(/\{\{reset_link\}\}/g, resetLink);
 
     const subject = lang === 'es' ? 'Recuperación de Contraseña - Readlyme' : 'Recuperação de Senha - Readlyme';
