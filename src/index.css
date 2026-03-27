@@ -41,7 +41,12 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   width: 100vw;
   height: 100vh;
+  user-select: none; /* Prevent blinking cursor (caret) on text clicks */
   /* Allow natural scrolling/pull-to-refresh on the body if needed, or handled by inner containers */
+}
+
+input, textarea, [contenteditable="true"] {
+  user-select: text;
 }
 
 /* Base typography */
