@@ -455,13 +455,13 @@ export const Admin: React.FC = () => {
             <label>Capa do Ebook {editingId && !coverFile && coverUrl ? ' - Atual' : '*'}</label>
             <input type="file" accept="image/*" onChange={e => setCoverFile(e.target?.files?.[0] || null)} required={!editingId && !coverUrl} />
             
-            {/* File type selector row */}
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '180px' }}>
+            {/* File type selector - stacked vertically to avoid overlap */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>
                 <label>Arquivo PDF {editingId && !pdfFile && pdfUrl ? ' - Atual' : ''}</label>
                 <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target?.files?.[0] || null)} />
               </div>
-              <div style={{ flex: 1, minWidth: '180px' }}>
+              <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   Arquivo HTML
                   <span style={{ fontSize: '11px', background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>NOVO</span>
@@ -470,7 +470,7 @@ export const Admin: React.FC = () => {
                 <input type="file" accept=".html,text/html" onChange={e => setHtmlFile(e.target?.files?.[0] || null)} />
               </div>
             </div>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               ⚡ Envie pelo menos um arquivo (PDF ou HTML). Se enviar os dois, o leitor HTML terá prioridade.
             </p>
             <label>Página de Vendas ou Código HTML (Hotmart) *</label>
