@@ -5,6 +5,7 @@ import { Library } from './pages/Library'
 import { Login } from './pages/Login'
 import { Admin } from './pages/Admin'
 import { PDFReader } from './components/PDFReader'
+import { InstallPrompt } from './components/InstallPrompt'
 import './App.css'
 
 function App() {
@@ -156,6 +157,7 @@ function App() {
           </nav>
         </>
       )}
+      <InstallPrompt />
     </div>
   )
 }
