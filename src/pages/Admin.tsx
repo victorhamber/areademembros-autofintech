@@ -648,7 +648,9 @@ export const Admin: React.FC = () => {
                   <tr>
                     <th>Data</th>
                     <th>Evento</th>
+                    <th>Comprador</th>
                     <th>E-mail</th>
+                    <th style={{ textAlign: 'center' }}>País</th>
                     <th>Produto</th>
                     <th>Status</th>
                     <th>Detalhes</th>
@@ -656,13 +658,24 @@ export const Admin: React.FC = () => {
                 </thead>
                 <tbody>
                   {webhookLogs.length === 0 ? (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>Nenhum evento recebido ainda. Configure o webhook na Hotmart e faça uma compra teste.</td></tr>
+                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>Nenhum evento recebido ainda. Configure o webhook na Hotmart e faça uma compra teste.</td></tr>
                   ) : (
                     webhookLogs.map(log => (
                       <tr key={log.id}>
-                        <td style={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{new Date(log.createdAt).toLocaleString('pt-BR')}</td>
+                        <td style={{ whiteSpace: 'nowrap', fontSize: '11px' }}>{new Date(log.createdAt).toLocaleString('pt-BR')}</td>
                         <td><code>{log.event}</code></td>
-                        <td>{log.buyerEmail || '-'}</td>
+                        <td style={{ fontSize: '12px', fontWeight: '500' }}>{log.buyerName || '-'}</td>
+                        <td style={{ fontSize: '12px' }}>{log.buyerEmail || '-'}</td>
+                        <td style={{ textAlign: 'center', fontSize: '16px' }}>
+                          {log.buyerCountry ? (
+                            <span title={log.buyerCountry}>
+                              {log.buyerCountry === 'BR' ? '🇧🇷' : 
+                               log.buyerCountry === 'PT' ? '🇵🇹' :
+                               ['AR', 'MX', 'CO', 'ES', 'CL', 'PE', 'EC', 'UY', 'PY', 'BO', 'VE'].includes(log.buyerCountry) ? '🇪🇸' : 
+                               `🌍 (${log.buyerCountry})`}
+                            </span>
+                          ) : '-'}
+                        </td>
                         <td><code>{log.productId || '-'}</code></td>
                         <td>
                           <span className={`webhook-status webhook-status-${log.status}`}>
@@ -670,7 +683,9 @@ export const Admin: React.FC = () => {
                             {' '}{log.status}
                           </span>
                         </td>
-                        <td style={{ fontSize: '12px', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.details || '-'}</td>
+                        <td style={{ fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {log.details || '-'}
+                        </td>
                       </tr>
                     ))
                   )}

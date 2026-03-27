@@ -480,7 +480,7 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
 
       if (!ebook) {
         await prisma.webhookLog.create({
-          data: { event, buyerEmail, buyerName, productId: offerCode, status: 'error', details: `No ebook found for offer: ${offerCode}` }
+          data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'error', details: `No ebook found for offer: ${offerCode}` }
         });
         return res.status(200).json({ status: 'No matching ebook' });
       }
@@ -504,7 +504,7 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
       }
 
       await prisma.webhookLog.create({
-        data: { event, buyerEmail, buyerName, productId: offerCode, status: 'success', details: `Granted access to "${ebook.title}"${isNewUser ? ' (new user, welcome email queued)' : ''}` }
+        data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Granted access to "${ebook.title}"${isNewUser ? ' (new user, welcome email queued)' : ''}` }
       });
 
       console.log(`[Hotmart] ✅ Access granted: ${buyerEmail} -> ${ebook.title}${isNewUser ? ' (new user)' : ''}`);
@@ -521,12 +521,12 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
         if (user && ebook) {
           await prisma.purchase.deleteMany({ where: { userId: user.id, ebookId: ebook.id } });
           await prisma.webhookLog.create({
-            data: { event, buyerEmail, buyerName, productId: offerCode, status: 'success', details: `Revoked access to "${ebook.title}"` }
+            data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Revoked access to "${ebook.title}"` }
           });
           console.log(`[Hotmart] ❌ Access revoked: ${buyerEmail} -> ${ebook.title}`);
         } else {
           await prisma.webhookLog.create({
-            data: { event, buyerEmail, buyerName, productId: offerCode, status: 'warning', details: 'User or ebook not found for revocation' }
+            data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'warning', details: 'User or ebook not found for revocation' }
           });
         }
       }
@@ -535,7 +535,7 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
 
     // Other events — just log
     await prisma.webhookLog.create({
-      data: { event, buyerEmail, buyerName, productId: offerCode, status: 'ignored', details: `Unhandled event type: ${event}` }
+      data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'ignored', details: `Unhandled event type: ${event}` }
     });
 
     return res.status(200).json({ status: 'Event logged' });
