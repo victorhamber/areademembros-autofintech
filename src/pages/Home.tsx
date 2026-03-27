@@ -57,6 +57,26 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     return () => clearInterval(interval);
   }, [booksWithCovers.length]);
   
+  // HOTMART WIDGET SPA RACE CONDITION FIX
+  // We must inject the widget script *after* React has mounted the transparent <a> tags.
+  // Otherwise, Hotmart scans an empty DOM and native redirect fallback triggers.
+  useEffect(() => {
+    if (!isLoading && books.length > 0) {
+      const timer = setTimeout(() => {
+        const id = 'hotmart-logic-script';
+        const existing = document.getElementById(id);
+        if (existing) existing.remove();
+        
+        const script = document.createElement('script');
+        script.id = id;
+        script.src = 'https://static.hotmart.com/checkout/widget.min.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }, 300); // slight delay to guarantee DOM paint
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, books.length]);
+
   const heroBook = booksWithCovers.length > 0 ? booksWithCovers[heroIndex % booksWithCovers.length] : null;
 
   // SEARCH FILTER
