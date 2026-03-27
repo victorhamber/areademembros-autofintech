@@ -12,6 +12,7 @@ model User {
   email     String     @unique
   password  String?
   name      String?
+  country   String?
   purchases Purchase[]
   wishlists Wishlist[]
   createdAt DateTime   @default(now())
@@ -84,4 +85,10 @@ model WebhookLog {
   status      String   @default("received")
   details     String?
   createdAt   DateTime @default(now())
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
 }

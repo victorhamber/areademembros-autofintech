@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Pencil, Trash2, Users, BookOpen, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search } from 'lucide-react';
+import { Pencil, Trash2, Users, BookOpen, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail } from 'lucide-react';
 import './Admin.css';
 
 export const Admin: React.FC = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [masterPassword, setMasterPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'ebooks' | 'users' | 'webhooks'>('ebooks');
+  const [activeTab, setActiveTab] = useState<'ebooks' | 'users' | 'webhooks' | 'email'>('ebooks');
 
   const [ebooks, setEbooks] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -36,6 +36,14 @@ export const Admin: React.FC = () => {
   const [managingAccessFor, setManagingAccessFor] = useState<any | null>(null);
   const [grantEbookId, setGrantEbookId] = useState('');
   const [userSearch, setUserSearch] = useState('');
+
+  // -- EMAIL SETTINGS STATE --
+  const [emailSettings, setEmailSettings] = useState<Record<string, string>>({
+    resend_api_key: '', sender_name: '', sender_email: '',
+    welcome_template_pt: '', welcome_template_es: '',
+    reset_template_pt: '', reset_template_es: ''
+  });
+  const [emailSaving, setEmailSaving] = useState(false);
 
   // -- FETCHERS --
   const fetchCategories = async (pwd: string) => {
@@ -73,6 +81,16 @@ export const Admin: React.FC = () => {
     } catch (err) { console.error('Error fetching webhook logs'); }
   };
 
+  const fetchEmailSettings = async (pwd: string) => {
+    try {
+      const res = await fetch('/api/admin/settings', { headers: { 'x-admin-password': pwd } });
+      if (res.ok) {
+        const data = await res.json();
+        setEmailSettings(prev => ({ ...prev, ...data }));
+      }
+    } catch (err) { console.error('Error fetching email settings'); }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (token) {
@@ -81,6 +99,7 @@ export const Admin: React.FC = () => {
         fetchUsers(token);
         fetchCategories(token);
         fetchWebhookLogs(token);
+        fetchEmailSettings(token);
       });
     }
   }, []);
@@ -92,6 +111,7 @@ export const Admin: React.FC = () => {
       fetchCategories(masterPassword);
       fetchUsers(masterPassword);
       fetchWebhookLogs(masterPassword);
+      fetchEmailSettings(masterPassword);
     }
   };
 
@@ -261,6 +281,9 @@ export const Admin: React.FC = () => {
           </button>
           <button className={activeTab === 'webhooks' ? 'active' : ''} onClick={() => setActiveTab('webhooks')}>
             <Webhook size={18} /> Webhook
+          </button>
+          <button className={activeTab === 'email' ? 'active' : ''} onClick={() => setActiveTab('email')}>
+            <Mail size={18} /> E-mail
           </button>
           
           <div style={{ width: '1px', height: '24px', background: 'var(--border-subtle)', margin: '0 8px' }}></div>
@@ -653,6 +676,141 @@ export const Admin: React.FC = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: EMAIL CONFIG --- */}
+      {activeTab === 'email' && (
+        <div className="admin-content">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '800px' }}>
+            <div className="admin-form">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Mail size={20} /> Configurações de E-mail</h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
+                Configure o token da API Resend e o remetente para envio de e-mails transacionais (boas-vindas e recuperação de senha).
+              </p>
+
+              <label>Token da API Resend</label>
+              <input
+                type="password"
+                placeholder="re_xxxxxxxxxx"
+                value={emailSettings.resend_api_key}
+                onChange={e => setEmailSettings(p => ({ ...p, resend_api_key: e.target.value }))}
+              />
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-6px' }}>
+                Este valor não é exibido por segurança. Para atualizar, cole um novo token e salve.
+              </p>
+
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label>Nome do Remetente</label>
+                  <input
+                    placeholder="Ex: Readlyme"
+                    value={emailSettings.sender_name}
+                    onChange={e => setEmailSettings(p => ({ ...p, sender_name: e.target.value }))}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <label>E-mail do Remetente</label>
+                  <input
+                    type="email"
+                    placeholder="noreply@seudominio.com"
+                    value={emailSettings.sender_email}
+                    onChange={e => setEmailSettings(p => ({ ...p, sender_email: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <hr style={{ borderColor: 'var(--border-subtle)', margin: '20px 0' }} />
+
+              <h4>Template: Boas-vindas (Português)</h4>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
+                Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
+              </p>
+              <textarea
+                rows={6}
+                placeholder="HTML do e-mail de boas-vindas em PT (deixe vazio para usar o template padrão)"
+                value={emailSettings.welcome_template_pt}
+                onChange={e => setEmailSettings(p => ({ ...p, welcome_template_pt: e.target.value }))}
+                style={{ fontFamily: 'monospace', fontSize: '12px' }}
+              />
+
+              <h4>Template: Boas-vindas (Español)</h4>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
+                Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
+              </p>
+              <textarea
+                rows={6}
+                placeholder="HTML del correo de bienvenida en ES (deje vacío para usar la plantilla predeterminada)"
+                value={emailSettings.welcome_template_es}
+                onChange={e => setEmailSettings(p => ({ ...p, welcome_template_es: e.target.value }))}
+                style={{ fontFamily: 'monospace', fontSize: '12px' }}
+              />
+
+              <hr style={{ borderColor: 'var(--border-subtle)', margin: '20px 0' }} />
+
+              <h4>Template: Recuperação de Senha (Português)</h4>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
+                Placeholders: {'{{name}}'}, {'{{reset_link}}'}
+              </p>
+              <textarea
+                rows={6}
+                placeholder="HTML do e-mail de reset em PT (deixe vazio para usar o template padrão)"
+                value={emailSettings.reset_template_pt}
+                onChange={e => setEmailSettings(p => ({ ...p, reset_template_pt: e.target.value }))}
+                style={{ fontFamily: 'monospace', fontSize: '12px' }}
+              />
+
+              <h4>Template: Recuperação de Senha (Español)</h4>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-4px' }}>
+                Placeholders: {'{{name}}'}, {'{{reset_link}}'}
+              </p>
+              <textarea
+                rows={6}
+                placeholder="HTML del correo de reset en ES (deje vacío para usar la plantilla predeterminada)"
+                value={emailSettings.reset_template_es}
+                onChange={e => setEmailSettings(p => ({ ...p, reset_template_es: e.target.value }))}
+                style={{ fontFamily: 'monospace', fontSize: '12px' }}
+              />
+
+              <button
+                type="button"
+                className="btn-submit"
+                disabled={emailSaving}
+                onClick={async () => {
+                  setEmailSaving(true);
+                  try {
+                    const res = await fetch('/api/admin/settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
+                      body: JSON.stringify(emailSettings)
+                    });
+                    if (res.ok) {
+                      alert('Configurações salvas com sucesso!');
+                      fetchEmailSettings(masterPassword);
+                    } else {
+                      alert('Erro ao salvar configurações.');
+                    }
+                  } catch { alert('Erro de conexão.'); } finally { setEmailSaving(false); }
+                }}
+                style={{ marginTop: '16px' }}
+              >
+                {emailSaving ? 'Salvando...' : 'Salvar Configurações'}
+              </button>
+            </div>
+
+            {/* Info panel */}
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '20px', border: '1px solid var(--border-subtle)' }}>
+              <h4 style={{ marginTop: 0, color: 'var(--accent-primary)' }}>Como funciona</h4>
+              <ul style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.7, paddingLeft: '18px' }}>
+                <li>Usamos o provedor <strong>Resend</strong> para envio de e-mails transacionais.</li>
+                <li>O token é salvo no banco de dados e usado apenas no backend.</li>
+                <li>Os templates aceitam placeholders que serão substituídos automaticamente.</li>
+                <li>Se o template estiver vazio, um template padrão será usado.</li>
+                <li>Novos compradores recebem a senha padrão <code>Mudar123@</code>.</li>
+                <li>O idioma do e-mail é definido automaticamente pelo país do comprador.</li>
+              </ul>
             </div>
           </div>
         </div>

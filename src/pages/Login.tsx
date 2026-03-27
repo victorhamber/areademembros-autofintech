@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { t } from '../i18n/translations';
 import type { Lang } from '../i18n/translations';
 import './Login.css';
@@ -9,11 +9,40 @@ interface LoginProps {
   setLang: (l: Lang) => void;
 }
 
+type View = 'login' | 'forgot' | 'reset';
+
 export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
   const tr = t(lang);
+  const [view, setView] = useState<View>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Forgot password
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+
+  // Reset password (from URL token)
+  const [resetToken, setResetToken] = useState('');
+  const [resetUserId, setResetUserId] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+  // Check URL for reset token on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('reset_token');
+    const userId = params.get('user_id');
+    if (token && userId) {
+      setResetToken(token);
+      setResetUserId(userId);
+      setView('reset');
+      // Clean the URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +65,51 @@ export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
       }
     } catch (err) {
       console.error(err);
+      alert(tr.login_error_connection);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    setLoading(true);
+    try {
+      await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail })
+      });
+      setForgotSent(true);
+    } catch {
+      alert(tr.login_error_connection);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setResetError(tr.reset_password_mismatch);
+      return;
+    }
+    setLoading(true);
+    setResetError('');
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, userId: resetUserId, newPassword })
+      });
+      if (res.ok) {
+        setResetSuccess(true);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setResetError(data.error || tr.reset_password_error);
+      }
+    } catch {
       alert(tr.login_error_connection);
     } finally {
       setLoading(false);
@@ -67,38 +141,130 @@ export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
             draggable={false} 
           />
         </div>
-        <p className="login-subtitle">{tr.login_subtitle}</p>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="input-group">
-            <label>{tr.login_email_label}</label>
-            <input 
-              type="email" 
-              placeholder={tr.login_email_placeholder}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="input-group">
-            <label>{tr.login_password_label}</label>
-            <input 
-              type="password" 
-              placeholder="••••••••" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          
-          <button type="submit" className="login-submit-btn" disabled={loading}>
-            {loading ? tr.login_loading : tr.login_btn}
-          </button>
-        </form>
-        
-        <p className="login-footer">
-          {tr.login_footer} <a href="#">{tr.login_footer_link}</a>
-        </p>
+        {/* ── LOGIN VIEW ── */}
+        {view === 'login' && (
+          <>
+            <p className="login-subtitle">{tr.login_subtitle}</p>
+            <form onSubmit={handleSubmit} className="login-form">
+              <div className="input-group">
+                <label>{tr.login_email_label}</label>
+                <input 
+                  type="email" 
+                  placeholder={tr.login_email_placeholder}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="input-group">
+                <label>{tr.login_password_label}</label>
+                <input 
+                  type="password" 
+                  placeholder="••••••••" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button
+                type="button"
+                className="forgot-password-link"
+                onClick={() => { setView('forgot'); setForgotSent(false); setForgotEmail(''); }}
+              >
+                {tr.forgot_password_link}
+              </button>
+              
+              <button type="submit" className="login-submit-btn" disabled={loading}>
+                {loading ? tr.login_loading : tr.login_btn}
+              </button>
+            </form>
+            
+            <p className="login-footer">
+              {tr.login_footer} <a href="#">{tr.login_footer_link}</a>
+            </p>
+          </>
+        )}
+
+        {/* ── FORGOT PASSWORD VIEW ── */}
+        {view === 'forgot' && (
+          <>
+            <h2 className="login-subtitle" style={{ fontSize: '18px', fontWeight: 700 }}>{tr.forgot_password_title}</h2>
+            {forgotSent ? (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ color: 'var(--accent-primary)', lineHeight: 1.6, marginBottom: '16px' }}>{tr.forgot_password_sent}</p>
+                <button className="login-submit-btn" onClick={() => { setView('login'); setForgotSent(false); }}>
+                  {tr.forgot_password_back}
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="login-form">
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '12px' }}>{tr.forgot_password_desc}</p>
+                <div className="input-group">
+                  <label>{tr.login_email_label}</label>
+                  <input
+                    type="email"
+                    placeholder={tr.login_email_placeholder}
+                    value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <button type="submit" className="login-submit-btn" disabled={loading}>
+                  {loading ? tr.forgot_password_sending : tr.forgot_password_send}
+                </button>
+                <button type="button" className="forgot-password-link" onClick={() => setView('login')} style={{ marginTop: '12px' }}>
+                  {tr.forgot_password_back}
+                </button>
+              </form>
+            )}
+          </>
+        )}
+
+        {/* ── RESET PASSWORD VIEW ── */}
+        {view === 'reset' && (
+          <>
+            <h2 className="login-subtitle" style={{ fontSize: '18px', fontWeight: 700 }}>{tr.reset_password_title}</h2>
+            {resetSuccess ? (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ color: 'var(--accent-primary)', lineHeight: 1.6, marginBottom: '16px' }}>{tr.reset_password_success}</p>
+                <button className="login-submit-btn" onClick={() => { setView('login'); setResetSuccess(false); }}>
+                  {tr.forgot_password_back}
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleResetPassword} className="login-form">
+                {resetError && <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: '8px' }}>{resetError}</p>}
+                <div className="input-group">
+                  <label>{tr.reset_password_placeholder}</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div className="input-group">
+                  <label>{tr.reset_password_confirm}</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <button type="submit" className="login-submit-btn" disabled={loading}>
+                  {loading ? tr.reset_password_saving : tr.reset_password_btn}
+                </button>
+              </form>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

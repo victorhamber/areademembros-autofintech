@@ -3,11 +3,76 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
+import { Resend } from 'resend';
 import multer from 'multer';
 
 dotenv.config();
+
+const DEFAULT_PASSWORD = 'Mudar123@';
+
+// Spanish-speaking country ISO codes
+const ES_COUNTRIES = ['AR','BO','CL','CO','CR','CU','DO','EC','SV','GQ','GT','HN','MX','NI','PA','PY','PE','ES','UY','VE'];
+
+// ==========================================
+// EMAIL HELPER (RESEND)
+// ==========================================
+async function getSetting(prismaClient: PrismaClient, key: string): Promise<string | null> {
+  const s = await prismaClient.setting.findUnique({ where: { key } });
+  return s?.value || null;
+}
+
+async function sendEmail(prismaClient: PrismaClient, to: string, subject: string, html: string) {
+  try {
+    const apiKey = await getSetting(prismaClient, 'resend_api_key');
+    if (!apiKey) { console.log('[Email] No Resend API key configured. Skipping.'); return; }
+
+    const senderName = (await getSetting(prismaClient, 'sender_name')) || 'EbookPro';
+    const senderEmail = (await getSetting(prismaClient, 'sender_email')) || 'noreply@example.com';
+
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from: `${senderName} <${senderEmail}>`,
+      to: [to],
+      subject,
+      html
+    });
+    if (error) console.error('[Email] Resend error:', error);
+    else console.log(`[Email] ✅ Sent to ${to}: ${subject}`);
+  } catch (err) {
+    console.error('[Email] Failed to send:', err);
+  }
+}
+
+function detectLang(country: string | null | undefined): 'es' | 'pt' {
+  if (!country) return 'pt';
+  return ES_COUNTRIES.includes(country.toUpperCase()) ? 'es' : 'pt';
+}
+
+async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name: string | null, password: string, country: string | null) {
+  const lang = detectLang(country);
+  const templateKey = lang === 'es' ? 'welcome_template_es' : 'welcome_template_pt';
+  let template = await getSetting(prismaClient, templateKey);
+
+  // Fallback default template
+  if (!template) {
+    template = lang === 'es'
+      ? '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h1 style="color:#45c4b0;">¡Bienvenido(a), {{name}}!</h1><p>Tu acceso a la plataforma <b>Readlyme</b> está listo.</p><p><b>E-mail:</b> {{email}}<br/><b>Contraseña temporal:</b> {{password}}</p><p>Recomendamos que cambies tu contraseña después de iniciar sesión.</p><p style="margin-top:24px;"><a href="{{app_url}}" style="background:#45c4b0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Acceder Ahora</a></p></div>'
+      : '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h1 style="color:#45c4b0;">Bem-vindo(a), {{name}}!</h1><p>Seu acesso à plataforma <b>Readlyme</b> está pronto.</p><p><b>E-mail:</b> {{email}}<br/><b>Senha temporária:</b> {{password}}</p><p>Recomendamos que troque sua senha após o primeiro login.</p><p style="margin-top:24px;"><a href="{{app_url}}" style="background:#45c4b0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Acessar Agora</a></p></div>';
+  }
+
+  const appUrl = process.env.APP_URL || 'https://readlyme.com';
+  const html = template
+    .replace(/\{\{name\}\}/g, name || (lang === 'es' ? 'Lector(a)' : 'Leitor(a)'))
+    .replace(/\{\{email\}\}/g, email)
+    .replace(/\{\{password\}\}/g, password)
+    .replace(/\{\{app_url\}\}/g, appUrl);
+
+  const subject = lang === 'es' ? '¡Bienvenido(a) a Readlyme! Tu acceso está listo' : 'Bem-vindo(a) à Readlyme! Seu acesso está pronto';
+  await sendEmail(prismaClient, email, subject, html);
+}
 
 // ES Modules directory name polyfill
 const __filename = fileURLToPath(import.meta.url);
@@ -64,7 +129,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (user && !user.password) {
       user = await prisma.user.update({
         where: { id: user.id },
-        data: { password } // In a real app, hash this with bcrypt!
+        data: { password }
       });
       return res.json({ id: user.id, email: user.email, name: user.name });
     }
@@ -82,6 +147,79 @@ app.post('/api/auth/login', async (req, res) => {
 
     return res.status(401).json({ error: 'E-mail ou senha incorretos. Acesso negado.' });
   } catch (err) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+});
+
+// ==========================================
+// FORGOT PASSWORD & RESET
+// ==========================================
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    // Always return success to prevent email enumeration
+    if (!user) return res.json({ success: true });
+
+    // Generate reset token (valid for 1 hour)
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = Date.now() + 3600000; // 1 hour
+    await prisma.setting.upsert({
+      where: { key: `reset_token_${user.id}` },
+      update: { value: `${token}|${expires}` },
+      create: { key: `reset_token_${user.id}`, value: `${token}|${expires}` }
+    });
+
+    // Send reset email
+    const lang = detectLang(user.country);
+    const templateKey = lang === 'es' ? 'reset_template_es' : 'reset_template_pt';
+    let template = await getSetting(prisma, templateKey);
+
+    const appUrl = process.env.APP_URL || 'https://readlyme.com';
+    const resetLink = `${appUrl}?reset_token=${token}&user_id=${user.id}`;
+
+    if (!template) {
+      template = lang === 'es'
+        ? '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h1 style="color:#45c4b0;">Recuperación de Contraseña</h1><p>Hola {{name}},</p><p>Haz clic en el botón para crear una nueva contraseña:</p><p style="margin-top:24px;"><a href="{{reset_link}}" style="background:#45c4b0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Cambiar Contraseña</a></p><p style="margin-top:16px;font-size:12px;color:#888;">Este enlace expira en 1 hora. Si no solicitaste este cambio, ignora este correo.</p></div>'
+        : '<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;"><h1 style="color:#45c4b0;">Recuperação de Senha</h1><p>Olá {{name}},</p><p>Clique no botão abaixo para criar uma nova senha:</p><p style="margin-top:24px;"><a href="{{reset_link}}" style="background:#45c4b0;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Trocar Senha</a></p><p style="margin-top:16px;font-size:12px;color:#888;">Este link expira em 1 hora. Se você não solicitou essa mudança, ignore este e-mail.</p></div>';
+    }
+
+    const html = template
+      .replace(/\{\{name\}\}/g, user.name || (lang === 'es' ? 'Usuario' : 'Usuário'))
+      .replace(/\{\{reset_link\}\}/g, resetLink);
+
+    const subject = lang === 'es' ? 'Recuperación de Contraseña - Readlyme' : 'Recuperação de Senha - Readlyme';
+    await sendEmail(prisma, user.email, subject, html);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Forgot Password Error]', err);
+    res.status(500).json({ error: 'Server Error' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, userId, newPassword } = req.body;
+    if (!token || !userId || !newPassword) return res.status(400).json({ error: 'Missing fields' });
+
+    const setting = await prisma.setting.findUnique({ where: { key: `reset_token_${userId}` } });
+    if (!setting) return res.status(400).json({ error: 'Token inválido ou expirado.' });
+
+    const [savedToken, expiresStr] = setting.value.split('|');
+    if (savedToken !== token || Date.now() > parseInt(expiresStr)) {
+      await prisma.setting.delete({ where: { key: `reset_token_${userId}` } }).catch(() => {});
+      return res.status(400).json({ error: 'Token inválido ou expirado.' });
+    }
+
+    await prisma.user.update({ where: { id: userId }, data: { password: newPassword } });
+    await prisma.setting.delete({ where: { key: `reset_token_${userId}` } }).catch(() => {});
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Reset Password Error]', err);
     res.status(500).json({ error: 'Server Error' });
   }
 });
@@ -251,10 +389,11 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
     const event = body.event || 'UNKNOWN';
     const buyerEmail = body.data?.buyer?.email?.toLowerCase()?.trim();
     const buyerName = body.data?.buyer?.name || body.data?.buyer?.first_name || null;
+    const buyerCountry = body.data?.purchase?.checkout_country?.iso || body.data?.buyer?.address?.country || null;
     const productId = String(body.data?.product?.id || body.data?.product?.ucode || '');
     const offerCode = body.data?.product?.offer_code || body.data?.purchase?.offer?.code || productId;
 
-    console.log(`[Hotmart Webhook] Event: ${event}, Buyer: ${buyerEmail}, Product: ${productId}, Offer: ${offerCode}`);
+    console.log(`[Hotmart Webhook] Event: ${event}, Buyer: ${buyerEmail}, Country: ${buyerCountry}, Product: ${productId}, Offer: ${offerCode}`);
 
     // PURCHASE_APPROVED — Create user + grant access
     if (event === 'PURCHASE_APPROVED' || event === 'PURCHASE_COMPLETE') {
@@ -265,17 +404,22 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
         return res.status(200).json({ status: 'Error: no buyer email' });
       }
 
-      // Find or create user
+      // Find or create user with default password
       let user = await prisma.user.findUnique({ where: { email: buyerEmail } });
+      let isNewUser = false;
       if (!user) {
         user = await prisma.user.create({
-          data: { email: buyerEmail, name: buyerName }
+          data: { email: buyerEmail, name: buyerName, password: DEFAULT_PASSWORD, country: buyerCountry }
         });
-      } else if (buyerName && !user.name) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { name: buyerName }
-        });
+        isNewUser = true;
+      } else {
+        // Update name and country if missing
+        const updates: any = {};
+        if (buyerName && !user.name) updates.name = buyerName;
+        if (buyerCountry && !user.country) updates.country = buyerCountry;
+        if (Object.keys(updates).length > 0) {
+          user = await prisma.user.update({ where: { id: user.id }, data: updates });
+        }
       }
 
       // Find ebook by hotmartOffer (try offer code, then product ID)
@@ -297,17 +441,23 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
           data: { userId: user.id, ebookId: ebook.id }
         });
       } catch (e: any) {
-        // Already has access — no problem
         if (!e.message?.includes('Unique constraint')) {
           throw e;
         }
       }
 
+      // Send welcome email for new users
+      if (isNewUser) {
+        sendWelcomeEmail(prisma, buyerEmail, buyerName, DEFAULT_PASSWORD, buyerCountry).catch(err =>
+          console.error('[Email] Welcome email failed:', err)
+        );
+      }
+
       await prisma.webhookLog.create({
-        data: { event, buyerEmail, buyerName, productId: offerCode, status: 'success', details: `Granted access to "${ebook.title}"` }
+        data: { event, buyerEmail, buyerName, productId: offerCode, status: 'success', details: `Granted access to "${ebook.title}"${isNewUser ? ' (new user, welcome email queued)' : ''}` }
       });
 
-      console.log(`[Hotmart] ✅ Access granted: ${buyerEmail} -> ${ebook.title}`);
+      console.log(`[Hotmart] ✅ Access granted: ${buyerEmail} -> ${ebook.title}${isNewUser ? ' (new user)' : ''}`);
       return res.status(200).json({ status: 'Access granted' });
     }
 
@@ -449,6 +599,46 @@ app.delete('/api/admin/webhook-logs', adminAuth, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to clear logs' });
+  }
+});
+
+// -- EMAIL SETTINGS --
+app.get('/api/admin/settings', adminAuth, async (req, res) => {
+  try {
+    const settings = await prisma.setting.findMany({
+      where: { key: { notIn: (await prisma.setting.findMany({ where: { key: { startsWith: 'reset_token_' } } })).map(s => s.key) } }
+    });
+    // Mask the API key for security
+    const result: Record<string, string> = {};
+    for (const s of settings) {
+      if (s.key === 'resend_api_key' && s.value) {
+        result[s.key] = '••••••••' + s.value.slice(-4);
+      } else {
+        result[s.key] = s.value;
+      }
+    }
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+app.post('/api/admin/settings', adminAuth, async (req, res) => {
+  try {
+    const entries = req.body as Record<string, string>;
+    for (const [key, value] of Object.entries(entries)) {
+      // Skip masked values (don't overwrite with masked text)
+      if (key === 'resend_api_key' && value.startsWith('••')) continue;
+      if (key.startsWith('reset_token_')) continue; // Security: don't allow writing reset tokens
+      await prisma.setting.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value }
+      });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save settings' });
   }
 });
 

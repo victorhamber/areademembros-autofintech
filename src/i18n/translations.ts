@@ -106,6 +106,23 @@ const translations = {
     // ── BookRow / BookCard ──
     book_locked: 'Comprar',
     pdf_not_found: 'Arquivo PDF não encontrado para este livro.',
+
+    // ── Forgot/Reset Password ──
+    forgot_password_link: 'Esqueceu sua senha?',
+    forgot_password_title: 'Recuperar Senha',
+    forgot_password_desc: 'Informe seu e-mail e enviaremos um link para redefinir sua senha.',
+    forgot_password_send: 'Enviar Link',
+    forgot_password_sending: 'Enviando...',
+    forgot_password_sent: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação em instantes.',
+    forgot_password_back: 'Voltar ao login',
+    reset_password_title: 'Nova Senha',
+    reset_password_placeholder: 'Digite sua nova senha',
+    reset_password_confirm: 'Confirmar nova senha',
+    reset_password_btn: 'Redefinir Senha',
+    reset_password_saving: 'Salvando...',
+    reset_password_success: 'Senha alterada com sucesso! Faça login com a nova senha.',
+    reset_password_error: 'Token inválido ou expirado. Solicite novamente.',
+    reset_password_mismatch: 'As senhas não coincidem.',
   },
 
   es: {
@@ -213,6 +230,23 @@ const translations = {
     // ── BookRow / BookCard ──
     book_locked: 'Comprar',
     pdf_not_found: 'Archivo PDF no encontrado para este libro.',
+
+    // ── Forgot/Reset Password ──
+    forgot_password_link: '¿Olvidaste tu contraseña?',
+    forgot_password_title: 'Recuperar Contraseña',
+    forgot_password_desc: 'Ingresa tu e-mail y te enviaremos un enlace para restablecer tu contraseña.',
+    forgot_password_send: 'Enviar Enlace',
+    forgot_password_sending: 'Enviando...',
+    forgot_password_sent: 'Si el e-mail está registrado, recibirás un enlace de recuperación en breve.',
+    forgot_password_back: 'Volver al inicio de sesión',
+    reset_password_title: 'Nueva Contraseña',
+    reset_password_placeholder: 'Escribe tu nueva contraseña',
+    reset_password_confirm: 'Confirmar nueva contraseña',
+    reset_password_btn: 'Cambiar Contraseña',
+    reset_password_saving: 'Guardando...',
+    reset_password_success: '¡Contraseña cambiada con éxito! Inicia sesión con la nueva contraseña.',
+    reset_password_error: 'Token inválido o expirado. Solicítalo de nuevo.',
+    reset_password_mismatch: 'Las contraseñas no coinciden.',
   },
 } as const;
 
