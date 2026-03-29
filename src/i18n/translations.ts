@@ -112,7 +112,7 @@ const translations = {
 
     // ── BookRow / BookCard ──
     book_locked: 'Comprar',
-    pdf_not_found: 'Arquivo PDF não encontrado para este livro.',
+    pdf_not_found: 'Conteúdo não encontrado para este livro (Arquivo ou Link).',
 
     // ── Forgot/Reset Password ──
     forgot_password_link: 'Esqueceu sua senha?',
@@ -243,7 +243,7 @@ const translations = {
 
     // ── BookRow / BookCard ──
     book_locked: 'Comprar',
-    pdf_not_found: 'Archivo PDF no encontrado para este libro.',
+    pdf_not_found: 'Contenido no encontrado para este libro (Archivo o Link).',
 
     // ── Forgot/Reset Password ──
     forgot_password_link: '¿Olvidaste tu contraseña?',

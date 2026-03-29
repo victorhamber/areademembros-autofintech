@@ -87,3 +87,30 @@
 .html-reader-iframe-hidden {
   opacity: 0;
 }
+
+/* ── External Mode (Immersive) ── */
+.html-reader-container:has(.html-external-mode) .html-reader-header {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50px;
+  padding: 6px;
+  width: auto;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.html-reader-container:has(.html-external-mode) .html-reader-title {
+  display: none;
+}
+
+.html-reader-container:has(.html-external-mode) .html-back-btn {
+  color: #fff;
+}
+
+.html-reader-container:has(.html-external-mode) .html-reader-loading {
+  top: 0;
+}

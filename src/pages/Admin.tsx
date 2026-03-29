@@ -23,6 +23,7 @@ export const Admin: React.FC = () => {
   const [coverUrl, setCoverUrl] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
   const [htmlUrl, setHtmlUrl] = useState('');
+  const [externalUrl, setExternalUrl] = useState('');
   const [salesUrl, setSalesUrl] = useState('');
   const [hotmartOffer, setHotmartOffer] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -200,13 +201,13 @@ export const Admin: React.FC = () => {
 
   const clearForm = () => {
     setEditingId(null); setTitle(''); setAuthor(''); setDescription(''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
-    setCoverUrl(''); setPdfUrl(''); setHtmlUrl(''); setSalesUrl(''); setHotmartOffer('');
+    setCoverUrl(''); setPdfUrl(''); setHtmlUrl(''); setExternalUrl(''); setSalesUrl(''); setHotmartOffer('');
     setCategoryId(''); setFeaturedList('');
   };
 
   const handleEdit = (eb: any) => {
     setEditingId(eb.id); setTitle(eb.title); setAuthor(eb.author || ''); setDescription(eb.description || '');
-    setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl || ''); setHtmlUrl(eb.htmlUrl || ''); setSalesUrl(eb.salesUrl);
+    setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl || ''); setHtmlUrl(eb.htmlUrl || ''); setExternalUrl(eb.externalUrl || ''); setSalesUrl(eb.salesUrl);
     setHotmartOffer(eb.hotmartOffer); setCategoryId(eb.categoryId || '');
     setFeaturedList(eb.featuredList || ''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -226,15 +227,15 @@ export const Admin: React.FC = () => {
       if (coverFile) finalCoverUrl = await uploadFile(coverFile);
       if (pdfFile) finalPdfUrl = await uploadFile(pdfFile);
       if (htmlFile) finalHtmlUrl = await uploadFile(htmlFile);
-
+      
       if (!finalCoverUrl) {
         alert('A capa é obrigatória!'); setIsSubmitting(false); return;
       }
-      if (!finalPdfUrl && !finalHtmlUrl) {
-        alert('É obrigatório enviar pelo menos um arquivo: PDF ou HTML!'); setIsSubmitting(false); return;
+      if (!finalPdfUrl && !finalHtmlUrl && !externalUrl) {
+        alert('É obrigatório enviar um arquivo (PDF/HTML) ou inserir um Link Externo!'); setIsSubmitting(false); return;
       }
 
-      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, salesUrl, hotmartOffer, categoryId, featuredList };
+      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, externalUrl: externalUrl || null, salesUrl, hotmartOffer, categoryId, featuredList };
       const res = await fetch(editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks', {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
@@ -504,7 +505,21 @@ export const Admin: React.FC = () => {
               </div>
             </div>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              ⚡ Envie pelo menos um arquivo (PDF ou HTML). Se enviar os dois, o leitor HTML terá prioridade.
+              ⚡ Envie pelo menos um arquivo (PDF ou HTML) ou insira um Link abaixo. Se houver Link, ele terá prioridade total.
+            </p>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Link Externo / App Interativo (Opcional)
+              <span style={{ fontSize: '11px', background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>PRIORIDADE</span>
+            </label>
+            <input 
+              placeholder="https://exemplo.com/app-ou-site-interativo" 
+              value={externalUrl} 
+              onChange={e => setExternalUrl(e.target.value)} 
+              style={{ border: externalUrl ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)' }}
+            />
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '10px' }}>
+              Útil para integrar apps exclusivos, dashboards ou sites externos de suporte ao ebook.
             </p>
             <label>Página de Vendas ou Código HTML (Hotmart) *</label>
             <textarea 
@@ -562,9 +577,10 @@ export const Admin: React.FC = () => {
                       <td><img src={eb.coverUrl} alt={eb.title} /></td>
                       <td>{eb.title}</td>
                       <td>
+                        {eb.externalUrl && <span style={{ background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>LINK</span>}
                         {eb.htmlUrl && <span style={{ background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>HTML</span>}
                         {eb.pdfUrl && <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>PDF</span>}
-                        {!eb.htmlUrl && !eb.pdfUrl && <span style={{ color: '#ef4444', fontSize: '12px' }}>⚠ Sem arquivo</span>}
+                        {!eb.htmlUrl && !eb.pdfUrl && !eb.externalUrl && <span style={{ color: '#ef4444', fontSize: '12px' }}>⚠ Sem arquivo</span>}
                       </td>
                       <td>{eb.category?.name || '-'}</td>
                       <td><span className="badge-highlight">{eb.featuredList || '-'}</span></td>

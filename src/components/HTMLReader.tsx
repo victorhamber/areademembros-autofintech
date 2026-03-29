@@ -9,9 +9,10 @@ interface HTMLReaderProps {
   title: string;
   lang: Lang;
   onClose: () => void;
+  isExternal?: boolean;
 }
 
-export const HTMLReader: React.FC<HTMLReaderProps> = ({ url, title, lang, onClose }) => {
+export const HTMLReader: React.FC<HTMLReaderProps> = ({ url, title, lang, onClose, isExternal }) => {
   const tr = t(lang);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [loading, setLoading] = useState(true);
@@ -68,9 +69,10 @@ export const HTMLReader: React.FC<HTMLReaderProps> = ({ url, title, lang, onClos
       <iframe
         ref={iframeRef}
         src={url}
-        className={`html-reader-iframe ${loading ? 'html-reader-iframe-hidden' : ''}`}
+        className={`html-reader-iframe ${loading ? 'html-reader-iframe-hidden' : ''} ${isExternal ? 'html-external-mode' : ''}`}
         title={title}
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads allow-modals"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
       />
     </div>
   );

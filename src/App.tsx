@@ -95,14 +95,17 @@ function App() {
     const book = books.find(b => b.title === title);
     if (!book) return;
 
-    // Mark reading progress (works for both PDF and HTML)
+    // Mark reading progress (works for PDF, HTML and External Links)
     fetch('/api/reading-progress', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
       body: JSON.stringify({ ebookId: book.id, page: book.lastPage || 1 })
     }).catch(console.error)
 
-    if (book.htmlUrl) {
+    if (book.externalUrl) {
+      // External Link / Interactive App
+      setHtmlReaderData({ url: book.externalUrl, title });
+    } else if (book.htmlUrl) {
       // HTML ebook
       setHtmlReaderData({ url: book.htmlUrl, title });
     } else if (book.pdfUrl) {
@@ -161,6 +164,7 @@ function App() {
           title={htmlReaderData.title}
           lang={lang}
           onClose={handleCloseHtmlReader}
+          isExternal={books.find(b => b.htmlUrl === htmlReaderData.url || b.externalUrl === htmlReaderData.url)?.externalUrl === htmlReaderData.url}
         />
       ) : readerData ? (
         <PDFReader 

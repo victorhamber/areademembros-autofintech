@@ -39,6 +39,7 @@ model Ebook {
   featuredList  String?
   purchases     Purchase[]
   wishlists     Wishlist[]
+  externalUrl   String?
   createdAt     DateTime  @default(now())
 }
 
