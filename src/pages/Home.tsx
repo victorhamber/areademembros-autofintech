@@ -21,6 +21,11 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
 
+  // FILTER BY LANGUAGE (Default to 'pt' for older records without language field)
+  // Hide bonuses from the main general view unless accessed directly or featured 
+  // Wait, user still wants to click to see salesUrl.
+  const activeBooks = books.filter(b => (b.language || 'pt') === lang);
+
   // Reset category pill when lang changes so label matches
   useEffect(() => { setSelectedCategory(''); }, [lang]);
 
@@ -53,7 +58,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
 
   // DYNAMIC HERO BANNER - Auto-rotating carousel
   const [heroIndex, setHeroIndex] = useState(0);
-  const booksWithCovers = books.filter(b => b.coverUrl);
+  const booksWithCovers = activeBooks.filter(b => b.coverUrl && !b.isBonus);
   
   useEffect(() => {
     if (booksWithCovers.length <= 1) return;
@@ -85,29 +90,32 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
 
   // SEARCH FILTER
   const filteredBooks = searchQuery.trim()
-    ? books.filter(b => 
+    ? activeBooks.filter(b => 
         b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b.author && b.author.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : null;
 
-  // Sections
-  const myBooks = books.filter(b => b.hasAccess);
-  const mostRead = [...books]
-    .filter(b => (b._count?.purchases || 0) > 0)
+  // Sections (Filter out bonuses from standard shelves except for 'myBooks' and 'wishlist')
+  const myBooks = activeBooks.filter(b => b.hasAccess);
+  const mostRead = [...activeBooks]
+    .filter(b => !b.isBonus && (b._count?.purchases || 0) > 0)
     .sort((a,b) => (b._count?.purchases || 0) - (a._count?.purchases || 0));
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const newReleases = [...books]
-    .filter(b => new Date(b.createdAt || 0).getTime() > thirtyDaysAgo.getTime())
+  const newReleases = [...activeBooks]
+    .filter(b => !b.isBonus && new Date(b.createdAt || 0).getTime() > thirtyDaysAgo.getTime())
     .sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 10);
-  const wishlisted = books.filter(b => b.isWishlisted);
+  const wishlisted = activeBooks.filter(b => b.isWishlisted);
 
   const categoriesMap = new Map<string, any[]>();
   const featuredMap = new Map<string, any[]>();
 
-  books.forEach(book => {
+  activeBooks.forEach(book => {
+    // Only put bonuses in categories/featured if explicitly marked, usually we might hide them, but let's just make sure
+    if (book.isBonus && !book.hasAccess) return; // Optional: hide unowned bonuses from categories
+
     if (book.category && book.category.name) {
       if (!categoriesMap.has(book.category.name)) categoriesMap.set(book.category.name, []);
       categoriesMap.get(book.category.name)!.push(book);

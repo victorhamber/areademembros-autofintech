@@ -20,6 +20,9 @@ export const Admin: React.FC = () => {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [htmlFile, setHtmlFile] = useState<File | null>(null);
+  const [isBonus, setIsBonus] = useState(false);
+  const [parentEbookId, setParentEbookId] = useState('');
+  const [language, setLanguage] = useState('pt');
   const [coverUrl, setCoverUrl] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
   const [htmlUrl, setHtmlUrl] = useState('');
@@ -199,10 +202,10 @@ export const Admin: React.FC = () => {
     return data.url;
   };
 
-  const clearForm = () => {
+    const clearForm = () => {
     setEditingId(null); setTitle(''); setAuthor(''); setDescription(''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
     setCoverUrl(''); setPdfUrl(''); setHtmlUrl(''); setExternalUrl(''); setSalesUrl(''); setHotmartOffer('');
-    setCategoryId(''); setFeaturedList('');
+    setCategoryId(''); setFeaturedList(''); setIsBonus(false); setParentEbookId(''); setLanguage('pt');
   };
 
   const handleEdit = (eb: any) => {
@@ -210,6 +213,7 @@ export const Admin: React.FC = () => {
     setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl || ''); setHtmlUrl(eb.htmlUrl || ''); setExternalUrl(eb.externalUrl || ''); setSalesUrl(eb.salesUrl);
     setHotmartOffer(eb.hotmartOffer); setCategoryId(eb.categoryId || '');
     setFeaturedList(eb.featuredList || ''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
+    setIsBonus(eb.isBonus || false); setParentEbookId(eb.parentEbookId || ''); setLanguage(eb.language || 'pt');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -235,7 +239,7 @@ export const Admin: React.FC = () => {
         alert('É obrigatório enviar um arquivo (PDF/HTML) ou inserir um Link Externo!'); setIsSubmitting(false); return;
       }
 
-      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, externalUrl: externalUrl || null, salesUrl, hotmartOffer, categoryId, featuredList };
+      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, externalUrl: externalUrl || null, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language };
       const res = await fetch(editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks', {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
@@ -441,6 +445,39 @@ export const Admin: React.FC = () => {
               </div>
             )}
             
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+              <div style={{ flex: 1 }}>
+                <label>Tipo de Cadastro *</label>
+                <select value={isBonus ? 'bonus' : 'produto'} onChange={e => { setIsBonus(e.target.value === 'bonus'); if (e.target.value === 'produto') setParentEbookId(''); }} className="admin-input-styled">
+                  <option value="produto">Produto Principal</option>
+                  <option value="bonus">Bônus Especial</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label>Idioma do Ebook *</label>
+                <select value={language} onChange={e => setLanguage(e.target.value)} className="admin-input-styled">
+                  <option value="pt">Português (PT)</option>
+                  <option value="es">Espanhol (ES)</option>
+                  <option value="en">Inglês (EN)</option>
+                </select>
+              </div>
+            </div>
+
+            {isBonus && (
+              <div style={{ background: 'rgba(212,175,55,0.05)', padding: '15px', borderRadius: '8px', border: '1px solid rgba(212,175,55,0.2)', marginBottom: '15px' }}>
+                <label style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}><KeyRound size={16} /> Vincular Bônus ao Produto Pai *</label>
+                <select value={parentEbookId} onChange={e => setParentEbookId(e.target.value)} className="admin-input-styled" required={isBonus}>
+                  <option value="">Selecione o Produto Principal...</option>
+                  {ebooks.filter(e => !e.isBonus).map(eb => (
+                    <option key={eb.id} value={eb.id}>{eb.title}</option>
+                  ))}
+                </select>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', marginBottom: 0 }}>
+                  Todos os clientes que já compraram ou vierem a comprar o Produto Principal ganharão acesso a este Bônus automaticamente.
+                </p>
+              </div>
+            )}
+
             <label>Título do Livro *</label>
             <input placeholder="Ex: O Poder do Hábito" value={title} onChange={e => setTitle(e.target.value)} required />
             
@@ -541,8 +578,12 @@ export const Admin: React.FC = () => {
               required 
               style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
             />
-            <label>Código da Oferta (Hotmart) *</label>
-            <input placeholder="Letras e Números da Oferta" value={hotmartOffer} onChange={e => setHotmartOffer(e.target.value)} required />
+            {!isBonus && (
+              <>
+                <label>Código da Oferta (Hotmart) *</label>
+                <input placeholder="Letras e Números da Oferta" value={hotmartOffer} onChange={e => setHotmartOffer(e.target.value)} required={!isBonus} />
+              </>
+            )}
             
             <div className="admin-form-actions" style={{ flexDirection: 'column' }}>
               <button type="submit" disabled={isSubmitting}>
@@ -575,7 +616,16 @@ export const Admin: React.FC = () => {
                   {ebooks.map(eb => (
                     <tr key={eb.id}>
                       <td><img src={eb.coverUrl} alt={eb.title} /></td>
-                      <td>{eb.title}</td>
+                      <td>
+                        <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                           {eb.language === 'es' ? '🇪🇸' : eb.language === 'en' ? '🇺🇸' : '🇧🇷'} {eb.title}
+                        </div>
+                        {eb.isBonus && (
+                          <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px', background: 'rgba(212,175,55,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                            🎁 Bônus de: {ebooks.find(p => p.id === eb.parentEbookId)?.title || 'Desconhecido'}
+                          </div>
+                        )}
+                      </td>
                       <td>
                         {eb.externalUrl && <span style={{ background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>LINK</span>}
                         {eb.htmlUrl && <span style={{ background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>HTML</span>}

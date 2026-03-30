@@ -40,6 +40,11 @@ model Ebook {
   purchases     Purchase[]
   wishlists     Wishlist[]
   externalUrl   String?
+  isBonus       Boolean   @default(false)
+  parentEbookId String?
+  parentEbook   Ebook?    @relation("EbookBonuses", fields: [parentEbookId], references: [id])
+  bonuses       Ebook[]   @relation("EbookBonuses")
+  language      String    @default("pt")
   createdAt     DateTime  @default(now())
 }
 

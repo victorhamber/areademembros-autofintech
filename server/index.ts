@@ -505,6 +505,14 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
         }
       }
 
+      // Grant access to bonuses linked to this ebook
+      const bonuses = await prisma.ebook.findMany({ where: { isBonus: true, parentEbookId: ebook.id } });
+      if (bonuses.length > 0) {
+        const newPurchases = bonuses.map(b => ({ userId: user.id, ebookId: b.id }));
+        await prisma.purchase.createMany({ data: newPurchases, skipDuplicates: true });
+        console.log(`[Hotmart] 🎁 Granted bonuses to ${buyerEmail}: ` + bonuses.map(b => b.title).join(', '));
+      }
+
       // Send welcome email for new users
       if (isNewUser) {
         sendWelcomeEmail(prisma, buyerEmail, buyerName, DEFAULT_PASSWORD, buyerCountry).catch(err =>
@@ -528,7 +536,10 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
                    || (productId !== offerCode ? await prisma.ebook.findUnique({ where: { hotmartOffer: productId } }) : null);
 
         if (user && ebook) {
-          await prisma.purchase.deleteMany({ where: { userId: user.id, ebookId: ebook.id } });
+          const linkedBonuses = await prisma.ebook.findMany({ where: { parentEbookId: ebook.id } });
+          const idsToRemove = [ebook.id, ...linkedBonuses.map(b => b.id)];
+          
+          await prisma.purchase.deleteMany({ where: { userId: user.id, ebookId: { in: idsToRemove } } });
           await prisma.webhookLog.create({
             data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Revoked access to "${ebook.title}"` }
           });
@@ -630,7 +641,8 @@ app.post('/api/admin/purchases', adminAuth, async (req, res) => {
 
 app.delete('/api/admin/purchases/:userId/:ebookId', adminAuth, async (req, res) => {
   try {
-    const { userId, ebookId } = req.params;
+    const userId = String(req.params.userId);
+    const ebookId = String(req.params.ebookId);
     await prisma.purchase.deleteMany({ where: { userId, ebookId } });
     res.json({ success: true });
   } catch (error) {
@@ -715,7 +727,11 @@ app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
 
 app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
   try {
-    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, salesUrl, hotmartOffer, categoryId, featuredList } = req.body;
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
+    
+    // Auto-generate hotmartOffer if it's a bonus and not provided
+    const finalOffer = isBonus && !hotmartOffer ? `bonus_${crypto.randomUUID()}` : hotmartOffer;
+
     const newEbook = await prisma.ebook.create({
       data: { 
         title, 
@@ -726,11 +742,25 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
         htmlUrl: htmlUrl || null, 
         externalUrl: externalUrl || null,
         salesUrl, 
-        hotmartOffer, 
+        hotmartOffer: finalOffer,
         categoryId: categoryId || null, 
-        featuredList: featuredList || null 
+        featuredList: featuredList || null,
+        isBonus: isBonus || false,
+        parentEbookId: (isBonus && parentEbookId) ? String(parentEbookId) : null,
+        language: language || 'pt'
       }
     });
+
+    // Retroactive logic: If it's a bonus, distribute access to all existing buyers of the parent ebook
+    if (newEbook.isBonus && newEbook.parentEbookId) {
+      const parentPurchases = await prisma.purchase.findMany({ where: { ebookId: newEbook.parentEbookId } });
+      if (parentPurchases.length > 0) {
+        const newPurchases = parentPurchases.map(p => ({ userId: p.userId, ebookId: newEbook.id }));
+        await prisma.purchase.createMany({ data: newPurchases, skipDuplicates: true });
+        console.log(`[Bônus] ✅ Distribuído bônus "${newEbook.title}" para ${newPurchases.length} clientes do Produto Principal.`);
+      }
+    }
+
     res.json(newEbook);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create eBook' });
@@ -740,7 +770,11 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
 app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, salesUrl, hotmartOffer, categoryId, featuredList } = req.body;
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
+    
+    // Fetch current to see if it just became a bonus or changed parent
+    const currentEbook = await prisma.ebook.findUnique({ where: { id: String(id) } });
+
     const updatedEbook = await prisma.ebook.update({
       where: { id: String(id) },
       data: { 
@@ -754,9 +788,25 @@ app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
         salesUrl, 
         hotmartOffer, 
         categoryId: categoryId || null, 
-        featuredList: featuredList || null 
+        featuredList: featuredList || null,
+        isBonus: isBonus || false,
+        parentEbookId: (isBonus && parentEbookId) ? String(parentEbookId) : null,
+        language: language || 'pt'
       }
     });
+
+    // Retroactive logic if parentEbookId changed or newly became bonus
+    if (updatedEbook.isBonus && updatedEbook.parentEbookId) {
+      if (!currentEbook?.isBonus || currentEbook.parentEbookId !== updatedEbook.parentEbookId) {
+        const parentPurchases = await prisma.purchase.findMany({ where: { ebookId: updatedEbook.parentEbookId } });
+        if (parentPurchases.length > 0) {
+          const newPurchases = parentPurchases.map(p => ({ userId: p.userId, ebookId: updatedEbook.id }));
+          await prisma.purchase.createMany({ data: newPurchases, skipDuplicates: true });
+          console.log(`[Bônus] ✅ Atualização: Distribuído bônus "${updatedEbook.title}" para ${newPurchases.length} clientes do Produto Principal.`);
+        }
+      }
+    }
+
     res.json(updatedEbook);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update eBook' });
@@ -765,7 +815,7 @@ app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
 
 app.delete('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     await prisma.ebook.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
