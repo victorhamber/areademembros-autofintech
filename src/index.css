@@ -67,3 +67,14 @@ button {
   cursor: pointer;
   background: none;
 }
+
+/* Print Block (Anti-cópia/Save as PDF) */
+@media print {
+  body * {
+    display: none !important;
+  }
+  body, html {
+    background-color: #000 !important;
+    color: #fff !important;
+  }
+}
