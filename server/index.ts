@@ -776,6 +776,9 @@ app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
     // Fetch current to see if it just became a bonus or changed parent
     const currentEbook = await prisma.ebook.findUnique({ where: { id: String(id) } });
 
+    // Ensure hotmartOffer remains unique for bonuses if sent as empty string
+    const finalOffer = isBonus && !hotmartOffer ? (currentEbook?.hotmartOffer || `bonus_${crypto.randomUUID()}`) : hotmartOffer;
+
     const updatedEbook = await prisma.ebook.update({
       where: { id: String(id) },
       data: { 
@@ -787,7 +790,7 @@ app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
         htmlUrl: htmlUrl || null, 
         externalUrl: externalUrl || null,
         salesUrl, 
-        hotmartOffer, 
+        hotmartOffer: finalOffer, 
         categoryId: categoryId || null, 
         featuredList: featuredList || null,
         isBonus: isBonus || false,
