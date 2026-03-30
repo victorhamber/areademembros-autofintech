@@ -239,7 +239,10 @@ export const Admin: React.FC = () => {
         alert('É obrigatório enviar um arquivo (PDF/HTML) ou inserir um Link Externo!'); setIsSubmitting(false); return;
       }
 
-      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, externalUrl: externalUrl || null, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language };
+      const finalSalesUrl = isBonus ? '' : salesUrl;
+      const finalOfferCode = isBonus ? '' : hotmartOffer;
+
+      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, externalUrl: externalUrl || null, salesUrl: finalSalesUrl, hotmartOffer: finalOfferCode, categoryId, featuredList, isBonus, parentEbookId, language };
       const res = await fetch(editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks', {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
@@ -558,28 +561,29 @@ export const Admin: React.FC = () => {
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '10px' }}>
               Útil para integrar apps exclusivos, dashboards ou sites externos de suporte ao ebook.
             </p>
-            <label>Página de Vendas ou Código HTML (Hotmart) *</label>
-            <textarea 
-              placeholder="https://... ou cole aqui o script do Checkout Widget da Hotmart" 
-              value={salesUrl} 
-              onChange={e => {
-                const val = e.target.value;
-                if (val.includes('<script') && val.includes('hotmart-fb')) {
-                  const match = val.match(/href=["'](https:\/\/pay\.hotmart\.com\/[^"']+)["']/);
-                  if (match) {
-                    setSalesUrl(match[1]);
-                    alert('Código Hotmart Detectado! A URL do Checkout (Pop-up) foi extraída e convertida automaticamente.');
-                    return;
-                  }
-                }
-                setSalesUrl(val);
-              }} 
-              rows={3}
-              required 
-              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-            />
             {!isBonus && (
               <>
+                <label>Página de Vendas ou Código HTML (Hotmart) *</label>
+                <textarea 
+                  placeholder="https://... ou cole aqui o script do Checkout Widget da Hotmart" 
+                  value={salesUrl} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val.includes('<script') && val.includes('hotmart-fb')) {
+                      const match = val.match(/href=["'](https:\/\/pay\.hotmart\.com\/[^"']+)["']/);
+                      if (match) {
+                        setSalesUrl(match[1]);
+                        alert('Código Hotmart Detectado! A URL do Checkout (Pop-up) foi extraída e convertida automaticamente.');
+                        return;
+                      }
+                    }
+                    setSalesUrl(val);
+                  }} 
+                  rows={3}
+                  required={!isBonus}
+                  style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                />
+                
                 <label>Código da Oferta (Hotmart) *</label>
                 <input placeholder="Letras e Números da Oferta" value={hotmartOffer} onChange={e => setHotmartOffer(e.target.value)} required={!isBonus} />
               </>

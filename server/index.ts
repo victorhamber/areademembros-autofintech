@@ -151,6 +151,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/public/ebooks', async (req, res) => {
   try {
     const ebooks = await prisma.ebook.findMany({ 
+      where: { isBonus: false },
       orderBy: { createdAt: 'desc' },
       include: { category: true }
     });

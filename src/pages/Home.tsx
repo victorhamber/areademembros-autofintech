@@ -91,8 +91,10 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
   // SEARCH FILTER
   const filteredBooks = searchQuery.trim()
     ? activeBooks.filter(b => 
-        b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (b.author && b.author.toLowerCase().includes(searchQuery.toLowerCase()))
+        // Se for Bônus e o usuário não possui, esconde da busca
+        !(b.isBonus && !b.hasAccess) && 
+        (b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (b.author && b.author.toLowerCase().includes(searchQuery.toLowerCase())))
       )
     : null;
 
