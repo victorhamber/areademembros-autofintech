@@ -107,6 +107,7 @@ export const Library: React.FC<LibraryProps> = ({ books, onRead, onToggleWishlis
             {...book} 
             onClick={() => onRead(book.title, book.coverUrl)} 
             onToggleWishlist={onToggleWishlist}
+            lang={lang}
           />
         ))}
       </div>

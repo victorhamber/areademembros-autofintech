@@ -2,6 +2,9 @@ import React from 'react';
 import { Bookmark, Lock } from 'lucide-react';
 import './BookCard.css';
 
+import { t } from '../i18n/translations';
+import type { Lang } from '../i18n/translations';
+
 interface BookCardProps {
   id: string;
   title: string;
@@ -11,6 +14,8 @@ interface BookCardProps {
   hasAccess?: boolean;
   isWishlisted?: boolean;
   salesUrl?: string;
+  isBonus?: boolean;
+  lang?: Lang;
   onClick: (e: React.MouseEvent, id: string, hasAccess: boolean) => void;
   onToggleWishlist?: (id: string) => void;
 }
@@ -24,10 +29,13 @@ export const BookCard: React.FC<BookCardProps> = ({
   hasAccess = false, 
   isWishlisted = false,
   salesUrl,
+  isBonus = false,
+  lang = 'pt',
   onClick,
   onToggleWishlist
 }) => {
   const isHotmart = !hasAccess && salesUrl && salesUrl.includes('pay.hotmart.com');
+  const tr = t(lang);
 
   const content = (
     <>
@@ -41,7 +49,7 @@ export const BookCard: React.FC<BookCardProps> = ({
           style={{ filter: !hasAccess ? 'grayscale(100%)' : 'none' }}
         />
         
-        {hasAccess && <div className="badge-access">Comprado</div>}
+        {hasAccess && <div className="badge-access">{isBonus ? tr.badge_bonus : tr.badge_purchased}</div>}
         
         {/* Lock overlay for books without access */}
         {!hasAccess && (

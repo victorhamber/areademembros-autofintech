@@ -112,6 +112,8 @@ const translations = {
 
     // ── BookRow / BookCard ──
     book_locked: 'Comprar',
+    badge_purchased: 'COMPRADO',
+    badge_bonus: 'BÔNUS',
     pdf_not_found: 'Conteúdo não encontrado para este livro (Arquivo ou Link).',
 
     // ── Forgot/Reset Password ──
@@ -243,6 +245,8 @@ const translations = {
 
     // ── BookRow / BookCard ──
     book_locked: 'Comprar',
+    badge_purchased: 'COMPRADO',
+    badge_bonus: 'BONO',
     pdf_not_found: 'Contenido no encontrado para este libro (Archivo o Link).',
 
     // ── Forgot/Reset Password ──

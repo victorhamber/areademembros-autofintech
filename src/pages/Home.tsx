@@ -249,7 +249,7 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
         {/* SEARCH RESULTS MODE */}
         {filteredBooks !== null ? (
           filteredBooks.length > 0 ? (
-            <BookRow title={`${tr.search_results_title} "${searchQuery}"`} books={filteredBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />
+            <BookRow title={`${tr.search_results_title} "${searchQuery}"`} books={filteredBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />
           ) : (
             <div className="empty-search">
               <p>{tr.no_results} "<strong>{searchQuery}</strong>"</p>
@@ -257,23 +257,23 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
           )
         ) : (
           <>
-            {displayMyBooks.length > 0 && <BookRow title={tr.section_my_books} books={displayMyBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayMyBooks.length > 0 && <BookRow title={tr.section_my_books} books={displayMyBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />}
             
             {Array.from(featuredMap.entries()).map(([listName, lstBooks]) => {
               const displayFeatured = lstBooks.filter(isCategoryMatch);
               if (displayFeatured.length === 0) return null;
-              return <BookRow key={`featured-${listName}`} title={listName} books={displayFeatured} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
+              return <BookRow key={`featured-${listName}`} title={listName} books={displayFeatured} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />;
             })}
 
-            {displayNewReleases.length > 0 && <BookRow title={tr.section_new_releases} books={displayNewReleases} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
-            {displayMostRead.length > 0 && <BookRow title={tr.section_most_read} books={displayMostRead} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayNewReleases.length > 0 && <BookRow title={tr.section_new_releases} books={displayNewReleases} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />}
+            {displayMostRead.length > 0 && <BookRow title={tr.section_most_read} books={displayMostRead} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />}
             
             {Array.from(categoriesMap.entries()).map(([catName, catBooks]) => {
               if (activeCategory !== allLabel && catName !== activeCategory) return null;
-              return <BookRow key={`cat-${catName}`} title={catName} books={catBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />;
+              return <BookRow key={`cat-${catName}`} title={catName} books={catBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />;
             })}
 
-            {displayWishlisted.length > 0 && <BookRow title={tr.section_wishlist} books={displayWishlisted} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} />}
+            {displayWishlisted.length > 0 && <BookRow title={tr.section_wishlist} books={displayWishlisted} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />}
           </>
         )}
       </div>

@@ -2,14 +2,17 @@ import React, { useRef, useState } from 'react';
 import { BookCard } from './BookCard';
 import './BookRow.css';
 
+import type { Lang } from '../i18n/translations';
+
 interface BookRowProps {
   title: string;
   books: any[];
+  lang?: Lang;
   onBookClick: (id: string, hasAccess: boolean) => void;
   onToggleWishlist: (id: string) => void;
 }
 
-export const BookRow: React.FC<BookRowProps> = ({ title, books, onBookClick, onToggleWishlist }) => {
+export const BookRow: React.FC<BookRowProps> = ({ title, books, lang = 'pt', onBookClick, onToggleWishlist }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isMoved, setIsMoved] = useState(false);
@@ -74,6 +77,8 @@ export const BookRow: React.FC<BookRowProps> = ({ title, books, onBookClick, onT
             hasAccess={book.hasAccess}
             isWishlisted={book.isWishlisted}
             salesUrl={book.salesUrl}
+            isBonus={book.isBonus}
+            lang={lang}
             onClick={handleClick}
             onToggleWishlist={handleWishlist}
           />
