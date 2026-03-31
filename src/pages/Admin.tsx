@@ -584,8 +584,11 @@ export const Admin: React.FC = () => {
                   style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 />
                 
-                <label>Código da Oferta (Hotmart) *</label>
-                <input placeholder="Letras e Números da Oferta" value={hotmartOffer} onChange={e => setHotmartOffer(e.target.value)} required={!isBonus} />
+                <label>Código(s) da Oferta (Hotmart) *</label>
+                <input placeholder="Ex: zct67hul, PROMO123 (Códigos separados por vírgula)" value={hotmartOffer} onChange={e => setHotmartOffer(e.target.value)} required={!isBonus} />
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '10px' }}>
+                  Você pode adicionar múltiplos códigos se tiver valores promocionais diferentes para o mesmo ebook.
+                </p>
               </>
             )}
             

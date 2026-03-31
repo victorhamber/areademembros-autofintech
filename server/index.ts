@@ -482,11 +482,19 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
         }
       }
 
-      // Find ebook by hotmartOffer (try offer code, then product ID)
-      let ebook = await prisma.ebook.findUnique({ where: { hotmartOffer: offerCode } });
-      if (!ebook && productId !== offerCode) {
-        ebook = await prisma.ebook.findUnique({ where: { hotmartOffer: productId } });
-      }
+      // Find ebook by hotmartOffer (try offer code, then product ID, supporting comma-separated values)
+      const possibleEbooks = await prisma.ebook.findMany({
+        where: {
+          OR: [
+            { hotmartOffer: { contains: offerCode } },
+            { hotmartOffer: { contains: productId } }
+          ]
+        }
+      });
+      let ebook = possibleEbooks.find(e => {
+        const codes = e.hotmartOffer.split(',').map(s => s.trim());
+        return codes.includes(offerCode) || codes.includes(productId);
+      }) || null;
 
       if (!ebook) {
         await prisma.webhookLog.create({
@@ -529,12 +537,22 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
       return res.status(200).json({ status: 'Access granted' });
     }
 
-    // PURCHASE_CANCELED / PURCHASE_REFUNDED — Revoke access
     if (event === 'PURCHASE_CANCELED' || event === 'PURCHASE_REFUNDED' || event === 'PURCHASE_CHARGEBACK') {
       if (buyerEmail) {
         const user = await prisma.user.findUnique({ where: { email: buyerEmail } });
-        const ebook = await prisma.ebook.findUnique({ where: { hotmartOffer: offerCode } }) 
-                   || (productId !== offerCode ? await prisma.ebook.findUnique({ where: { hotmartOffer: productId } }) : null);
+        
+        const possibleEbooks = await prisma.ebook.findMany({
+          where: {
+            OR: [
+              { hotmartOffer: { contains: offerCode } },
+              { hotmartOffer: { contains: productId } }
+            ]
+          }
+        });
+        const ebook = possibleEbooks.find(e => {
+          const codes = e.hotmartOffer.split(',').map(s => s.trim());
+          return codes.includes(offerCode) || codes.includes(productId);
+        }) || null;
 
         if (user && ebook) {
           const linkedBonuses = await prisma.ebook.findMany({ where: { parentEbookId: ebook.id } });

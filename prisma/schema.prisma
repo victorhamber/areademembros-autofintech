@@ -33,7 +33,7 @@ model Ebook {
   pdfUrl        String?           
   htmlUrl       String?           
   salesUrl      String            
-  hotmartOffer  String    @unique 
+  hotmartOffer  String    
   categoryId    String?
   category      Category? @relation(fields: [categoryId], references: [id])
   featuredList  String?
