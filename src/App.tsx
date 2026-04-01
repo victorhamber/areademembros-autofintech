@@ -102,7 +102,11 @@ function App() {
       body: JSON.stringify({ ebookId: book.id, page: book.lastPage || 1 })
     }).catch(console.error)
 
-    if (book.externalUrl) {
+    if (book.redirectUrl) {
+      // Direct external redirect
+      window.open(book.redirectUrl, '_blank');
+      // No need to set active reader data
+    } else if (book.externalUrl) {
       // External Link / Interactive App
       setHtmlReaderData({ url: book.externalUrl, title });
     } else if (book.htmlUrl) {

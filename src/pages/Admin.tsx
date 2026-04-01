@@ -27,6 +27,7 @@ export const Admin: React.FC = () => {
   const [pdfUrl, setPdfUrl] = useState('');
   const [htmlUrl, setHtmlUrl] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
+  const [redirectUrl, setRedirectUrl] = useState('');
   const [salesUrl, setSalesUrl] = useState('');
   const [hotmartOffer, setHotmartOffer] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -221,13 +222,13 @@ export const Admin: React.FC = () => {
 
     const clearForm = () => {
     setEditingId(null); setTitle(''); setAuthor(''); setDescription(''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
-    setCoverUrl(''); setPdfUrl(''); setHtmlUrl(''); setExternalUrl(''); setSalesUrl(''); setHotmartOffer('');
+    setCoverUrl(''); setPdfUrl(''); setHtmlUrl(''); setExternalUrl(''); setRedirectUrl(''); setSalesUrl(''); setHotmartOffer('');
     setCategoryId(''); setFeaturedList(''); setIsBonus(false); setParentEbookId(''); setLanguage('pt');
   };
 
   const handleEdit = (eb: any) => {
     setEditingId(eb.id); setTitle(eb.title); setAuthor(eb.author || ''); setDescription(eb.description || '');
-    setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl || ''); setHtmlUrl(eb.htmlUrl || ''); setExternalUrl(eb.externalUrl || ''); setSalesUrl(eb.salesUrl);
+    setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl || ''); setHtmlUrl(eb.htmlUrl || ''); setExternalUrl(eb.externalUrl || ''); setRedirectUrl(eb.redirectUrl || ''); setSalesUrl(eb.salesUrl);
     setHotmartOffer(eb.hotmartOffer); setCategoryId(eb.categoryId || '');
     setFeaturedList(eb.featuredList || ''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
     setIsBonus(eb.isBonus || false); setParentEbookId(eb.parentEbookId || ''); setLanguage(eb.language || 'pt');
@@ -252,14 +253,14 @@ export const Admin: React.FC = () => {
       if (!finalCoverUrl) {
         alert('A capa é obrigatória!'); setIsSubmitting(false); return;
       }
-      if (!finalPdfUrl && !finalHtmlUrl && !externalUrl) {
-        alert('É obrigatório enviar um arquivo (PDF/HTML) ou inserir um Link Externo!'); setIsSubmitting(false); return;
+      if (!finalPdfUrl && !finalHtmlUrl && !externalUrl && !redirectUrl) {
+        alert('É obrigatório enviar um arquivo (PDF/HTML) ou inserir um Link (Externo/Redirecionamento)!'); setIsSubmitting(false); return;
       }
 
       const finalSalesUrl = isBonus ? '' : salesUrl;
       const finalOfferCode = isBonus ? '' : hotmartOffer;
 
-      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, externalUrl: externalUrl || null, salesUrl: finalSalesUrl, hotmartOffer: finalOfferCode, categoryId, featuredList, isBonus, parentEbookId, language };
+      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, externalUrl: externalUrl || null, redirectUrl: redirectUrl || null, salesUrl: finalSalesUrl, hotmartOffer: finalOfferCode, categoryId, featuredList, isBonus, parentEbookId, language };
       const res = await fetch(editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks', {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
@@ -581,8 +582,23 @@ export const Admin: React.FC = () => {
               style={{ border: externalUrl ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)' }}
             />
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '10px' }}>
-              Útil para integrar apps exclusivos, dashboards ou sites externos de suporte ao ebook.
+              Útil para integrar apps exclusivos, dashboards ou sites externos de suporte ao ebook mantendo o usuário dentro da plataforma (Iframe).
             </p>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Link de Redirecionamento Direto (Downlod/Site Externo)
+              <span style={{ fontSize: '11px', background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>PRIORIDADE MÁXIMA</span>
+            </label>
+            <input 
+              placeholder="https://exemplo.com/download-do-bonus.zip" 
+              value={redirectUrl} 
+              onChange={e => setRedirectUrl(e.target.value)} 
+              style={{ border: redirectUrl ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)' }}
+            />
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '10px' }}>
+              Ao usar esta opção, o arquivo/link será aberto diretamente em uma nova aba ignorando o leitor interno.
+            </p>
+
             {!isBonus && (
               <>
                 <label>Página de Vendas ou Código HTML (Hotmart) *</label>
@@ -656,10 +672,11 @@ export const Admin: React.FC = () => {
                         )}
                       </td>
                       <td>
-                        {eb.externalUrl && <span style={{ background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>LINK</span>}
-                        {eb.htmlUrl && <span style={{ background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>HTML</span>}
-                        {eb.pdfUrl && <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>PDF</span>}
-                        {!eb.htmlUrl && !eb.pdfUrl && !eb.externalUrl && <span style={{ color: '#ef4444', fontSize: '12px' }}>⚠ Sem arquivo</span>}
+                        {eb.redirectUrl && <span style={{ background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>REDIRECT</span>}
+                        {eb.externalUrl && !eb.redirectUrl && <span style={{ background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>LINK</span>}
+                        {eb.htmlUrl && !eb.redirectUrl && <span style={{ background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>HTML</span>}
+                        {eb.pdfUrl && !eb.redirectUrl && <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>PDF</span>}
+                        {!eb.htmlUrl && !eb.pdfUrl && !eb.externalUrl && !eb.redirectUrl && <span style={{ color: '#ef4444', fontSize: '12px' }}>⚠ Sem arquivo</span>}
                       </td>
                       <td>{eb.category?.name || '-'}</td>
                       <td><span className="badge-highlight">{eb.featuredList || '-'}</span></td>

@@ -782,7 +782,7 @@ app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
 
 app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
   try {
-    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
     
     // Auto-generate hotmartOffer if it's a bonus and not provided
     const finalOffer = isBonus && !hotmartOffer ? `bonus_${crypto.randomUUID()}` : hotmartOffer;
@@ -796,6 +796,7 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
         pdfUrl: pdfUrl || null, 
         htmlUrl: htmlUrl || null, 
         externalUrl: externalUrl || null,
+        redirectUrl: redirectUrl || null,
         salesUrl, 
         hotmartOffer: finalOffer,
         categoryId: categoryId || null, 
@@ -825,7 +826,7 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
 app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
     
     // Fetch current to see if it just became a bonus or changed parent
     const currentEbook = await prisma.ebook.findUnique({ where: { id: String(id) } });
@@ -843,6 +844,7 @@ app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
         pdfUrl: pdfUrl || null, 
         htmlUrl: htmlUrl || null, 
         externalUrl: externalUrl || null,
+        redirectUrl: redirectUrl || null,
         salesUrl, 
         hotmartOffer: finalOffer, 
         categoryId: categoryId || null, 

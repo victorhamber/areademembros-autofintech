@@ -40,6 +40,7 @@ model Ebook {
   purchases     Purchase[]
   wishlists     Wishlist[]
   externalUrl   String?
+  redirectUrl   String?
   isBonus       Boolean   @default(false)
   parentEbookId String?
   parentEbook   Ebook?    @relation("EbookBonuses", fields: [parentEbookId], references: [id])
