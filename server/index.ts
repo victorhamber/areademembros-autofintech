@@ -548,7 +548,7 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
       return res.status(200).json({ status: 'Access granted' });
     }
 
-    if (event === 'PURCHASE_CANCELED' || event === 'PURCHASE_REFUNDED' || event === 'PURCHASE_CHARGEBACK') {
+    if (event === 'PURCHASE_CANCELED' || event === 'PURCHASE_REFUNDED' || event === 'PURCHASE_CHARGEBACK' || event === 'PURCHASE_PROTEST') {
       if (buyerEmail) {
         const user = await prisma.user.findUnique({ where: { email: buyerEmail } });
         
