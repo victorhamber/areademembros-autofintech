@@ -175,6 +175,23 @@ export const Admin: React.FC = () => {
     } catch(err) { alert('Erro.'); }
   };
 
+  const handleDeleteUser = async (user: any) => {
+    if (!window.confirm(`⚠️ Tem certeza que deseja EXCLUIR permanentemente o usuário ${user.email} e todos os seus históricos e acessos? Essa ação é IRREVERSÍVEL.`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-password': masterPassword }
+      });
+      if (res.ok) {
+        alert('Usuário excluído com sucesso!');
+        fetchUsers(masterPassword);
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || 'Falha ao excluir usuário.');
+      }
+    } catch(err) { alert('Erro na comunicação com servidor.'); }
+  };
+
   // -- EBOOKS MANAGEMENT --
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim()) return;
@@ -409,9 +426,14 @@ export const Admin: React.FC = () => {
                         </span>
                       </td>
                       <td>
-                        <button className="btn-primary" onClick={() => setManagingAccessFor(u)} style={{ fontSize: '12px', padding: '6px 14px' }}>
-                          <KeyRound size={14} /> Acessos
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button className="btn-primary" onClick={() => setManagingAccessFor(u)} style={{ fontSize: '12px', padding: '6px 14px' }}>
+                            <KeyRound size={14} /> Acessos
+                          </button>
+                          <button className="btn-icon btn-danger" onClick={() => handleDeleteUser(u)} title="Excluir Usuário">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

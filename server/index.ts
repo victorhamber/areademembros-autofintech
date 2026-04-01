@@ -450,10 +450,17 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
     const buyerEmail = body.data?.buyer?.email?.toLowerCase()?.trim();
     const buyerName = body.data?.buyer?.name || body.data?.buyer?.first_name || null;
     const buyerCountry = body.data?.purchase?.checkout_country?.iso || body.data?.buyer?.address?.country || null;
-    const productId = String(body.data?.product?.id || body.data?.product?.ucode || '');
-    const offerCode = body.data?.product?.offer_code || body.data?.purchase?.offer?.code || productId;
+    const productId = String(body.data?.product?.id || body.data?.product?.ucode || '').trim();
+    const offerCode = String(body.data?.product?.offer_code || body.data?.purchase?.offer?.code || productId).trim();
 
     console.log(`[Hotmart Webhook] Event: ${event}, Buyer: ${buyerEmail}, Country: ${buyerCountry}, Product: ${productId}, Offer: ${offerCode}`);
+
+    if (!productId && !offerCode) {
+      await prisma.webhookLog.create({
+        data: { event, status: 'ignored', details: 'Missing product ID and offer code' }
+      });
+      return res.status(200).json({ status: 'Ignored: missing product or offer info' });
+    }
 
     // PURCHASE_APPROVED — Create user + grant access
     if (event === 'PURCHASE_APPROVED' || event === 'PURCHASE_COMPLETE') {
@@ -482,7 +489,7 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
         }
       }
 
-      // Find ebook by hotmartOffer (try offer code, then product ID, supporting comma-separated values)
+      // Find ebooks by hotmartOffer
       const possibleEbooks = await prisma.ebook.findMany({
         where: {
           OR: [
@@ -491,35 +498,38 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
           ]
         }
       });
-      let ebook = possibleEbooks.find(e => {
+      
+      const ebooksToProcess = possibleEbooks.filter(e => {
         const codes = e.hotmartOffer.split(',').map(s => s.trim());
         return codes.includes(offerCode) || codes.includes(productId);
-      }) || null;
+      });
 
-      if (!ebook) {
+      if (ebooksToProcess.length === 0) {
         await prisma.webhookLog.create({
           data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'error', details: `No ebook found for offer: ${offerCode}` }
         });
         return res.status(200).json({ status: 'No matching ebook' });
       }
 
-      // Grant access (idempotent)
-      try {
-        await prisma.purchase.create({
-          data: { userId: user.id, ebookId: ebook.id }
-        });
-      } catch (e: any) {
-        if (!e.message?.includes('Unique constraint')) {
-          throw e;
+      // Grant access (idempotent, supports repurchasing/reactivation)
+      for (const ebook of ebooksToProcess) {
+        try {
+          await prisma.purchase.create({
+            data: { userId: user.id, ebookId: ebook.id }
+          });
+        } catch (e: any) {
+          if (!e.message?.includes('Unique constraint')) {
+            throw e;
+          }
         }
-      }
 
-      // Grant access to bonuses linked to this ebook
-      const bonuses = await prisma.ebook.findMany({ where: { isBonus: true, parentEbookId: ebook.id } });
-      if (bonuses.length > 0) {
-        const newPurchases = bonuses.map(b => ({ userId: user.id, ebookId: b.id }));
-        await prisma.purchase.createMany({ data: newPurchases, skipDuplicates: true });
-        console.log(`[Hotmart] 🎁 Granted bonuses to ${buyerEmail}: ` + bonuses.map(b => b.title).join(', '));
+        // Grant access to bonuses linked to this ebook
+        const bonuses = await prisma.ebook.findMany({ where: { isBonus: true, parentEbookId: ebook.id } });
+        if (bonuses.length > 0) {
+          const newPurchases = bonuses.map(b => ({ userId: user.id, ebookId: b.id }));
+          await prisma.purchase.createMany({ data: newPurchases, skipDuplicates: true });
+          console.log(`[Hotmart] 🎁 Granted bonuses to ${buyerEmail}: ` + bonuses.map(b => b.title).join(', '));
+        }
       }
 
       // Send welcome email for new users
@@ -529,11 +539,12 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
         );
       }
 
+      const titles = ebooksToProcess.map(e => e.title).join(', ');
       await prisma.webhookLog.create({
-        data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Granted access to "${ebook.title}"${isNewUser ? ' (new user, welcome email queued)' : ''}` }
+        data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Granted access to "${titles}"${isNewUser ? ' (new user, welcome email queued)' : ''}` }
       });
 
-      console.log(`[Hotmart] ✅ Access granted: ${buyerEmail} -> ${ebook.title}${isNewUser ? ' (new user)' : ''}`);
+      console.log(`[Hotmart] ✅ Access granted: ${buyerEmail} -> ${titles}${isNewUser ? ' (new user)' : ''}`);
       return res.status(200).json({ status: 'Access granted' });
     }
 
@@ -549,20 +560,26 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
             ]
           }
         });
-        const ebook = possibleEbooks.find(e => {
+        
+        const ebooksToProcess = possibleEbooks.filter(e => {
           const codes = e.hotmartOffer.split(',').map(s => s.trim());
           return codes.includes(offerCode) || codes.includes(productId);
-        }) || null;
+        });
 
-        if (user && ebook) {
-          const linkedBonuses = await prisma.ebook.findMany({ where: { parentEbookId: ebook.id } });
-          const idsToRemove = [ebook.id, ...linkedBonuses.map(b => b.id)];
+        if (user && ebooksToProcess.length > 0) {
+          let idsToRemove: string[] = [];
+          for (const eb of ebooksToProcess) {
+            idsToRemove.push(eb.id);
+            const linkedBonuses = await prisma.ebook.findMany({ where: { parentEbookId: eb.id } });
+            idsToRemove.push(...linkedBonuses.map(b => b.id));
+          }
           
           await prisma.purchase.deleteMany({ where: { userId: user.id, ebookId: { in: idsToRemove } } });
+          const titles = ebooksToProcess.map(e => e.title).join(', ');
           await prisma.webhookLog.create({
-            data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Revoked access to "${ebook.title}"` }
+            data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Revoked access to "${titles}"` }
           });
-          console.log(`[Hotmart] ❌ Access revoked: ${buyerEmail} -> ${ebook.title}`);
+          console.log(`[Hotmart] ❌ Access revoked: ${buyerEmail} -> ${titles}`);
         } else {
           await prisma.webhookLog.create({
             data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'warning', details: 'User or ebook not found for revocation' }
@@ -666,6 +683,25 @@ app.delete('/api/admin/purchases/:userId/:ebookId', adminAuth, async (req, res) 
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Falha ao revogar acesso' });
+  }
+});
+
+app.delete('/api/admin/users/:id', adminAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    
+    // Cleanup user relations first
+    await prisma.purchase.deleteMany({ where: { userId: id } });
+    await prisma.wishlist.deleteMany({ where: { userId: id } });
+    await prisma.highlight.deleteMany({ where: { userId: id } });
+    
+    // Delete user
+    await prisma.user.delete({ where: { id } });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete user:', error);
+    res.status(500).json({ error: 'Falha ao excluir usuário. Verifique logs.' });
   }
 });
 // -----------------------------
