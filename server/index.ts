@@ -13,6 +13,12 @@ dotenv.config();
 
 const DEFAULT_PASSWORD = 'Mudar123@';
 
+const DEFAULT_APP_URL = 'https://app.readlyme.com';
+function getAppUrl() {
+  const raw = (process.env.APP_URL || DEFAULT_APP_URL).trim();
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
 // Spanish-speaking country ISO codes
 const ES_COUNTRIES = ['AR','BO','CL','CO','CR','CU','DO','EC','SV','GQ','GT','HN','MX','NI','PA','PY','PE','ES','UY','VE'];
 
@@ -93,7 +99,7 @@ async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name:
         </div>`;
   }
 
-  const appUrl = process.env.APP_URL || 'https://readlyme.com';
+  const appUrl = getAppUrl();
   const html = template
     .replace(/\{\{name\}\}/g, name || (lang === 'es' ? 'Lector(a)' : 'Leitor(a)'))
     .replace(/\{\{email\}\}/g, email)
@@ -215,7 +221,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const templateKey = lang === 'es' ? 'reset_template_es' : 'reset_template_pt';
     let template = await getSetting(prisma, templateKey);
 
-    const appUrl = process.env.APP_URL || 'https://readlyme.com';
+    const appUrl = getAppUrl();
     const resetLink = `${appUrl}?reset_token=${token}&user_id=${user.id}`;
 
     if (!template) {
