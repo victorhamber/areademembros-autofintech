@@ -28,6 +28,7 @@ function App() {
   const [readerData, setReaderData] = useState<{url: string, title: string, ebookId: string, initialPage: number} | null>(null)
   const [htmlReaderData, setHtmlReaderData] = useState<{url: string, title: string} | null>(null)
   const [showShowcase, setShowShowcase] = useState(false)
+  const [showcaseSlug, setShowcaseSlug] = useState<string | null>(null)
   
   const [catalog, setCatalog] = useState<any[]>([])
   const [myBooksData, setMyBooksData] = useState<any[]>([])
@@ -78,6 +79,19 @@ function App() {
   }
 
   useEffect(() => { fetchData() }, [userId])
+
+  useEffect(() => {
+    const path = window.location.pathname.replace(/\/+$/, '')
+    const match = path.match(/^\/(vitrine|catalogo|cat[aá]logo)(?:\/([^/]+))?$/i)
+    if (match) {
+      setShowShowcase(true)
+      setShowcaseSlug(match[2] ? decodeURIComponent(match[2]) : null)
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    const qLang = params.get('lang')
+    if (qLang === 'pt' || qLang === 'es') setLang(qLang)
+  }, [setLang])
 
   const books = catalog.map(book => {
     const myBookData = myBooksData.find(mb => mb.id === book.id)
@@ -155,7 +169,7 @@ function App() {
 
   if (!userId) {
     if (showShowcase) {
-      return <Showcase lang={lang} onBack={() => setShowShowcase(false)} />
+      return <Showcase lang={lang} slug={showcaseSlug} onBack={() => { setShowShowcase(false); setShowcaseSlug(null) }} />
     }
     return <Login onLogin={handleLogin} lang={lang} setLang={setLang} onShowcase={() => setShowShowcase(true)} />
   }

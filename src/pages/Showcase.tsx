@@ -3,6 +3,7 @@ import { t } from '../i18n/translations';
 import type { Lang } from '../i18n/translations';
 import './Showcase.css';
 import { X, ShoppingCart } from 'lucide-react';
+import { slugify } from '../utils/slug';
 
 interface Ebook {
   id: string;
@@ -17,13 +18,22 @@ interface Ebook {
 interface ShowcaseProps {
   lang: Lang;
   onBack: () => void;
+  slug?: string | null;
 }
 
-export const Showcase: React.FC<ShowcaseProps> = ({ lang, onBack }) => {
+export const Showcase: React.FC<ShowcaseProps> = ({ lang, onBack, slug }) => {
   const tr = t(lang);
   const [ebooks, setEbooks] = useState<Ebook[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEbook, setSelectedEbook] = useState<Ebook | null>(null);
+
+  const activeSlug = (slug || '').trim().toLowerCase();
+  const filteredEbooks = !activeSlug
+    ? ebooks
+    : ebooks.filter(e => {
+        const cat = e.category?.name ? slugify(e.category.name) : '';
+        return cat === activeSlug;
+      });
 
   useEffect(() => {
     fetch('/api/public/ebooks')
@@ -39,9 +49,11 @@ export const Showcase: React.FC<ShowcaseProps> = ({ lang, onBack }) => {
     <div className="showcase-container">
       <header className="showcase-header">
         <img src="/logo.png" alt="Readlyme" className="showcase-logo" />
-        <button className="showcase-back-btn" onClick={onBack}>
-          {tr.showcase_back_btn}
-        </button>
+        {!activeSlug && (
+          <button className="showcase-back-btn" onClick={onBack}>
+            {tr.showcase_back_btn}
+          </button>
+        )}
       </header>
 
       <div className="showcase-title-section">
@@ -60,7 +72,7 @@ export const Showcase: React.FC<ShowcaseProps> = ({ lang, onBack }) => {
         </div>
       ) : (
         <div className="showcase-grid">
-          {ebooks.map(ebook => (
+          {filteredEbooks.map(ebook => (
             <div 
               key={ebook.id} 
               className="showcase-card"
@@ -83,7 +95,12 @@ export const Showcase: React.FC<ShowcaseProps> = ({ lang, onBack }) => {
       {selectedEbook && (
         <div className="showcase-modal-overlay" onClick={() => setSelectedEbook(null)}>
           <div className="showcase-modal-content" onClick={e => e.stopPropagation()}>
-            <button className="showcase-modal-close" onClick={() => setSelectedEbook(null)}>
+            <button
+              className="showcase-modal-close"
+              onClick={() => setSelectedEbook(null)}
+              aria-label="Fechar"
+              title="Fechar"
+            >
               <X size={20} />
             </button>
             
