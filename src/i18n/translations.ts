@@ -16,7 +16,7 @@ const translations = {
 
     // ── Showcase ──
     showcase_title: 'Nossa Vitrine',
-    showcase_description: 'Explore nossos ebooks disponíveis para você.',
+    showcase_description: 'Explore nossos produtos disponíveis para você.',
     showcase_buy_btn: 'Comprar Agora',
     showcase_back_btn: 'Voltar ao Login',
     showcase_details_title: 'Detalhes do Ebook',
@@ -149,7 +149,7 @@ const translations = {
 
     // ── Showcase ──
     showcase_title: 'Nuestro Catálogo',
-    showcase_description: 'Explora nuestros ebooks disponibles para ti.',
+    showcase_description: 'Explora nuestros productos disponibles para ti.',
     showcase_buy_btn: 'Comprar Ahora',
     showcase_back_btn: 'Volver al Login',
     showcase_details_title: 'Detalles del Ebook',
