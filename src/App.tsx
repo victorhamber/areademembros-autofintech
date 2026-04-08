@@ -13,6 +13,13 @@ import { t } from './i18n/translations'
 import type { Lang } from './i18n/translations'
 import './App.css'
 
+function parseShowcaseRoute(pathname: string): { isShowcase: boolean; slug: string | null } {
+  const path = pathname.replace(/\/+$/, '')
+  const match = path.match(/^\/(vitrine|catalogo|cat[aá]logo)(?:\/([^/]+))?$/i)
+  if (!match) return { isShowcase: false, slug: null }
+  return { isShowcase: true, slug: match[2] ? decodeURIComponent(match[2]) : null }
+}
+
 function App() {
   if (window.location.pathname === '/admin') {
     return <Admin />
@@ -21,6 +28,7 @@ function App() {
   const { lang, setLang } = useLanguage()
   const tr = t(lang)
 
+  const [routePathname, setRoutePathname] = useState(() => window.location.pathname)
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('ebookpro_userId'))
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('ebookpro_userEmail'))
   const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('ebookpro_userName'))
@@ -81,17 +89,32 @@ function App() {
   useEffect(() => { fetchData() }, [userId])
 
   useEffect(() => {
-    const path = window.location.pathname.replace(/\/+$/, '')
-    const match = path.match(/^\/(vitrine|catalogo|cat[aá]logo)(?:\/([^/]+))?$/i)
-    if (match) {
-      setShowShowcase(true)
-      setShowcaseSlug(match[2] ? decodeURIComponent(match[2]) : null)
-    }
+    const onPopState = () => setRoutePathname(window.location.pathname)
+    window.addEventListener('popstate', onPopState)
 
     const params = new URLSearchParams(window.location.search)
     const qLang = params.get('lang')
     if (qLang === 'pt' || qLang === 'es') setLang(qLang)
+
+    return () => window.removeEventListener('popstate', onPopState)
   }, [setLang])
+
+  useEffect(() => {
+    const parsed = parseShowcaseRoute(routePathname)
+    if (parsed.isShowcase) {
+      setShowShowcase(true)
+      setShowcaseSlug(parsed.slug)
+    } else {
+      setShowShowcase(false)
+      setShowcaseSlug(null)
+    }
+  }, [routePathname])
+
+  const navigate = (pathname: string) => {
+    if (window.location.pathname === pathname) return
+    window.history.pushState({}, '', pathname)
+    setRoutePathname(pathname)
+  }
 
   const books = catalog.map(book => {
     const myBookData = myBooksData.find(mb => mb.id === book.id)
@@ -167,11 +190,12 @@ function App() {
     localStorage.setItem('ebookpro_userName', newName)
   }
 
+  if (showShowcase) {
+    return <Showcase lang={lang} slug={showcaseSlug} onBack={() => navigate('/')} />
+  }
+
   if (!userId) {
-    if (showShowcase) {
-      return <Showcase lang={lang} slug={showcaseSlug} onBack={() => { setShowShowcase(false); setShowcaseSlug(null) }} />
-    }
-    return <Login onLogin={handleLogin} lang={lang} setLang={setLang} onShowcase={() => setShowShowcase(true)} />
+    return <Login onLogin={handleLogin} lang={lang} setLang={setLang} onShowcase={() => navigate('/vitrine')} />
   }
 
   return (
