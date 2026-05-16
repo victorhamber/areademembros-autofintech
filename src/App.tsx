@@ -220,7 +220,7 @@ function App() {
   }
 
   if (!userId) {
-    return <Login onLogin={handleLogin} lang={lang} setLang={setLang} onShowcase={() => navigate('/vitrine')} />
+    return <Login onLogin={handleLogin} lang={lang} setLang={setLang} />
   }
 
   const memberNavItems: { tab: MemberTab; Icon: LucideIcon; label: string }[] = [

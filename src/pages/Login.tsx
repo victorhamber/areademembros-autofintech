@@ -8,12 +8,11 @@ interface LoginProps {
   onLogin: (userId: string, email: string) => void;
   lang: Lang;
   setLang: (l: Lang) => void;
-  onShowcase: () => void;
 }
 
 type View = 'login' | 'forgot' | 'reset' | 'trial';
 
-export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang, onShowcase }) => {
+export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
   const tr = t(lang);
   const [view, setView] = useState<View>('login');
   const [email, setEmail] = useState('');
@@ -200,19 +199,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang, onShowcase
           </div>
         )}
 
-        <div style={{ textAlign: 'center', marginBottom: '24px', userSelect: 'none' }}>
-          <img 
-            src="/logo.png" 
-            alt={tr.login_brand_title} 
-            style={{ maxWidth: '240px', height: 'auto', userSelect: 'none', pointerEvents: 'none' }} 
-            draggable={false} 
-          />
-        </div>
-
         <div className="login-identity-block">
           <p className="login-kicker">{tr.login_kicker}</p>
           <h1 className="login-title-main">{tr.login_brand_title}</h1>
-          <p className="login-support-text">{tr.login_support_text}</p>
         </div>
 
         {/* ── LOGIN VIEW ── */}
@@ -253,19 +242,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang, onShowcase
                 {loading ? tr.login_loading : tr.login_btn}
               </button>
             </form>
-            
-            <p className="login-footer">
-              {tr.login_footer} <button type="button" onClick={onShowcase} className="showcase-link-btn">{tr.login_footer_link}</button>
-            </p>
-            <p className="login-footer" style={{ marginTop: 8 }}>
-              <button
-                type="button"
-                onClick={() => { setView('trial'); setTrialMsg(null); }}
-                className="showcase-link-btn"
-              >
-                {tr.login_trial_link}
-              </button>
-            </p>
           </>
         )}
 
