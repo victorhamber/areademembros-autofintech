@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react'
-import { Home as HomeIcon, Library as LibraryIcon, User as UserIcon } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Home as HomeIcon, User as UserIcon, ShieldCheck, Trophy, GraduationCap, Download, LifeBuoy, type LucideIcon } from 'lucide-react'
 import { Home } from './pages/Home'
-import { Library } from './pages/Library'
+import { ValidationPanel } from './pages/ValidationPanel'
+import { Ranking } from './pages/Ranking'
 import { Login } from './pages/Login'
 import { Admin } from './pages/Admin'
 import { Showcase } from './pages/Showcase'
-import { PDFReader } from './components/PDFReader'
-import { HTMLReader } from './components/HTMLReader'
+import { Courses } from './pages/Courses'
+import { Library } from './pages/Library'
 import { InstallPrompt } from './components/InstallPrompt'
 import { useLanguage } from './i18n/useLanguage'
 import { t } from './i18n/translations'
 import type { Lang } from './i18n/translations'
 import './App.css'
+
+type MemberTab = 'home' | 'courses' | 'downloads' | 'validation' | 'ranking' | 'profile'
 
 function parseShowcaseRoute(pathname: string): { isShowcase: boolean; slug: string | null } {
   const path = pathname.replace(/\/+$/, '')
@@ -20,7 +23,81 @@ function parseShowcaseRoute(pathname: string): { isShowcase: boolean; slug: stri
   return { isShowcase: true, slug: match[2] ? decodeURIComponent(match[2]) : null }
 }
 
+function parsePublicBuilderRoute(pathname: string): string | null {
+  const path = pathname.replace(/\/+$/, '')
+  if (!path || path === '/') return null
+  if (path.startsWith('/admin')) return null
+  if (path.startsWith('/api/')) return null
+  if (path.startsWith('/uploads/')) return null
+  if (/^\/(vitrine|catalogo|cat[aá]logo)(?:\/|$)/i.test(path)) return null
+  const rawSlug = path.replace(/^\/+/, '')
+  if (!rawSlug || rawSlug.includes('.') || rawSlug.includes('?') || rawSlug.includes('#')) return null
+  return decodeURIComponent(rawSlug)
+}
+
+function PublicBuilderPage({ slug }: { slug: string }) {
+  const [html, setHtml] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [redirecting, setRedirecting] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError(null)
+    fetch(`/api/public/links/resolve?slug=${encodeURIComponent(slug)}`)
+      .then(async (res) => {
+        if (res.ok) {
+          const data = (await res.json()) as { found?: boolean; targetUrl?: string }
+          if (!active) return
+          if (data?.found && data?.targetUrl) {
+            setRedirecting(true)
+            window.location.replace(data.targetUrl)
+            return
+          }
+        }
+        return fetch(`/api/public/pages/${encodeURIComponent(slug)}`).then(async (pagesRes) => {
+          const text = await pagesRes.text()
+          if (!pagesRes.ok) throw new Error(text || 'Página não encontrada.')
+          if (!active) return
+          setHtml(text)
+        })
+      })
+      .catch((err: unknown) => {
+        if (!active) return
+        setError(err instanceof Error ? err.message : 'Página não encontrada.')
+      })
+      .finally(() => {
+        if (!active) return
+        setLoading(false)
+      })
+    return () => { active = false }
+  }, [slug])
+
+  if (redirecting) {
+    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#111' }}>Redirecionando…</div>
+  }
+  if (loading) {
+    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#111' }}>Carregando página…</div>
+  }
+  if (error || !html) {
+    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#111', padding: 20, textAlign: 'center' }}>{error || 'Página não encontrada.'}</div>
+  }
+  return (
+    <iframe
+      title={`Página pública ${slug}`}
+      srcDoc={html}
+      style={{ width: '100vw', height: '100vh', border: 'none', display: 'block', background: '#fff' }}
+    />
+  )
+}
+
 function App() {
+  const directBuilderSlug = parsePublicBuilderRoute(window.location.pathname)
+  if (directBuilderSlug) {
+    return <PublicBuilderPage slug={directBuilderSlug} />
+  }
+
   if (window.location.pathname === '/admin') {
     return <Admin />
   }
@@ -32,16 +109,24 @@ function App() {
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('ebookpro_userId'))
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('ebookpro_userEmail'))
   const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('ebookpro_userName'))
-  const [activeTab, setActiveTab] = useState('home')
-  const [readerData, setReaderData] = useState<{url: string, title: string, ebookId: string, initialPage: number} | null>(null)
-  const [htmlReaderData, setHtmlReaderData] = useState<{url: string, title: string} | null>(null)
+  const [activeTab, setActiveTab] = useState<MemberTab>('home')
   const [showShowcase, setShowShowcase] = useState(false)
   const [showcaseSlug, setShowcaseSlug] = useState<string | null>(null)
-  
-  const [catalog, setCatalog] = useState<any[]>([])
-  const [myBooksData, setMyBooksData] = useState<any[]>([])
+  const [supportUrl, setSupportUrl] = useState('')
+
   const [isLoading, setIsLoading] = useState(true)
-  const [wishlistIds, setWishlistIds] = useState<string[]>([])
+  const [pendingCourseSlug, setPendingCourseSlug] = useState<string | null>(null)
+
+  const clearPendingCourseSlug = useCallback(() => setPendingCourseSlug(null), [])
+
+  const authHeaders = (json = false): Record<string, string> => {
+    const h: Record<string, string> = {}
+    if (userId) h['x-user-id'] = userId
+    const tok = localStorage.getItem('ebookpro_token')
+    if (tok) h['Authorization'] = `Bearer ${tok}`
+    if (json) h['Content-Type'] = 'application/json'
+    return h
+  }
 
   const handleLogin = (id: string, email: string) => {
     setUserId(id)
@@ -55,20 +140,13 @@ function App() {
     localStorage.removeItem('ebookpro_userId')
     localStorage.removeItem('ebookpro_userEmail')
     localStorage.removeItem('ebookpro_userName')
+    localStorage.removeItem('ebookpro_token')
   }
 
   const fetchData = () => {
     if (!userId) return
     setIsLoading(true)
-    Promise.all([
-      fetch('/api/ebooks').then(r => r.json()),
-      fetch('/api/ebooks/my', { headers: { 'x-user-id': userId } }).then(r => r.json()),
-      fetch('/api/wishlist', { headers: { 'x-user-id': userId } }).then(r => r.json()),
-      fetch('/api/profile', { headers: { 'x-user-id': userId } }).then(r => r.json())
-    ]).then(([catalogData, myBooks, wishlistData, profile]) => {
-      if (Array.isArray(catalogData)) setCatalog(catalogData)
-      if (Array.isArray(myBooks)) setMyBooksData(myBooks)
-      if (Array.isArray(wishlistData)) setWishlistIds(wishlistData)
+    Promise.all([fetch('/api/profile', { headers: authHeaders() }).then(r => r.json())]).then(([profile]) => {
       if (profile?.name) { setUserName(profile.name); localStorage.setItem('ebookpro_userName', profile.name) }
       
       // Auto-set language based on user's country if not manually set recently
@@ -100,6 +178,22 @@ function App() {
   }, [setLang])
 
   useEffect(() => {
+    let cancelled = false
+    fetch('/api/public/member-hero')
+      .then((r) => r.json())
+      .then((d: { supportUrl?: string | null }) => {
+        if (cancelled) return
+        setSupportUrl(String(d?.supportUrl || '').trim())
+      })
+      .catch(() => {
+        if (!cancelled) setSupportUrl('')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     const parsed = parseShowcaseRoute(routePathname)
     if (parsed.isShowcase) {
       setShowShowcase(true)
@@ -116,75 +210,6 @@ function App() {
     setRoutePathname(pathname)
   }
 
-  const books = catalog.map(book => {
-    const myBookData = myBooksData.find(mb => mb.id === book.id)
-    return {
-      ...book,
-      hasAccess: !!myBookData,
-      isWishlisted: wishlistIds.includes(book.id),
-      lastReadAt: myBookData?.lastReadAt || null,
-      lastPage: myBookData?.lastPage || 0,
-      isReading: !!myBookData?.lastReadAt
-    }
-  })
-
-  const handleOpenReader = (title: string, _coverUrl?: string) => {
-    const book = books.find(b => b.title === title);
-    if (!book) return;
-
-    // Mark reading progress (works for PDF, HTML and External Links)
-    fetch('/api/reading-progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
-      body: JSON.stringify({ ebookId: book.id, page: book.lastPage || 1 })
-    }).catch(console.error)
-
-    if (book.redirectUrl) {
-      // Direct external redirect
-      window.open(book.redirectUrl, '_blank');
-      // No need to set active reader data
-    } else if (book.externalUrl) {
-      // External Link / Interactive App
-      setHtmlReaderData({ url: book.externalUrl, title });
-    } else if (book.htmlUrl) {
-      // HTML ebook
-      setHtmlReaderData({ url: book.htmlUrl, title });
-    } else if (book.pdfUrl) {
-      // PDF ebook
-      setReaderData({ url: book.pdfUrl, title, ebookId: book.id, initialPage: book.lastPage || 1 });
-    } else {
-      alert(tr.pdf_not_found);
-    }
-  }
-
-  const handleCloseReader = (lastPage?: number) => {
-    if (readerData && lastPage) {
-      fetch('/api/reading-progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
-        body: JSON.stringify({ ebookId: readerData.ebookId, page: lastPage })
-      }).catch(console.error)
-    }
-    setReaderData(null)
-    fetchData()
-  }
-
-  const handleCloseHtmlReader = () => {
-    setHtmlReaderData(null)
-    fetchData()
-  }
-
-  const handleToggleWishlist = (id: string) => {
-    setWishlistIds(current =>
-      current.includes(id) ? current.filter(wId => wId !== id) : [...current, id]
-    )
-    fetch('/api/wishlist/toggle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
-      body: JSON.stringify({ ebookId: id })
-    }).catch(console.error)
-  }
-
   const handleProfileUpdate = (newName: string) => {
     setUserName(newName)
     localStorage.setItem('ebookpro_userName', newName)
@@ -198,66 +223,188 @@ function App() {
     return <Login onLogin={handleLogin} lang={lang} setLang={setLang} onShowcase={() => navigate('/vitrine')} />
   }
 
-  return (
-    <div className="app-container">
-      {htmlReaderData ? (
-        <HTMLReader
-          url={htmlReaderData.url}
-          title={htmlReaderData.title}
-          lang={lang}
-          onClose={handleCloseHtmlReader}
-          isExternal={books.find(b => b.htmlUrl === htmlReaderData.url || b.externalUrl === htmlReaderData.url)?.externalUrl === htmlReaderData.url}
-        />
-      ) : readerData ? (
-        <PDFReader 
-          url={readerData.url} 
-          title={readerData.title} 
-          initialPage={readerData.initialPage}
-          ebookId={readerData.ebookId}
-          userId={userId || ''}
-          lang={lang}
-          onClose={handleCloseReader}
-        />
-      ) : (
-        <>
-          <main className="app-main">
-            {activeTab === 'home' && <Home books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} isLoading={isLoading} userEmail={userEmail} userName={userName} lang={lang} setLang={setLang} />}
-            {activeTab === 'library' && <Library books={books} onRead={handleOpenReader} onToggleWishlist={handleToggleWishlist} isLoading={isLoading} lang={lang} />}
-            {activeTab === 'profile' && (
-              <ProfilePage
-                userId={userId}
-                userEmail={userEmail}
-                userName={userName}
-                bookCount={myBooksData.length}
-                lang={lang}
-                onLogout={handleLogout}
-                onProfileUpdate={handleProfileUpdate}
-              />
-            )}
-          </main>
+  const memberNavItems: { tab: MemberTab; Icon: LucideIcon; label: string }[] = [
+    { tab: 'home', Icon: HomeIcon, label: tr.nav_home },
+    { tab: 'courses', Icon: GraduationCap, label: tr.nav_courses },
+    { tab: 'downloads', Icon: Download, label: tr.nav_downloads },
+    { tab: 'validation', Icon: ShieldCheck, label: tr.nav_validation },
+    { tab: 'ranking', Icon: Trophy, label: tr.nav_ranking },
+    { tab: 'profile', Icon: UserIcon, label: tr.nav_profile },
+  ]
+  const profileNav = memberNavItems.find((x) => x.tab === 'profile')
+  const coreNav = memberNavItems.filter((x) => x.tab !== 'profile')
 
-          <nav className="bottom-nav">
-            <button className={`bottom-nav-item ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>
-              <HomeIcon /> <span>{tr.nav_home}</span>
-            </button>
-            <button className={`bottom-nav-item ${activeTab === 'library' ? 'active' : ''}`} onClick={() => setActiveTab('library')}>
-              <LibraryIcon /> <span>{tr.nav_library}</span>
-            </button>
-            <button className={`bottom-nav-item ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>
-              <UserIcon /> <span>{tr.nav_profile}</span>
-            </button>
-          </nav>
-        </>
-      )}
+  const openSupport = () => {
+    const url = supportUrl.trim()
+    if (!url) {
+      alert(tr.support_not_configured)
+      return
+    }
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const currentSectionLabel =
+    activeTab === 'home'
+      ? tr.nav_home
+      : activeTab === 'courses'
+        ? tr.nav_courses
+        : activeTab === 'downloads'
+          ? tr.nav_downloads
+        : activeTab === 'validation'
+            ? tr.nav_validation
+            : activeTab === 'ranking'
+              ? tr.nav_ranking
+              : tr.nav_profile
+
+  return (
+    <div className="app-container app-member-shell">
+        <div className="app-member-layout">
+          {activeTab !== 'home' && (
+            <header className="member-topbar" role="banner">
+              <div className="member-topbar-inner">
+                <span className="member-topbar-badge">{tr.member_area_badge}</span>
+                <span className="member-topbar-section">{currentSectionLabel}</span>
+              </div>
+            </header>
+          )}
+
+          <aside className="member-sidebar" aria-label={tr.member_sidebar_hint}>
+            <div className="member-sidebar-brand">
+              <img
+                src="/autofintech-logo.png"
+                alt={tr.home_brand_logo_alt}
+                className="member-sidebar-logo"
+                width={200}
+                height={48}
+                decoding="async"
+              />
+            </div>
+            <nav className="member-sidebar-nav">
+              {coreNav.map(({ tab, Icon, label }) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`member-sidebar-item ${activeTab === tab ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  <Icon aria-hidden />
+                  <span>{label}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                className="member-sidebar-item"
+                onClick={openSupport}
+              >
+                <LifeBuoy aria-hidden />
+                <span>{tr.nav_support}</span>
+              </button>
+              {profileNav && (
+                <button
+                  type="button"
+                  className={`member-sidebar-item ${activeTab === profileNav.tab ? 'active' : ''}`}
+                  onClick={() => setActiveTab(profileNav.tab)}
+                >
+                  <profileNav.Icon aria-hidden />
+                  <span>{profileNav.label}</span>
+                </button>
+              )}
+            </nav>
+          </aside>
+
+          <div className="member-body">
+            <main className={`app-main${activeTab === 'home' ? ' app-main--netflix-home' : ''}`}>
+              {activeTab === 'home' && (
+                <Home
+                  onOpenCourse={slug => {
+                    setPendingCourseSlug(slug)
+                    setActiveTab('courses')
+                  }}
+                  isLoading={isLoading}
+                  userEmail={userEmail}
+                  userName={userName}
+                  lang={lang}
+                  setLang={setLang}
+                  authHeaders={authHeaders}
+                />
+              )}
+              {activeTab === 'courses' && userId && (
+                <Courses
+                  userId={userId}
+                  lang={lang}
+                  initialSlug={pendingCourseSlug}
+                  onInitialSlugConsumed={clearPendingCourseSlug}
+                  authHeaders={authHeaders}
+                />
+              )}
+              {activeTab === 'downloads' && (
+                <Library
+                  books={[]}
+                  onRead={() => {}}
+                  onToggleWishlist={() => {}}
+                  isLoading={isLoading}
+                  lang={lang}
+                />
+              )}
+              {activeTab === 'validation' && userId && (
+                <ValidationPanel userId={userId} lang={lang} userEmail={userEmail} authHeaders={authHeaders} />
+              )}
+              {activeTab === 'ranking' && <Ranking lang={lang} />}
+              {activeTab === 'profile' && (
+                <ProfilePage
+                  userEmail={userEmail}
+                  userName={userName}
+                  lang={lang}
+                  onLogout={handleLogout}
+                  onProfileUpdate={handleProfileUpdate}
+                  authHeaders={authHeaders}
+                />
+              )}
+            </main>
+
+            <nav className="bottom-nav" aria-label={tr.member_sidebar_hint}>
+              {coreNav.map(({ tab, Icon, label }) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`bottom-nav-item ${activeTab === tab ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  <Icon aria-hidden />
+                  <span>{label}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                className="bottom-nav-item"
+                onClick={openSupport}
+              >
+                <LifeBuoy aria-hidden />
+                <span>{tr.nav_support}</span>
+              </button>
+              {profileNav && (
+                <button
+                  type="button"
+                  className={`bottom-nav-item ${activeTab === profileNav.tab ? 'active' : ''}`}
+                  onClick={() => setActiveTab(profileNav.tab)}
+                >
+                  <profileNav.Icon aria-hidden />
+                  <span>{profileNav.label}</span>
+                </button>
+              )}
+            </nav>
+          </div>
+        </div>
       <InstallPrompt lang={lang} />
     </div>
   )
 }
 
 // ===== PROFILE PAGE COMPONENT =====
-function ProfilePage({ userId, userEmail, userName, bookCount, lang, onLogout, onProfileUpdate }: {
-  userId: string; userEmail: string | null; userName: string | null; bookCount: number;
+function ProfilePage({ userEmail, userName, lang, onLogout, onProfileUpdate, authHeaders }: {
+  userEmail: string | null; userName: string | null;
   lang: Lang; onLogout: () => void; onProfileUpdate: (name: string) => void;
+  authHeaders: (json?: boolean) => Record<string, string>;
 }) {
   const tr = t(lang)
   const [editingName, setEditingName] = useState(false)
@@ -274,7 +421,7 @@ function ProfilePage({ userId, userEmail, userName, bookCount, lang, onLogout, o
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        headers: authHeaders(true),
         body: JSON.stringify({ name: nameValue })
       })
       if (res.ok) {
@@ -292,7 +439,7 @@ function ProfilePage({ userId, userEmail, userName, bookCount, lang, onLogout, o
     try {
       const res = await fetch('/api/profile/password', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+        headers: authHeaders(true),
         body: JSON.stringify({ currentPassword: currentPass, newPassword: newPass })
       })
       const data = await res.json()
@@ -326,7 +473,7 @@ function ProfilePage({ userId, userEmail, userName, bookCount, lang, onLogout, o
             {displayName} <span style={{ fontSize: '13px', color: 'var(--accent-primary)' }}>✏️</span>
           </h2>
         )}
-        <p className="profile-stats">{bookCount} {tr.profile_books_count}</p>
+        <p className="profile-stats">{tr.profile_area_hint}</p>
       </div>
       
       <div className="profile-section">

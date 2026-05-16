@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#0B1121" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>Readlyme</title>
+    <title>AutoFinTech</title>
     <!-- Google Fonts for premium typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,10 +21,23 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
+    <script type="module">
+      // Em desenvolvimento, o Service Worker atrapalha (cache agressivo).
+      // Em produção, ele habilita o PWA/offline/install.
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup error', err));
+        const isProd = import.meta.env.PROD;
+
+        window.addEventListener('load', async () => {
+          try {
+            if (!isProd) {
+              const regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map(r => r.unregister()));
+              return;
+            }
+            await navigator.serviceWorker.register('/sw.js');
+          } catch (err) {
+            console.log('SW setup error', err);
+          }
         });
       }
     </script>

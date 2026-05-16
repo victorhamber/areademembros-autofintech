@@ -1,11 +1,11 @@
 {
-  "name": "Readlyme",
-  "short_name": "Readlyme",
+  "name": "AutoFinTech",
+  "short_name": "AutoFinTech",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B1121",
   "theme_color": "#0B1121",
-  "description": "Premium Ebook Store & Reader",
+  "description": "Area de membros AutoFinTech",
   "icons": [
     {
       "src": "/logo.png",

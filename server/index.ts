@@ -1,6 +1,6 @@
+import './loadEnv.js';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -8,8 +8,17 @@ import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 import { Resend } from 'resend';
 import multer from 'multer';
-
-dotenv.config();
+import { signUserToken, signAdminJwt } from './auth/jwt.js';
+import { resolveUserId } from './auth/resolveUser.js';
+import { registerForexRoutes } from './forex/forexRoutes.js';
+import { registerMemberApiRoutes } from './routes/memberApi.js';
+import { registerEadAndTrialRoutes } from './routes/eadAndTrial.js';
+import { registerAdminForexRoutes } from './routes/adminForex.js';
+import { startScheduledJobs } from './jobs/scheduler.js';
+import { userHasMemberAccess } from './lib/userAccess.js';
+import { adminAuthMiddleware } from './middleware/adminAuth.js';
+import { resolveAdminPassword } from './lib/adminPassword.js';
+import { ensureDevTestAccount } from './lib/ensureDevTestAccount.js';
 
 const DEFAULT_PASSWORD = 'Mudar123@';
 
@@ -57,6 +66,105 @@ function detectLang(country: string | null | undefined): 'es' | 'pt' {
   return ES_COUNTRIES.includes(country.toUpperCase()) ? 'es' : 'pt';
 }
 
+function normalizeShortLinkSlug(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
+    .replace(/\/+/g, '/')
+    .toLowerCase();
+}
+
+function detectDeviceType(userAgentRaw: string | undefined): 'mobile' | 'desktop' {
+  const ua = String(userAgentRaw || '').toLowerCase();
+  return /android|iphone|ipad|ipod|mobile|windows phone|opera mini/.test(ua) ? 'mobile' : 'desktop';
+}
+
+function getCountryCodeFromHeaders(req: express.Request): string {
+  const v = String(
+    req.headers['cf-ipcountry'] ||
+      req.headers['x-vercel-ip-country'] ||
+      req.headers['cloudfront-viewer-country'] ||
+      ''
+  )
+    .trim()
+    .toUpperCase();
+  return /^[A-Z]{2}$/.test(v) ? v : '';
+}
+
+function getRegionCodeFromHeaders(req: express.Request): string {
+  const v = String(
+    req.headers['x-vercel-ip-country-region'] ||
+      req.headers['cloudfront-viewer-country-region'] ||
+      req.headers['cf-region-code'] ||
+      ''
+  )
+    .trim()
+    .toUpperCase();
+  return v.replace(/[^A-Z0-9_-]/g, '').slice(0, 10);
+}
+
+function getClientIp(req: express.Request): string {
+  const xff = String(req.headers['x-forwarded-for'] || '').trim();
+  if (xff) return xff.split(',')[0].trim().slice(0, 45);
+  const ip = String(req.ip || req.socket?.remoteAddress || '').trim();
+  return ip.slice(0, 45);
+}
+
+function appendTrackingParams(targetUrl: string, utmParamsJson: string | null): string {
+  if (!utmParamsJson) return targetUrl;
+  try {
+    const parsed = JSON.parse(utmParamsJson) as Record<string, unknown>;
+    const entries = Object.entries(parsed).filter(([, v]) => String(v || '').trim().length > 0);
+    if (!entries.length) return targetUrl;
+    const url = new URL(targetUrl);
+    for (const [k, v] of entries) url.searchParams.set(k, String(v));
+    return url.toString();
+  } catch {
+    return targetUrl;
+  }
+}
+
+function applySmartRouting(
+  targetUrl: string,
+  smartRulesJson: string | null,
+  countryCode: string,
+  regionCode: string,
+  deviceType: 'mobile' | 'desktop'
+): string {
+  if (!smartRulesJson) return targetUrl;
+  try {
+    const rules = JSON.parse(smartRulesJson) as Array<{
+      type?: string;
+      value?: string;
+      region?: string;
+      target?: string;
+    }>;
+    if (!Array.isArray(rules)) return targetUrl;
+    for (const rule of rules) {
+      const type = String(rule?.type || '').toLowerCase();
+      const value = String(rule?.value || '').trim();
+      const target = String(rule?.target || '').trim();
+      if (!type || !value || !target) continue;
+      if (type === 'device' && value.toLowerCase() === deviceType) return target;
+      if (type === 'geo' && countryCode) {
+        const countries = value
+          .toUpperCase()
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean);
+        if (!countries.includes(countryCode)) continue;
+        const requiredRegion = String(rule?.region || '').trim().toUpperCase();
+        if (requiredRegion && requiredRegion !== regionCode) continue;
+        return target;
+      }
+    }
+    return targetUrl;
+  } catch {
+    return targetUrl;
+  }
+}
+
 async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name: string | null, password: string, country: string | null) {
   const lang = detectLang(country);
   const templateKey = lang === 'es' ? 'welcome_template_es' : 'welcome_template_pt';
@@ -77,7 +185,7 @@ async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name:
             <p style="margin:5px 0 0 0;color:#1a1a1a;font-size:16px;"><strong>Contraseña temporal:</strong> <code style="background:#eee;padding:2px 6px;border-radius:4px;">{{password}}</code></p>
           </div>
           <div style="text-align:center;">
-            <a href="{{app_url}}" style="display:inline-block;background-color:#45c4b0;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Entrar a la Biblioteca</a>
+            <a href="{{app_url}}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Entrar a la Biblioteca</a>
           </div>
           <p style="color:#888;font-size:13px;text-align:center;margin-top:30px;">Recomendamos que cambies tu contraseña después de tu primer inicio de sesión.</p>
         </div>`
@@ -93,7 +201,7 @@ async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name:
             <p style="margin:5px 0 0 0;color:#1a1a1a;font-size:16px;"><strong>Senha temporária:</strong> <code style="background:#eee;padding:2px 6px;border-radius:4px;">{{password}}</code></p>
           </div>
           <div style="text-align:center;">
-            <a href="{{app_url}}" style="display:inline-block;background-color:#45c4b0;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Acessar Biblioteca</a>
+            <a href="{{app_url}}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Acessar Biblioteca</a>
           </div>
           <p style="color:#888;font-size:13px;text-align:center;margin-top:30px;">Recomendamos que troque sua senha após o primeiro login.</p>
         </div>`;
@@ -122,6 +230,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+registerForexRoutes(app, prisma);
+registerMemberApiRoutes(app, prisma);
+registerEadAndTrialRoutes(app, prisma);
+startScheduledJobs(prisma);
+
 // ==========================================
 // FILE UPLOADS (MULTER)
 // ==========================================
@@ -143,6 +256,14 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage });
+
+function detectMediaKind(mimeTypeRaw: string | undefined): 'imagem' | 'video' | 'audio' | 'arquivo' {
+  const mime = String(mimeTypeRaw || '').toLowerCase();
+  if (mime.startsWith('image/')) return 'imagem';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  return 'arquivo';
+}
 
 // Serve uploaded files publicly
 app.use('/uploads', express.static(uploadDir));
@@ -167,13 +288,141 @@ app.get('/api/public/ebooks', async (req, res) => {
   }
 });
 
+/** Banner fixo da home (área do membro): fundo + selo opcionais via admin (Setting). */
+app.get('/api/public/member-hero', async (_req, res) => {
+  try {
+    let backgroundUrl = (await getSetting(prisma, 'member_hero_background_url'))?.trim() || null;
+    const kicker = (await getSetting(prisma, 'member_hero_kicker'))?.trim() || null;
+    const supportUrl = (await getSetting(prisma, 'member_support_url'))?.trim() || null;
+    if (!backgroundUrl) {
+      const c = await prisma.course.findFirst({
+        where: { published: true, coverUrl: { not: null } },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+        select: { coverUrl: true },
+      });
+      const u = c?.coverUrl?.trim();
+      backgroundUrl = u && u.length > 0 ? u : null;
+    }
+    res.json({ backgroundUrl: backgroundUrl || null, kicker: kicker || null, supportUrl: supportUrl || null });
+  } catch {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.get('/api/public/pages/:slug', async (req, res) => {
+  const normalizeSlug = (raw: string) =>
+    String(raw || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9-_/]+/g, '-')
+      .replace(/\/+/g, '/')
+      .replace(/(^[-/]+|[-/]+$)/g, '');
+
+  try {
+    const row = await prisma.setting.findUnique({ where: { key: 'admin_page_builder_pages_json' } });
+    const desired = normalizeSlug(String(req.params.slug || ''));
+    if (!desired) {
+      res.status(400).type('text/plain; charset=utf-8').send('Slug inválida.');
+      return;
+    }
+
+    const raw = String(row?.value || '').trim();
+    if (!raw) {
+      res.status(404).type('text/plain; charset=utf-8').send('Página não encontrada.');
+      return;
+    }
+
+    let pages: Array<{ slug?: string; html?: string; published?: boolean }> = [];
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) pages = parsed as typeof pages;
+    } catch {
+      pages = [];
+    }
+
+    const page = pages.find((p) => normalizeSlug(String(p?.slug || '')) === desired);
+    if (!page?.html) {
+      res.status(404).type('text/plain; charset=utf-8').send('Página não encontrada.');
+      return;
+    }
+
+    if (page.published === false) {
+      res.status(403).type('text/plain; charset=utf-8').send('Página em rascunho. Publique para liberar a URL.');
+      return;
+    }
+
+    res.status(200).type('text/html; charset=utf-8').send(String(page.html));
+  } catch {
+    res.status(500).type('text/plain; charset=utf-8').send('Erro ao carregar página.');
+  }
+});
+
+app.get('/api/public/links/resolve', async (req, res) => {
+  try {
+    const slug = normalizeShortLinkSlug(String(req.query?.slug || ''));
+    if (!slug) return res.status(400).json({ error: 'Slug obrigatória.' });
+
+    const link = await prisma.shortLink.findUnique({ where: { slug } });
+    if (!link || !link.isActive) return res.status(404).json({ found: false });
+
+    const countryCode = getCountryCodeFromHeaders(req);
+    const regionCode = getRegionCodeFromHeaders(req);
+    const deviceType = detectDeviceType(req.headers['user-agent']);
+    const ipAddress = getClientIp(req);
+    const referrer = String(req.headers.referer || '').trim().slice(0, 255);
+
+    let target = String(link.targetUrl || '').trim();
+    if (!target) return res.status(404).json({ found: false });
+
+    target = applySmartRouting(target, link.smartRules, countryCode, regionCode, deviceType);
+    target = appendTrackingParams(target, link.utmParams);
+
+    await prisma.shortLinkClick
+      .create({
+        data: {
+          linkId: link.id,
+          ipAddress,
+          countryCode,
+          regionCode,
+          deviceType,
+          referrer
+        }
+      })
+      .catch(() => {});
+
+    const status = [301, 302, 307, 308].includes(link.redirectType) ? link.redirectType : 302;
+    res.json({ found: true, targetUrl: target, status });
+  } catch {
+    res.status(500).json({ error: 'Falha ao resolver link.' });
+  }
+});
+
+app.get('/api/public/media/:id/download', async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    const media = await prisma.mediaAsset.findUnique({ where: { id } });
+    if (!media) return res.status(404).json({ error: 'Arquivo não encontrado.' });
+
+    const filePath = path.join(uploadDir, path.basename(media.storedName));
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
+
+    const mimeType = String(media.mimeType || '').trim();
+    if (mimeType) res.type(mimeType);
+    return res.download(filePath, media.originalName || media.storedName);
+  } catch {
+    return res.status(500).json({ error: 'Falha ao baixar arquivo.' });
+  }
+});
+
 // ==========================================
 // USER AUTHENTICATION & ACCESS ROUTES
 // ==========================================
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    let user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({ where: { email: String(email || '').toLowerCase().trim() } });
     
     // First-Time Login Logic: If user exists from Hotmart but has no password yet
     if (user && !user.password) {
@@ -181,12 +430,22 @@ app.post('/api/auth/login', async (req, res) => {
         where: { id: user.id },
         data: { password }
       });
-      return res.json({ id: user.id, email: user.email, name: user.name });
+      const ok = await userHasMemberAccess(prisma, user.id);
+      if (!ok) {
+        return res.status(401).json({ error: 'Sem acesso ativo: é necessário compra ou licença ativa.' });
+      }
+      const token = signUserToken(user.id, user.email);
+      return res.json({ id: user.id, email: user.email, name: user.name, token });
     }
     
     // Validate Existing User
     if (user && user.password === password) {
-      return res.json({ id: user.id, email: user.email, name: user.name });
+      const ok = await userHasMemberAccess(prisma, user.id);
+      if (!ok) {
+        return res.status(401).json({ error: 'Sem acesso ativo: é necessário compra ou licença ativa.' });
+      }
+      const token = signUserToken(user.id, user.email);
+      return res.json({ id: user.id, email: user.email, name: user.name, token });
     }
     
     return res.status(401).json({ error: 'E-mail ou senha incorretos. Acesso negado. Apenas usuários que já efetuaram uma compra podem acessar.' });
@@ -233,7 +492,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
             <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">Recuperación de Contraseña</h1>
             <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Hola {{name}}, recibimos una solicitud para restablecer tu contraseña. Si no fuiste tú, puedes ignorar este correo.</p>
             <div style="text-align:center;margin:30px 0;">
-              <a href="{{reset_link}}" style="display:inline-block;background-color:#45c4b0;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Cambiar mi Contraseña</a>
+              <a href="{{reset_link}}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Cambiar mi Contraseña</a>
             </div>
             <p style="color:#888;font-size:12px;text-align:center;margin-top:30px;">Este enlace caducará en 1 hora por motivos de seguridad.</p>
           </div>`
@@ -244,7 +503,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
             <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">Recuperação de Senha</h1>
             <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Olá {{name}}, recebemos uma solicitação para redefinir sua senha. Se não foi você, pode ignorar este e-mail.</p>
             <div style="text-align:center;margin:30px 0;">
-              <a href="{{reset_link}}" style="display:inline-block;background-color:#45c4b0;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Alterar minha Senha</a>
+              <a href="{{reset_link}}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Alterar minha Senha</a>
             </div>
             <p style="color:#888;font-size:12px;text-align:center;margin-top:30px;">Este link expirará em 1 hora por motivos de segurança.</p>
           </div>`;
@@ -292,7 +551,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
 app.get('/api/ebooks/my', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     const purchases = await prisma.purchase.findMany({
@@ -314,7 +573,7 @@ app.get('/api/ebooks/my', async (req, res) => {
 // PROFILE
 app.get('/api/profile', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, name: true, country: true } });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -324,7 +583,7 @@ app.get('/api/profile', async (req, res) => {
 
 app.put('/api/profile', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { name } = req.body;
     const user = await prisma.user.update({ where: { id: userId }, data: { name } });
@@ -334,7 +593,7 @@ app.put('/api/profile', async (req, res) => {
 
 app.put('/api/profile/password', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { currentPassword, newPassword } = req.body;
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -349,7 +608,7 @@ app.put('/api/profile/password', async (req, res) => {
 // READING PROGRESS
 app.post('/api/reading-progress', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { ebookId, page } = req.body;
     await prisma.purchase.updateMany({
@@ -363,7 +622,7 @@ app.post('/api/reading-progress', async (req, res) => {
 // HIGHLIGHTS
 app.get('/api/highlights/:ebookId', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { ebookId } = req.params;
     const highlights = await prisma.highlight.findMany({
@@ -376,7 +635,7 @@ app.get('/api/highlights/:ebookId', async (req, res) => {
 
 app.post('/api/highlights', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { ebookId, pageNumber, text, color } = req.body;
     const highlight = await prisma.highlight.create({
@@ -388,7 +647,7 @@ app.post('/api/highlights', async (req, res) => {
 
 app.delete('/api/highlights/:id', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     await prisma.highlight.delete({ where: { id: req.params.id } });
     res.json({ success: true });
@@ -398,7 +657,7 @@ app.delete('/api/highlights/:id', async (req, res) => {
 // WISHLIST (synced across devices)
 app.get('/api/wishlist', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const items = await prisma.wishlist.findMany({ where: { userId }, select: { ebookId: true } });
     res.json(items.map(i => i.ebookId));
@@ -409,7 +668,7 @@ app.get('/api/wishlist', async (req, res) => {
 
 app.post('/api/wishlist/toggle', async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { ebookId } = req.body;
     
@@ -611,17 +870,26 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
 });
 
 // ==========================================
+// ADMIN — login por JSON (evita header bloqueado / proxy)
+// ==========================================
+app.post('/api/admin/login', (req, res) => {
+  try {
+    const password = String(req.body?.password ?? '');
+    if (password !== resolveAdminPassword()) {
+      return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+    res.json({ token: signAdminJwt() });
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==========================================
 // ADMIN DASHBOARD ROUTES
 // ==========================================
-const adminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const adminPassword = req.headers['x-admin-password'];
-  if (!process.env.ADMIN_PASSWORD || adminPassword !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized Access. Invalid Master Password.' });
-  }
-  next();
-};
+registerAdminForexRoutes(app, prisma, adminAuthMiddleware);
 
-app.get('/api/admin/categories', adminAuth, async (req, res) => {
+app.get('/api/admin/categories', adminAuthMiddleware, async (req, res) => {
   try {
     const cats = await prisma.category.findMany({ orderBy: { name: 'asc' } });
     res.json(cats);
@@ -630,7 +898,7 @@ app.get('/api/admin/categories', adminAuth, async (req, res) => {
   }
 });
 
-app.post('/api/admin/categories', adminAuth, async (req, res) => {
+app.post('/api/admin/categories', adminAuthMiddleware, async (req, res) => {
   try {
     const { name } = req.body;
     const cat = await prisma.category.create({ data: { name } });
@@ -640,14 +908,66 @@ app.post('/api/admin/categories', adminAuth, async (req, res) => {
   }
 });
 
-app.post('/api/admin/upload', adminAuth, upload.single('file'), (req, res) => {
+app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const fileUrl = `/uploads/${req.file.filename}`;
   res.json({ url: fileUrl });
 });
 
+app.get('/api/admin/media', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const rows = await prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: 'Falha ao listar mídias.' });
+  }
+});
+
+app.post('/api/admin/media', adminAuthMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const created = await prisma.mediaAsset.create({
+      data: {
+        originalName: String(req.file.originalname || req.file.filename),
+        storedName: String(req.file.filename),
+        url: fileUrl,
+        mimeType: req.file.mimetype || null,
+        kind: detectMediaKind(req.file.mimetype),
+        sizeBytes: Number(req.file.size || 0)
+      }
+    });
+    res.json(created);
+  } catch {
+    res.status(500).json({ error: 'Falha ao salvar mídia.' });
+  }
+});
+
+app.delete('/api/admin/media/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    const row = await prisma.mediaAsset.findUnique({ where: { id } });
+    if (!row) return res.status(404).json({ error: 'Mídia não encontrada.' });
+
+    const filePath = path.join(uploadDir, path.basename(row.storedName));
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        // Se não conseguir deletar no disco, seguimos removendo o registro.
+      }
+    }
+
+    await prisma.mediaAsset.delete({ where: { id } });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Falha ao remover mídia.' });
+  }
+});
+
 // -- USER & ACCESS MANAGEMENT --
-app.get('/api/admin/users', adminAuth, async (req, res) => {
+app.get('/api/admin/users', adminAuthMiddleware, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
@@ -661,17 +981,23 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
   }
 });
 
-app.post('/api/admin/users', adminAuth, async (req, res) => {
+app.post('/api/admin/users', adminAuthMiddleware, async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await prisma.user.create({ data: { email, password } });
+    const { email, password, name } = req.body;
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password,
+        name: name != null && String(name).trim() ? String(name).trim() : null
+      }
+    });
     res.json(user);
   } catch(error) {
     res.status(400).json({ error: 'Erro. Talvez e-mail já exista.' });
   }
 });
 
-app.post('/api/admin/purchases', adminAuth, async (req, res) => {
+app.post('/api/admin/purchases', adminAuthMiddleware, async (req, res) => {
   try {
     const { userId, ebookId } = req.body;
     const purchase = await prisma.purchase.create({ data: { userId, ebookId } });
@@ -681,7 +1007,7 @@ app.post('/api/admin/purchases', adminAuth, async (req, res) => {
   }
 });
 
-app.delete('/api/admin/purchases/:userId/:ebookId', adminAuth, async (req, res) => {
+app.delete('/api/admin/purchases/:userId/:ebookId', adminAuthMiddleware, async (req, res) => {
   try {
     const userId = String(req.params.userId);
     const ebookId = String(req.params.ebookId);
@@ -692,7 +1018,7 @@ app.delete('/api/admin/purchases/:userId/:ebookId', adminAuth, async (req, res) 
   }
 });
 
-app.delete('/api/admin/users/:id', adminAuth, async (req, res) => {
+app.delete('/api/admin/users/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const id = String(req.params.id);
     
@@ -713,7 +1039,7 @@ app.delete('/api/admin/users/:id', adminAuth, async (req, res) => {
 // -----------------------------
 
 // -- WEBHOOK LOGS --
-app.get('/api/admin/webhook-logs', adminAuth, async (req, res) => {
+app.get('/api/admin/webhook-logs', adminAuthMiddleware, async (req, res) => {
   try {
     const logs = await prisma.webhookLog.findMany({
       orderBy: { createdAt: 'desc' },
@@ -725,7 +1051,7 @@ app.get('/api/admin/webhook-logs', adminAuth, async (req, res) => {
   }
 });
 
-app.delete('/api/admin/webhook-logs', adminAuth, async (req, res) => {
+app.delete('/api/admin/webhook-logs', adminAuthMiddleware, async (req, res) => {
   try {
     await prisma.webhookLog.deleteMany({});
     res.json({ success: true });
@@ -735,7 +1061,7 @@ app.delete('/api/admin/webhook-logs', adminAuth, async (req, res) => {
 });
 
 // -- EMAIL SETTINGS --
-app.get('/api/admin/settings', adminAuth, async (req, res) => {
+app.get('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
   try {
     const settings = await prisma.setting.findMany({
       where: { key: { notIn: (await prisma.setting.findMany({ where: { key: { startsWith: 'reset_token_' } } })).map(s => s.key) } }
@@ -755,13 +1081,25 @@ app.get('/api/admin/settings', adminAuth, async (req, res) => {
   }
 });
 
-app.post('/api/admin/settings', adminAuth, async (req, res) => {
+app.post('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
   try {
     const entries = req.body as Record<string, string>;
     for (const [key, value] of Object.entries(entries)) {
       // Skip masked values (don't overwrite with masked text)
       if (key === 'resend_api_key' && value.startsWith('••')) continue;
       if (key.startsWith('reset_token_')) continue; // Security: don't allow writing reset tokens
+      if (key === 'member_hero_background_url') {
+        const v = String(value ?? '').trim();
+        if (v) {
+          const ok = /^https?:\/\//i.test(v) || (v.startsWith('/') && !v.startsWith('//'));
+          if (!ok) {
+            return res.status(400).json({
+              error:
+                'member_hero_background_url: use URL vazia, https://…, http://… ou caminho relativo /uploads/… (não use //).'
+            });
+          }
+        }
+      }
       await prisma.setting.upsert({
         where: { key },
         update: { value },
@@ -774,7 +1112,92 @@ app.post('/api/admin/settings', adminAuth, async (req, res) => {
   }
 });
 
-app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
+app.get('/api/admin/links', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const links = await prisma.shortLink.findMany({ orderBy: { createdAt: 'desc' } });
+    const grouped = await prisma.shortLinkClick.groupBy({
+      by: ['linkId'],
+      _count: { _all: true }
+    });
+    const clicksById = new Map<number, number>(grouped.map((g) => [g.linkId, g._count._all]));
+    res.json(
+      links.map((l) => ({
+        ...l,
+        clicks: clicksById.get(l.id) || 0
+      }))
+    );
+  } catch {
+    res.status(500).json({ error: 'Falha ao listar links.' });
+  }
+});
+
+app.post('/api/admin/links', adminAuthMiddleware, async (req, res) => {
+  try {
+    const slug = normalizeShortLinkSlug(String(req.body?.slug || ''));
+    const targetUrl = String(req.body?.targetUrl || '').trim();
+    if (!slug) return res.status(400).json({ error: 'Slug obrigatória.' });
+    if (!targetUrl) return res.status(400).json({ error: 'URL de destino obrigatória.' });
+    const redirectTypeRaw = Number(req.body?.redirectType || 301);
+    const redirectType = [301, 302, 307, 308].includes(redirectTypeRaw) ? redirectTypeRaw : 301;
+
+    const created = await prisma.shortLink.create({
+      data: {
+        name: String(req.body?.name || '').trim(),
+        slug,
+        targetUrl,
+        redirectType,
+        smartRules: String(req.body?.smartRules || '').trim() || null,
+        utmParams: String(req.body?.utmParams || '').trim() || null,
+        isActive: req.body?.isActive !== false
+      }
+    });
+    res.json(created);
+  } catch (e) {
+    res.status(400).json({ error: 'Falha ao criar link. Verifique slug duplicada.' });
+  }
+});
+
+app.put('/api/admin/links/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
+    const slug = normalizeShortLinkSlug(String(req.body?.slug || ''));
+    const targetUrl = String(req.body?.targetUrl || '').trim();
+    if (!slug) return res.status(400).json({ error: 'Slug obrigatória.' });
+    if (!targetUrl) return res.status(400).json({ error: 'URL de destino obrigatória.' });
+    const redirectTypeRaw = Number(req.body?.redirectType || 301);
+    const redirectType = [301, 302, 307, 308].includes(redirectTypeRaw) ? redirectTypeRaw : 301;
+
+    const updated = await prisma.shortLink.update({
+      where: { id },
+      data: {
+        name: String(req.body?.name || '').trim(),
+        slug,
+        targetUrl,
+        redirectType,
+        smartRules: String(req.body?.smartRules || '').trim() || null,
+        utmParams: String(req.body?.utmParams || '').trim() || null,
+        isActive: req.body?.isActive !== false
+      }
+    });
+    res.json(updated);
+  } catch {
+    res.status(400).json({ error: 'Falha ao atualizar link.' });
+  }
+});
+
+app.delete('/api/admin/links/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
+    await prisma.shortLink.delete({ where: { id } });
+    res.json({ success: true });
+  } catch {
+    res.status(400).json({ error: 'Falha ao remover link.' });
+  }
+});
+
+app.get('/api/admin/ebooks', adminAuthMiddleware, async (req, res) => {
   try {
     const ebooks = await prisma.ebook.findMany({ 
       orderBy: { createdAt: 'desc' },
@@ -786,9 +1209,9 @@ app.get('/api/admin/ebooks', adminAuth, async (req, res) => {
   }
 });
 
-app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
+app.post('/api/admin/ebooks', adminAuthMiddleware, async (req, res) => {
   try {
-    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, licenseSystemId, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
     
     // Auto-generate hotmartOffer if it's a bonus and not provided
     const finalOffer = isBonus && !hotmartOffer ? `bonus_${crypto.randomUUID()}` : hotmartOffer;
@@ -809,7 +1232,8 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
         featuredList: featuredList || null,
         isBonus: isBonus || false,
         parentEbookId: (isBonus && parentEbookId) ? String(parentEbookId) : null,
-        language: language || 'pt'
+        language: language || 'pt',
+        licenseSystemId: licenseSystemId ? String(licenseSystemId).trim() : null
       }
     });
 
@@ -829,12 +1253,10 @@ app.post('/api/admin/ebooks', adminAuth, async (req, res) => {
   }
 });
 
-app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
+app.put('/api/admin/ebooks/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
-    
-    // Fetch current to see if it just became a bonus or changed parent
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, licenseSystemId, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
     const currentEbook = await prisma.ebook.findUnique({ where: { id: String(id) } });
 
     // Ensure hotmartOffer remains unique for bonuses if sent as empty string
@@ -857,11 +1279,12 @@ app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
         featuredList: featuredList || null,
         isBonus: isBonus || false,
         parentEbookId: (isBonus && parentEbookId) ? String(parentEbookId) : null,
-        language: language || 'pt'
+        language: language || 'pt',
+        licenseSystemId: licenseSystemId !== undefined ? (licenseSystemId ? String(licenseSystemId).trim() : null) : undefined
       }
     });
 
-    // Retroactive logic if parentEbookId changed or newly became bonus
+    // Retroactive logic if parentEbookId changed
     if (updatedEbook.isBonus && updatedEbook.parentEbookId) {
       if (!currentEbook?.isBonus || currentEbook.parentEbookId !== updatedEbook.parentEbookId) {
         const parentPurchases = await prisma.purchase.findMany({ where: { ebookId: updatedEbook.parentEbookId } });
@@ -879,7 +1302,7 @@ app.put('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
   }
 });
 
-app.delete('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
+app.delete('/api/admin/ebooks/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const id = String(req.params.id);
     await prisma.ebook.delete({ where: { id } });
@@ -894,6 +1317,55 @@ app.delete('/api/admin/ebooks/:id', adminAuth, async (req, res) => {
 // ==========================================
 const distPath = path.join(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
+  app.use(async (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const slug = normalizeShortLinkSlug(req.path);
+    if (!slug) return next();
+
+    // Rotas reservadas da aplicação (não devem ser sequestradas por short links)
+    if (
+      slug === 'admin' ||
+      slug === 'vitrine' ||
+      slug === 'catalogo' ||
+      slug === 'catálogo' ||
+      slug.startsWith('api/') ||
+      slug.startsWith('uploads/')
+    ) {
+      return next();
+    }
+
+    const link = await prisma.shortLink.findUnique({ where: { slug } }).catch(() => null);
+    if (!link || !link.isActive) return next();
+
+    const countryCode = getCountryCodeFromHeaders(req);
+    const regionCode = getRegionCodeFromHeaders(req);
+    const deviceType = detectDeviceType(req.headers['user-agent']);
+    const ipAddress = getClientIp(req);
+    const referrer = String(req.headers.referer || '').trim().slice(0, 255);
+
+    let target = String(link.targetUrl || '').trim();
+    if (!target) return next();
+
+    target = applySmartRouting(target, link.smartRules, countryCode, regionCode, deviceType);
+    target = appendTrackingParams(target, link.utmParams);
+
+    await prisma.shortLinkClick
+      .create({
+        data: {
+          linkId: link.id,
+          ipAddress,
+          countryCode,
+          regionCode,
+          deviceType,
+          referrer
+        }
+      })
+      .catch(() => {});
+
+    const status = [301, 302, 307, 308].includes(link.redirectType) ? link.redirectType : 302;
+    return res.redirect(status, target);
+  });
+
   app.use(express.static(distPath));
   
   // Client side routing fallback
@@ -907,6 +1379,18 @@ if (fs.existsSync(distPath)) {
 // ==========================================
 // SERVER INITIALIZATION
 // ==========================================
-app.listen(PORT, () => {
-  console.log(`[EbookPro API] Server running centrally on port ${PORT}`);
-});
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      await ensureDevTestAccount(prisma);
+      console.log('[Dev] Conta teste garantida: teste@local.dev / TesteLocal123@');
+    } catch (e) {
+      console.error('[Dev] ensureDevTestAccount:', e);
+    }
+  }
+  app.listen(PORT, () => {
+    console.log(`[EbookPro API] Server running centrally on port ${PORT}`);
+  });
+}
+
+void startServer();

@@ -1,0 +1,115 @@
+# Contrato da API para o EA (paridade com WordPress)
+
+Base URL de exemplo: `https://seu-dominio.com` — todas as rotas abaixo são relativas a ela.
+
+## Autenticação
+
+| Rota | Header |
+|------|--------|
+| `validate_license` (v1 e v2) | `X-API-Key: <chave>` obrigatório. Chaves cadastradas em **Admin → Segurança / Licenças** (persistidas em `Setting` `forex_api_keys`, JSON array de strings). |
+| `submit_performance`, `get_ranking`, `download_setup` | Públicas (sem API Key), como no plugin. |
+
+## POST `/api/forex-rendimento/v1/validate_license` e `/api/forex-rendimento/v2/validate_license`
+
+**Body (JSON):**
+
+```json
+{
+  "email": "comprador@email.com",
+  "numero_conta": "12345678",
+  "system_id": "MEU_ROBO_ID"
+}
+```
+
+**Regras:**
+
+- `email` formato válido.
+- `numero_conta` mínimo 3 caracteres.
+- `system_id` obrigatório (string).
+
+**Respostas (igual intenção do PHP):**
+
+| Situação | HTTP | Body |
+|----------|------|------|
+| Licença ativa e não expirada | 200 | `{"status":"success","message":"Licença válida.","data_expiracao":"2026-01-01T00:00:00.000Z"}` |
+| Licença expirada (status `expirada`) | 403 | `{"status":"error","message":"Licença expirada."}` |
+| Inválida / inativa / não encontrada | 403 | `{"status":"error","message":"Licença inválida ou inativa."}` |
+| API Key ausente ou inválida | 403 | `{"status":"error","message":"Unauthorized: invalid or missing X-API-Key"}` |
+| Rate limit (60 req/min por IP) | 429 | `{"status":"error","message":"Rate limit exceeded. Try again later."}` |
+
+**Cache:** combinação email+conta+system_id fica em cache em memória por **5 minutos** (TTL 300s), como no WordPress.
+
+**Idempotência:** não se aplica (read-only).
+
+---
+
+## POST `/api/forex-rendimento/v1/submit_performance`
+
+**Body (JSON)** — mesmos campos do plugin:
+
+```json
+{
+  "email_hash": "ab12cd",
+  "numero_conta": "12345678",
+  "system_id": "MEU_ROBO_ID",
+  "corretora": "Corretora X",
+  "ativo": "EURUSD",
+  "lucro": 0,
+  "drawdown": -1.5,
+  "saldo_inicial": 1000,
+  "saldo_final": 1050,
+  "depositos": 0,
+  "setup_file": "... conteúdo do setup ..."
+}
+```
+
+**Obrigatórios:** `email_hash`, `numero_conta`, `system_id`, `setup_file` (não vazio).
+
+**Resposta sucesso (200):** `status`, `message`, `debug` com campos de auditoria (como no PHP).
+
+**Idempotência:** atualiza o **mesmo** registro lógico identificado por `(email_hash, numero_conta, system_id, corretora, ativo)` — mesma chave do plugin.
+
+---
+
+## GET `/api/forex-rendimento/v1/get_ranking?period=7`
+
+`period` ∈ `7`, `15`, `30` (default 7).
+
+**Resposta:** array de objetos com `rank`, `usuario`, `corretora`, `robo`, `ativo`, `lucro_percent`, `drawdown`, `saldo_inicial`, `saldo_final`, `depositos`, `setup_id`.
+
+---
+
+## GET `/api/forex-rendimento/v1/download_setup?id=<rankingEntryId>`
+
+Retorna arquivo texto **Windows-1252** (paridade MetaTrader), `Content-Disposition: attachment; filename="setup_trader_<id>.set"`.
+
+---
+
+## Hash de email (`email_hash`)
+
+Mesma regra do PHP (`RankingEndpoint` / EA):
+
+- Se `strlen(email) >= 5`: `substr(email, 0, 2) + strlen(email) + substr(email, -2)`.
+- Senão: `"anon"`.
+
+---
+
+## POST `/api/forex-rendimento/v1/webhook` (Hotmart / genérico)
+
+**Headers (um de):** `hottok`, `x-hotmart-hottok`, `x-webhook-token` — valor deve ser igual ao configurado em `Setting` **`forex_webhook_token`** (obrigatório em produção).
+
+**Body:** payload JSON Hotmart (eventos `PURCHASE_APPROVED`, `PURCHASE_COMPLETE`, cancelamentos, etc.) — processamento alinhado a `WebhookProcessor`.
+
+**Idempotência:** `event_id` da transação em `License.eventId` (unique); renovações usam `subscriber_code` quando presente.
+
+---
+
+## Migração de URL no EA
+
+Substituir:
+
+`https://site-wordpress.com/wp-json/forex-rendimento/v1/...`
+
+por:
+
+`https://<API-da-biblioteca>/api/forex-rendimento/v1/...`

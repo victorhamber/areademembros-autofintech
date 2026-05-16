@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bookmark, Lock } from 'lucide-react';
+import { Bookmark, GraduationCap, Lock } from 'lucide-react';
 import './BookCard.css';
 
 import { t } from '../i18n/translations';
@@ -15,6 +15,10 @@ interface BookCardProps {
   isWishlisted?: boolean;
   salesUrl?: string;
   isBonus?: boolean;
+  /** Card de trilha EAD na home: sem wishlist, badge próprio, capa opcional. */
+  isCourse?: boolean;
+  hideInfo?: boolean;
+  hideAccessBadge?: boolean;
   lang?: Lang;
   onClick: (e: React.MouseEvent, id: string, hasAccess: boolean) => void;
   onToggleWishlist?: (id: string) => void;
@@ -30,60 +34,78 @@ export const BookCard: React.FC<BookCardProps> = ({
   isWishlisted = false,
   salesUrl,
   isBonus = false,
+  isCourse = false,
+  hideInfo = false,
+  hideAccessBadge = false,
   lang = 'pt',
   onClick,
   onToggleWishlist
 }) => {
-  const isHotmart = !hasAccess && salesUrl && salesUrl.includes('pay.hotmart.com');
+  const isHotmart = !isCourse && !hasAccess && salesUrl && salesUrl.includes('pay.hotmart.com');
   const tr = t(lang);
+  const showCover = Boolean(coverUrl && coverUrl.trim());
 
   const content = (
     <>
       <div className="cover-container">
-        <img 
-          src={coverUrl} 
-          alt={title} 
-          className="book-cover" 
-          loading="lazy" 
-          draggable={false} 
-          style={{ filter: !hasAccess ? 'grayscale(100%)' : 'none' }}
-        />
-        
-        {hasAccess && <div className="badge-access">{isBonus ? tr.badge_bonus : tr.badge_purchased}</div>}
-        
+        {showCover ? (
+          <img
+            src={coverUrl}
+            alt={title}
+            className="book-cover"
+            loading="lazy"
+            draggable={false}
+            style={{ filter: !hasAccess ? 'grayscale(100%)' : 'none' }}
+          />
+        ) : (
+          <div className="book-cover book-cover--placeholder" aria-hidden>
+            <GraduationCap size={48} strokeWidth={1.25} />
+          </div>
+        )}
+
+        {hasAccess && !hideAccessBadge && (
+          <div className="badge-access">
+            {isCourse ? tr.badge_course : isBonus ? tr.badge_bonus : tr.badge_purchased}
+          </div>
+        )}
+
         {/* Lock overlay for books without access */}
         {!hasAccess && (
           <div className="lock-overlay">
             <Lock size={20} strokeWidth={2.5} />
           </div>
         )}
-        
+
         {/* Wishlist Button Overlay */}
-        <button 
-          className="wishlist-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            if (onToggleWishlist) onToggleWishlist(id);
-          }}
-          aria-label={isWishlisted ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-        >
-          <Bookmark 
-            size={18} 
-            color={isWishlisted ? "var(--accent-primary)" : "#fff"} 
-            fill={isWishlisted ? "var(--accent-primary)" : "transparent"} 
-            strokeWidth={1.5}
-          />
-        </button>
-      </div>
-      <div className="book-info">
-        <h3 className="book-title">{title}</h3>
-        {description ? (
-          <p className="book-description">{description}</p>
-        ) : (
-          <p className="book-author">{author}</p>
+        {!isCourse && (
+          <button
+            className="wishlist-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (onToggleWishlist) onToggleWishlist(id);
+            }}
+            aria-label={isWishlisted ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          >
+            <Bookmark
+              size={18}
+              color={isWishlisted ? 'var(--accent-primary)' : '#fff'}
+              fill={isWishlisted ? 'var(--accent-primary)' : 'transparent'}
+              strokeWidth={1.5}
+            />
+          </button>
         )}
       </div>
+      {!hideInfo && (
+        <div className="book-info">
+          <h3 className="book-title">{title}</h3>
+          {description ? (
+            <p className="book-description">{description}</p>
+          ) : (
+            <p className="book-author">{author}</p>
+          )}
+        </div>
+      )}
     </>
   );
 

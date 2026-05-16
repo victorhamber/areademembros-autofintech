@@ -8,25 +8,112 @@
   background-color: var(--bg-main);
 }
 
+/* Área de membros / EAD */
+.app-member-shell {
+  background: var(--bg-main);
+}
+
+:root {
+  --member-topbar-height: 52px;
+}
+
+.app-member-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+.member-topbar {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--member-topbar-height) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) var(--spacing-md) 0;
+  padding-bottom: 0;
+  background: rgba(12, 12, 12, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 99;
+}
+
+.member-topbar-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--member-topbar-height);
+  width: 100%;
+  padding-bottom: 8px;
+}
+
+.member-topbar-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+}
+
+.member-topbar-section {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.member-sidebar {
+  display: none;
+}
+
+.member-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
 .app-main {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + var(--spacing-md)); /* Space for bottom nav */
+  --member-main-padding-top: calc(var(--member-topbar-height) + env(safe-area-inset-top) + 44px);
+  padding-top: var(--member-main-padding-top);
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + var(--spacing-md)); /* bottom nav */
   scroll-behavior: smooth;
+  /* Espaço visual entre o topo do scroll e blocos sticky (ex.: trilha em Cursos) */
+  --member-sticky-inset: 8px;
 }
 
-/* Bottom Navigation Shell */
+/* Início: sem topbar fixa — hero encosta no topo e “respira” como streaming */
+.app-main--netflix-home {
+  --member-main-padding-top: 0px;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Bottom Navigation Shell (vários itens — rolagem horizontal no mobile) */
 .bottom-nav {
   height: calc(var(--nav-height) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(15, 17, 21, 0.85); /* Slightly transparent for blur */
+  padding-left: 6px;
+  padding-right: 6px;
+  background: rgba(0, 0, 0, 0.94);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--border-subtle);
   display: flex;
-  justify-content: space-around;
+  justify-content: flex-start;
   align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   position: fixed;
   bottom: 0;
   left: 0;
@@ -34,17 +121,25 @@
   z-index: 100;
 }
 
+.bottom-nav::-webkit-scrollbar {
+  display: none;
+}
+
 .bottom-nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 500;
+  line-height: 1.1;
   height: 100%;
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 58px;
+  max-width: 92px;
+  padding: 0 4px;
   transition: color 0.2s ease;
 }
 
@@ -53,9 +148,10 @@
 }
 
 .bottom-nav-item svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   stroke-width: 2px;
+  flex-shrink: 0;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -63,48 +159,130 @@
   transform: scale(1.1);
 }
 
+.member-sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.member-sidebar-logo {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 40px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.member-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.member-sidebar-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.member-sidebar-item span {
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.member-sidebar-item svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2px;
+  flex-shrink: 0;
+}
+
+.member-sidebar-item:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.member-sidebar-item.active {
+  color: #fff;
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
 /* =========================================
    Responsive Adjustments for Desktop
    ========================================= */
 @media (min-width: 768px) {
-  .app-main {
-    padding-bottom: var(--spacing-md);
-    padding-top: calc(var(--nav-height) + var(--spacing-md));
+  .app-member-layout {
+    flex-direction: row;
   }
-  
-  /* Restrain the maximum width of the inner pages to feel like a high-end web app */
+
+  .member-topbar {
+    display: none;
+  }
+
+  .member-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 280px;
+    flex-shrink: 0;
+    padding: var(--spacing-xl) var(--spacing-md);
+    background: var(--bg-main);
+    border-right: 1px solid var(--border-subtle);
+    min-height: 0;
+  }
+
+  .app-main {
+    --member-main-padding-top: 44px;
+    padding-top: var(--member-main-padding-top);
+    padding-bottom: var(--spacing-md);
+    --member-sticky-inset: 4px;
+  }
+
+  .app-main.app-main--netflix-home {
+    padding-top: 0;
+    --member-main-padding-top: 0px;
+  }
+
+  .bottom-nav {
+    display: none;
+  }
+
+  /* Largura confortável no conteúdo principal */
   .app-main > div {
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
   }
 
-  .bottom-nav {
-    top: 0;
-    bottom: auto;
-    border-top: none;
-    border-bottom: 1px solid var(--border-subtle);
-    justify-content: center;
-    gap: 40px;
-    background: rgba(15, 17, 21, 0.95); /* Slightly darker for top nav */
-  }
-
-  .bottom-nav-item {
-    flex: 0 0 auto;
-    flex-direction: row;
-    font-size: 14px;
-    gap: 10px;
-  }
-
-  .bottom-nav-item svg {
-    width: 20px;
-    height: 20px;
+  /* Início: hero e faixa superior ocupam toda a largura da coluna (sem “caixa” 1200px) */
+  .app-main > .home-page.home-page--fullbleed {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
   }
 }
 
 /* ========== PROFILE PAGE ========== */
 .profile-page {
-  padding: var(--spacing-xl) var(--spacing-md);
+  padding: var(--spacing-lg) var(--spacing-md);
   max-width: 500px;
   margin: 0 auto;
 }
@@ -120,8 +298,8 @@
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-primary), #2C8A79);
-  color: #000;
+  background: linear-gradient(135deg, var(--accent-primary), #1e3a5f);
+  color: #fff;
   font-size: 32px;
   font-weight: 700;
   display: flex;
@@ -175,7 +353,7 @@
   padding: 14px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 77, 79, 0.3);
-  background: rgba(255, 77, 79, 0.08);
+  background: rgba(255, 77, 79, 0.06);
   color: #ff4d4f;
   font-weight: 600;
   font-size: 16px;
@@ -204,7 +382,7 @@
   border-radius: var(--radius-sm);
   border: none;
   background: var(--accent-primary);
-  color: #000;
+  color: #fff;
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
@@ -225,10 +403,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 60vh;
+  justify-content: flex-start;
   text-align: center;
-  padding: var(--spacing-xl);
+  padding: var(--spacing-lg) var(--spacing-xl);
   color: var(--text-secondary);
 }
 .empty-icon-wrapper {

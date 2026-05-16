@@ -2,7 +2,7 @@
   min-height: 100vh;
   min-height: 100dvh;
   padding: var(--spacing-md);
-  background: linear-gradient(to bottom, var(--bg-main), #000);
+  background: linear-gradient(to bottom, var(--bg-main), var(--bg-main));
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
@@ -188,7 +188,7 @@
 }
 
 .showcase-modal-left {
-  background: #000;
+  background: var(--bg-main);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -254,7 +254,7 @@
 .showcase-buy-btn:hover {
   transform: translateY(-2px);
   filter: brightness(1.1);
-  box-shadow: 0 10px 20px rgba(69, 196, 176, 0.3);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
 }
 
 @keyframes fadeIn {

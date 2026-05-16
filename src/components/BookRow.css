@@ -1,11 +1,15 @@
 .book-row-container {
-  margin-bottom: var(--spacing-lg);
+  margin: 0 var(--spacing-md) var(--spacing-lg);
+  padding: 16px 0 10px;
+  border-radius: 10px;
+  border: 1px solid #2a2a2a;
+  background: #181818;
 }
 
 .row-title {
-  font-size: 20px;
-  font-weight: 700;
-  padding: 0 var(--spacing-md);
+  font-size: 18px;
+  font-weight: 600;
+  padding: 0 16px;
   margin-bottom: 12px;
   display: flex;
   align-items: center;
@@ -13,18 +17,18 @@
 .row-title::before {
   content: '';
   display: inline-block;
-  width: 4px;
-  height: 20px;
+  width: 8px;
+  height: 8px;
   background-color: var(--accent-primary);
-  margin-right: 10px;
-  border-radius: 2px;
+  margin-right: 8px;
+  border-radius: 50%;
 }
 
 .row-scroll {
   display: flex;
   gap: var(--spacing-md);
   overflow-x: auto;
-  padding: 0 var(--spacing-md) var(--spacing-md);
+  padding: 0 16px var(--spacing-md);
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -40,4 +44,19 @@
 .row-scroll.dragging {
   cursor: grabbing;
   scroll-snap-type: none; /* Disable snap so dragging is fluid */
+}
+
+@media (min-width: 768px) {
+  .book-row-container {
+    margin-bottom: 22px;
+    padding-top: 18px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .book-row-container {
+    max-width: 1140px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }

@@ -1,122 +1,1589 @@
-import React, { useState, useEffect } from 'react';
-import { Pencil, Trash2, Users, BookOpen, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail } from 'lucide-react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, Image as ImageIcon, Film, Music2, File as FileIcon } from 'lucide-react';
 import './Admin.css';
 
+const ADMIN_TABLE_PAGE_SIZE = 12;
+const PLAN_OPTIONS = ['teste', 'mensal', 'semestral', 'anual', 'vitalicio'] as const;
+const PAGE_BUILDER_PAGES_SETTING_KEY = 'admin_page_builder_pages_json';
+const PAGE_BUILDER_LEGACY_SETTING_KEY = 'admin_page_builder_html';
+type BuilderPageTarget = 'header' | 'body';
+type BuilderPage = {
+  slug: string;
+  target: BuilderPageTarget;
+  html: string;
+  updatedAt: string;
+  published?: boolean;
+};
+const DEFAULT_BUILDER_HTML = `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nova Página</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; background: #f6f8fb; color: #0f172a; }
+      .hero { max-width: 900px; margin: 48px auto; background: #fff; border-radius: 16px; padding: 36px; box-shadow: 0 10px 25px rgba(2, 6, 23, 0.08); }
+      .kicker { text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; color: #2563eb; font-weight: 700; }
+      h1 { margin: 12px 0; font-size: 38px; line-height: 1.15; }
+      p { color: #334155; line-height: 1.6; }
+      .btn { display: inline-block; margin-top: 16px; background: #2563eb; color: #fff; text-decoration: none; padding: 12px 22px; border-radius: 10px; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <section class="hero">
+      <span class="kicker">Oferta especial</span>
+      <h1>Edite esta página clicando nos elementos</h1>
+      <p>Use o editor visual para alterar textos e atributos sem sair do painel.</p>
+      <a class="btn" href="#comprar">Quero comprar agora</a>
+    </section>
+  </body>
+</html>`;
+
+function isoToDatetimeLocalValue(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function datetimeLocalToIsoOrNull(s: string): string | null {
+  const t = s.trim();
+  if (!t) return null;
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+function licenseStatusPillClass(status: string | null | undefined): string {
+  const t = String(status || '').toLowerCase().trim();
+  if (t === 'ativa' || t === 'inativa' || t === 'expirada') return t;
+  return 'outro';
+}
+
+function effectiveLicenseStatus(status: string | null | undefined, dataExpiracao: string | Date | null | undefined): string {
+  const raw = String(status || '').toLowerCase().trim();
+  const exp = dataExpiracao ? new Date(dataExpiracao) : null;
+  const expiredByDate = !!exp && !Number.isNaN(exp.getTime()) && exp.getTime() < Date.now();
+  if (raw === 'ativa' && expiredByDate) return 'expirada';
+  if (raw === 'ativa' || raw === 'inativa' || raw === 'expirada') return raw;
+  return raw || 'outro';
+}
+
+function planDurationDays(planRaw: string | null | undefined): number {
+  const plan = String(planRaw || 'mensal').toLowerCase().trim();
+  const toleranceDays = 3;
+  if (plan === 'teste') return 7 + toleranceDays;
+  if (plan === 'semestral') return 180 + toleranceDays;
+  if (plan === 'anual') return 365 + toleranceDays;
+  if (plan === 'vitalicio') return 18250 + toleranceDays;
+  return 30 + toleranceDays;
+}
+
+function planExpiryLocalValue(planRaw: string | null | undefined): string {
+  const d = new Date();
+  d.setDate(d.getDate() + planDurationDays(planRaw));
+  return isoToDatetimeLocalValue(d.toISOString());
+}
+
+function compareLicenseStatusLabel(a: string, b: string): number {
+  const rank = (s: string) => {
+    const t = s.toLowerCase();
+    if (t === 'ativa') return 0;
+    if (t === 'inativa') return 1;
+    if (t === 'expirada') return 2;
+    return 3;
+  };
+  const ra = rank(a);
+  const rb = rank(b);
+  if (ra !== rb) return ra - rb;
+  return a.localeCompare(b, 'pt');
+}
+
+function AdminPagination({
+  page,
+  totalItems,
+  pageSize = ADMIN_TABLE_PAGE_SIZE,
+  onChange,
+}: {
+  page: number;
+  totalItems: number;
+  pageSize?: number;
+  onChange: (p: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const current = Math.min(Math.max(1, page), totalPages);
+  if (totalItems <= pageSize) return null;
+  const from = (current - 1) * pageSize + 1;
+  const to = Math.min(current * pageSize, totalItems);
+  return (
+    <div className="admin-pagination" role="navigation" aria-label="Paginação da tabela">
+      <span className="admin-pagination-info">
+        {from}–{to} de {totalItems}
+      </span>
+      <div className="admin-pagination-buttons">
+        <button type="button" className="admin-pagination-btn" onClick={() => onChange(1)} disabled={current <= 1} aria-label="Primeira página">
+          «
+        </button>
+        <button type="button" className="admin-pagination-btn" onClick={() => onChange(current - 1)} disabled={current <= 1} aria-label="Página anterior">
+          ‹
+        </button>
+        <span className="admin-pagination-page">
+          {current} / {totalPages}
+        </span>
+        <button type="button" className="admin-pagination-btn" onClick={() => onChange(current + 1)} disabled={current >= totalPages} aria-label="Próxima página">
+          ›
+        </button>
+        <button type="button" className="admin-pagination-btn" onClick={() => onChange(totalPages)} disabled={current >= totalPages} aria-label="Última página">
+          »
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export const Admin: React.FC = () => {
+  const ADMIN_JWT_KEY = 'ebookpro_admin_jwt';
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [masterPassword, setMasterPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'ebooks' | 'users' | 'webhooks' | 'email'>('ebooks');
+  const [adminJwt, setAdminJwt] = useState('');
 
-  const [ebooks, setEbooks] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const authHeaders = (jwtOverride?: string): Record<string, string> => {
+    const t = jwtOverride ?? adminJwt;
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  };
+
+  const [activeTab, setActiveTab] = useState<
+    'courses' | 'users' | 'webhooks' | 'email' | 'products' | 'forexEA' | 'banner' | 'builder' | 'support' | 'links' | 'media'
+  >('courses');
+
   const [users, setUsers] = useState<any[]>([]);
   const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
-  
-  // -- EBOOK FORM STATE --
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [author, setAuthor] = useState('');
-  const [description, setDescription] = useState('');
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [htmlFile, setHtmlFile] = useState<File | null>(null);
-  const [isBonus, setIsBonus] = useState(false);
-  const [parentEbookId, setParentEbookId] = useState('');
-  const [language, setLanguage] = useState('pt');
-  const [coverUrl, setCoverUrl] = useState('');
-  const [pdfUrl, setPdfUrl] = useState('');
-  const [htmlUrl, setHtmlUrl] = useState('');
-  const [externalUrl, setExternalUrl] = useState('');
-  const [redirectUrl, setRedirectUrl] = useState('');
-  const [salesUrl, setSalesUrl] = useState('');
-  const [hotmartOffer, setHotmartOffer] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [featuredList, setFeaturedList] = useState('');
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // -- COURSES (EAD) STATE --
+  const [courses, setCourses] = useState<any[]>([]);
+  const [newCourseTitle, setNewCourseTitle] = useState('');
+  const [newCourseSlug, setNewCourseSlug] = useState('');
+  const [newCourseCoverFile, setNewCourseCoverFile] = useState<File | null>(null);
+  const [newCourseProductIds, setNewCourseProductIds] = useState('');
+  const [newCourseSalesPageUrl, setNewCourseSalesPageUrl] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
+  const [selectedModuleId, setSelectedModuleId] = useState<string>('');
+  const [selectedLessonId, setSelectedLessonId] = useState<string>('');
+  const [editCourseTitle, setEditCourseTitle] = useState('');
+  const [editCourseSlug, setEditCourseSlug] = useState('');
+  const [editCoursePublished, setEditCoursePublished] = useState(true);
+  const [editCourseCoverFile, setEditCourseCoverFile] = useState<File | null>(null);
+  const [editCourseProductIds, setEditCourseProductIds] = useState('');
+  const [editCourseSalesPageUrl, setEditCourseSalesPageUrl] = useState('');
+  const [editModuleTitle, setEditModuleTitle] = useState('');
+  const [editLessonTitle, setEditLessonTitle] = useState('');
+  const [editLessonVideoUrl, setEditLessonVideoUrl] = useState('');
+  const [editLessonBodyText, setEditLessonBodyText] = useState('');
+  const [editLessonActionLabel, setEditLessonActionLabel] = useState('');
+  const [editLessonActionUrl, setEditLessonActionUrl] = useState('');
+  const [newModuleTitle, setNewModuleTitle] = useState('');
+  const [newLessonTitle, setNewLessonTitle] = useState('');
+  const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
+  const [newLessonBodyText, setNewLessonBodyText] = useState('');
+  const [newLessonActionLabel, setNewLessonActionLabel] = useState('');
+  const [newLessonActionUrl, setNewLessonActionUrl] = useState('');
 
   // -- USER FORM STATE --
+  const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPass, setNewUserPass] = useState('');
+  const [newUserProductId, setNewUserProductId] = useState('');
+  const [newUserPlan, setNewUserPlan] = useState('mensal');
   const [managingAccessFor, setManagingAccessFor] = useState<any | null>(null);
-  const [grantEbookId, setGrantEbookId] = useState('');
+  const [licenseForm, setLicenseForm] = useState({
+    systemId: '',
+    plano: 'mensal',
+    statusLicenca: 'ativa',
+    dataExpiracao: planExpiryLocalValue('mensal'),
+    numeroConta: '',
+  });
+  const [editingLicenseId, setEditingLicenseId] = useState<number | null>(null);
+  const [licenseModalBusy, setLicenseModalBusy] = useState(false);
   const [userSearch, setUserSearch] = useState('');
+  const [userPlanFilter, setUserPlanFilter] = useState('todos');
+  const [userStatusFilter, setUserStatusFilter] = useState('todos');
+  const [pageUsers, setPageUsers] = useState(1);
+  const [pageProducts, setPageProducts] = useState(1);
+  const [pageWebhooks, setPageWebhooks] = useState(1);
+  const [builderPages, setBuilderPages] = useState<BuilderPage[]>([]);
+  const [builderLoadedOnce, setBuilderLoadedOnce] = useState(false);
+  const [builderSaving, setBuilderSaving] = useState(false);
+  const [builderStep, setBuilderStep] = useState<'list' | 'setup' | 'html'>('list');
+  const [builderSetupSlug, setBuilderSetupSlug] = useState('');
+  const [builderSetupTarget, setBuilderSetupTarget] = useState<BuilderPageTarget>('header');
+  const [builderSetupHeadCode, setBuilderSetupHeadCode] = useState('');
+  const [builderSetupBodyCode, setBuilderSetupBodyCode] = useState('');
+  const [builderHeadCodeDraft, setBuilderHeadCodeDraft] = useState('');
+  const [builderBodyCodeDraft, setBuilderBodyCodeDraft] = useState('');
+  const [builderCurrentSlug, setBuilderCurrentSlug] = useState('');
+  const [builderCodeDraft, setBuilderCodeDraft] = useState(DEFAULT_BUILDER_HTML);
+  const [builderPreviewHtml, setBuilderPreviewHtml] = useState(DEFAULT_BUILDER_HTML);
+  const [builderVisualOpen, setBuilderVisualOpen] = useState(false);
+  const [builderPreviewMode, setBuilderPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [builderSelectedPath, setBuilderSelectedPath] = useState('');
+  const [builderSelectedText, setBuilderSelectedText] = useState('');
+  const [builderSelectedHref, setBuilderSelectedHref] = useState('');
+  const [builderSelectedTextColor, setBuilderSelectedTextColor] = useState('#111111');
+  const [builderSelectedBgColor, setBuilderSelectedBgColor] = useState('#ffffff');
+  const [builderSelectedAlign, setBuilderSelectedAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [builderOffsetX, setBuilderOffsetX] = useState(0);
+  const [builderOffsetY, setBuilderOffsetY] = useState(0);
+  const builderIframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  /** Abas internas do editor EAD (painel direito). */
+  const [eadSectionTab, setEadSectionTab] = useState<'curso' | 'modulo' | 'aula'>('curso');
+  const [eadLessonSubtab, setEadLessonSubtab] = useState<'nova' | 'editar'>('nova');
 
   // -- EMAIL SETTINGS STATE --
   const [emailSettings, setEmailSettings] = useState<Record<string, string>>({
     resend_api_key: '', sender_name: '', sender_email: '',
-    welcome_template_pt: '', welcome_template_es: '',
-    reset_template_pt: '', reset_template_es: ''
+    welcome_template_pt: '',
+    reset_template_pt: '',
+    member_hero_background_url: '',
+    member_hero_kicker: '',
+    member_support_url: ''
   });
+  const [licenses, setLicenses] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [shortLinks, setShortLinks] = useState<any[]>([]);
+  const [mediaAssets, setMediaAssets] = useState<any[]>([]);
+  const [mediaSearch, setMediaSearch] = useState('');
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [editingShortLinkId, setEditingShortLinkId] = useState<number | null>(null);
+  const emptyShortLinkForm = () => ({
+    name: '',
+    slug: '',
+    targetUrl: '',
+    redirectType: 301,
+    utmParams: '',
+    smartRules: '',
+    isActive: true,
+  });
+  const [shortLinkForm, setShortLinkForm] = useState(emptyShortLinkForm);
+  const [forexWebhook, setForexWebhook] = useState('');
+  const [forexApiLines, setForexApiLines] = useState('');
   const [emailSaving, setEmailSaving] = useState(false);
+  const [bannerSaving, setBannerSaving] = useState(false);
+  const emptyProductForm = () => ({
+    productName: '',
+    systemId: '',
+    offerCode: '',
+    plano: 'mensal',
+    description: '',
+    downloadVersion: '',
+  });
+  const [newProduct, setNewProduct] = useState(emptyProductForm);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [selectedProductForDownload, setSelectedProductForDownload] = useState<any | null>(null);
+  const [robotFile, setRobotFile] = useState<File | null>(null);
 
-  // -- FETCHERS --
-  const fetchCategories = async (pwd: string) => {
-    try {
-      const res = await fetch('/api/admin/categories', { headers: { 'x-admin-password': pwd } });
-      if (res.ok) setCategories(await res.json());
-    } catch(err) { console.error('Error fetching categories'); }
+  const startEditProduct = (p: any) => {
+    setEditingProductId(Number(p.id));
+    setNewProduct({
+      productName: String(p.productName || ''),
+      systemId: String(p.systemId || ''),
+      offerCode: String(p.offerCode || ''),
+      plano: String(p.plano || 'mensal'),
+      description: String(p.description || ''),
+      downloadVersion: String(p.downloadVersion || ''),
+    });
+    setSelectedProductForDownload(null);
+    setRobotFile(null);
   };
 
-  const fetchEbooks = async (pwd: string) => {
+  const cancelEditProduct = () => {
+    setEditingProductId(null);
+    setNewProduct(emptyProductForm());
+  };
+
+  const startEditShortLink = (link: any) => {
+    setEditingShortLinkId(Number(link.id));
+    setShortLinkForm({
+      name: String(link.name || ''),
+      slug: String(link.slug || ''),
+      targetUrl: String(link.targetUrl || ''),
+      redirectType: Number(link.redirectType || 301),
+      utmParams: String(link.utmParams || ''),
+      smartRules: String(link.smartRules || ''),
+      isActive: Boolean(link.isActive),
+    });
+  };
+
+  const cancelEditShortLink = () => {
+    setEditingShortLinkId(null);
+    setShortLinkForm(emptyShortLinkForm());
+  };
+
+  const normalizeBuilderSlug = (raw: string) =>
+    raw
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9-_/]+/g, '-')
+      .replace(/\/+/g, '/')
+      .replace(/(^[-/]+|[-/]+$)/g, '') || 'pagina-nova';
+
+  const parseBuilderPagesSetting = (raw: string): BuilderPage[] => {
     try {
-      const res = await fetch('/api/admin/ebooks', { headers: { 'x-admin-password': pwd } });
-      if (res.ok) {
-        setEbooks(await res.json());
-        setIsAdminLoggedIn(true);
-        localStorage.setItem('adminToken', pwd);
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((x) => x as Partial<BuilderPage>)
+        .filter((x) => x && typeof x.slug === 'string' && typeof x.html === 'string')
+        .map((x) => ({
+          slug: normalizeBuilderSlug(String(x.slug)),
+          html: String(x.html),
+          target: x.target === 'header' ? 'header' : 'body',
+          updatedAt: x.updatedAt ? String(x.updatedAt) : new Date().toISOString(),
+          published: Boolean(x.published),
+        }));
+    } catch {
+      return [];
+    }
+  };
+
+  const serializeBuilderPagesSetting = (pages: BuilderPage[]) => JSON.stringify(pages, null, 2);
+
+  const getBuilderPreviewDocument = () => builderIframeRef.current?.contentDocument || null;
+
+  const serializeBuilderDocument = () => {
+    const doc = getBuilderPreviewDocument();
+    if (!doc) return '';
+    const cloned = doc.documentElement.cloneNode(true) as HTMLElement;
+    cloned.querySelector('#admin-builder-selection-style')?.remove();
+    cloned.querySelectorAll('.admin-builder-selected').forEach((el) => el.classList.remove('admin-builder-selected'));
+    return `<!doctype html>\n${cloned.outerHTML}`;
+  };
+
+  const buildElementPath = (el: Element, doc: Document): string => {
+    if (el === doc.body) return 'body';
+    const segments: string[] = [];
+    let current: Element | null = el;
+    while (current && current !== doc.body) {
+      const parentEl: Element | null = current.parentElement;
+      if (!parentEl) break;
+      const currentTag = current.tagName;
+      const sameTagSiblings = (Array.from(parentEl.children) as Element[]).filter((s: Element) => s.tagName === currentTag);
+      const idx = sameTagSiblings.indexOf(current) + 1;
+      segments.unshift(`${current.tagName.toLowerCase()}:nth-of-type(${idx})`);
+      current = parentEl;
+    }
+    return segments.length ? `body > ${segments.join(' > ')}` : 'body';
+  };
+
+  const parsePxValue = (v: string | null | undefined) => {
+    const n = parseInt(String(v || '').replace('px', '').trim(), 10);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const extractBuilderSelectedState = (el: Element | null) => {
+    if (!el) {
+      setBuilderSelectedText('');
+      setBuilderSelectedHref('');
+      setBuilderSelectedTextColor('#111111');
+      setBuilderSelectedBgColor('#ffffff');
+      setBuilderSelectedAlign('left');
+      setBuilderOffsetX(0);
+      setBuilderOffsetY(0);
+      return;
+    }
+    const h = el as HTMLElement;
+    const cs = window.getComputedStyle(h);
+    setBuilderSelectedText(h.innerText || '');
+    setBuilderSelectedHref(el.getAttribute('href') || '');
+    setBuilderSelectedTextColor(cs.color || '#111111');
+    setBuilderSelectedBgColor(cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? '#ffffff' : cs.backgroundColor || '#ffffff');
+    const ta = (cs.textAlign || 'left').toLowerCase();
+    setBuilderSelectedAlign(ta === 'center' ? 'center' : ta === 'right' ? 'right' : 'left');
+    setBuilderOffsetX(parsePxValue(h.style.marginLeft));
+    setBuilderOffsetY(parsePxValue(h.style.marginTop));
+  };
+
+  const selectBuilderElement = (path: string) => {
+    const doc = getBuilderPreviewDocument();
+    if (!doc || !path) return;
+    doc.querySelectorAll('.admin-builder-selected').forEach((el) => el.classList.remove('admin-builder-selected'));
+    const selected = doc.querySelector(path);
+    if (!selected) return;
+    selected.classList.add('admin-builder-selected');
+    setBuilderSelectedPath(path);
+    extractBuilderSelectedState(selected);
+  };
+
+  const applyBuilderVisualValues = (opts: {
+    text?: string;
+    href?: string;
+    textColor?: string;
+    bgColor?: string;
+    align?: 'left' | 'center' | 'right';
+    offsetX?: number;
+    offsetY?: number;
+  }) => {
+    const doc = getBuilderPreviewDocument();
+    if (!doc || !builderSelectedPath) return;
+    const target = doc.querySelector(builderSelectedPath) as HTMLElement | null;
+    if (!target) return;
+    if (opts.text !== undefined) target.innerText = opts.text;
+    if (opts.href !== undefined) target.setAttribute('href', opts.href);
+    if (opts.textColor !== undefined) target.style.color = opts.textColor;
+    if (opts.bgColor !== undefined) target.style.backgroundColor = opts.bgColor;
+    if (opts.align !== undefined) target.style.textAlign = opts.align;
+    if (opts.offsetX !== undefined) target.style.marginLeft = `${opts.offsetX}px`;
+    if (opts.offsetY !== undefined) target.style.marginTop = `${opts.offsetY}px`;
+    target.classList.add('admin-builder-selected');
+    extractBuilderSelectedState(target);
+    const serialized = serializeBuilderDocument();
+    if (serialized) {
+      const nextBody = getBuilderAreaCode(serialized, 'body');
+      setBuilderBodyCodeDraft(nextBody);
+      setBuilderCodeDraft((prev) => setBuilderHtmlSections(prev, { head: builderHeadCodeDraft, body: nextBody }));
+    }
+  };
+
+  const handleBuilderIframeLoad = () => {
+    const doc = getBuilderPreviewDocument();
+    if (!doc) return;
+    if (!doc.querySelector('#admin-builder-selection-style')) {
+      const st = doc.createElement('style');
+      st.id = 'admin-builder-selection-style';
+      st.textContent = `.admin-builder-selected{outline:2px solid #3b82f6 !important; outline-offset:2px !important;}`;
+      doc.head.appendChild(st);
+    }
+    doc.onclick = (ev) => {
+      const target = ev.target as Element | null;
+      if (!target) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const path = buildElementPath(target, doc);
+      selectBuilderElement(path);
+    };
+    if (builderSelectedPath) selectBuilderElement(builderSelectedPath);
+  };
+
+  const injectHtmlExtras = (html: string, headCode: string, bodyCode: string) => {
+    let out = html || DEFAULT_BUILDER_HTML;
+    const h = headCode.trim();
+    const b = bodyCode.trim();
+    if (h) out = out.includes('</head>') ? out.replace('</head>', `\n${h}\n</head>`) : `${h}\n${out}`;
+    if (b) out = out.includes('</body>') ? out.replace('</body>', `\n${b}\n</body>`) : `${out}\n${b}`;
+    return out;
+  };
+
+  const getBuilderAreaCode = (html: string, target: BuilderPageTarget) => {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html || DEFAULT_BUILDER_HTML, 'text/html');
+      if (target === 'body') return doc.body.innerHTML.trim();
+
+      // Exibe no campo de HEAD apenas o código "extra" (pixel, GTM, scripts),
+      // removendo a estrutura base gerada automaticamente.
+      const headClone = doc.head.cloneNode(true) as HTMLElement;
+      headClone.querySelectorAll('meta[charset], meta[name="viewport"], title').forEach((el) => el.remove());
+      headClone.querySelectorAll('style').forEach((styleEl) => {
+        const css = (styleEl.textContent || '').replace(/\s+/g, ' ');
+        if (css.includes('.hero { max-width: 900px') && css.includes('.kicker { text-transform: uppercase')) {
+          styleEl.remove();
+        }
+      });
+      return headClone.innerHTML.trim();
+    } catch {
+      return '';
+    }
+  };
+
+  const getBuilderHtmlSections = (html: string) => ({
+    head: getBuilderAreaCode(html, 'header'),
+    body: getBuilderAreaCode(html, 'body'),
+  });
+
+  const setBuilderAreaCode = (html: string, target: BuilderPageTarget, code: string) => {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html || DEFAULT_BUILDER_HTML, 'text/html');
+      if (target === 'header') {
+        doc.head.innerHTML = `
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          ${code}
+        `.trim();
       } else {
-        alert('Senha incorreta.'); setIsAdminLoggedIn(false);
-        localStorage.removeItem('adminToken');
+        doc.body.innerHTML = code;
       }
-    } catch (err) { alert('Servidor offline.'); }
+      return `<!doctype html>\n${doc.documentElement.outerHTML}`;
+    } catch {
+      return html;
+    }
   };
 
-  const fetchUsers = async (pwd: string) => {
+  const setBuilderHtmlSections = (html: string, sections: { head?: string; body?: string }) => {
+    let next = html || DEFAULT_BUILDER_HTML;
+    if (sections.head !== undefined) next = setBuilderAreaCode(next, 'header', sections.head);
+    if (sections.body !== undefined) next = setBuilderAreaCode(next, 'body', sections.body);
+    return next;
+  };
+
+  const toBuilderVisualPreviewHtml = (html: string) => {
     try {
-      const res = await fetch('/api/admin/users', { headers: { 'x-admin-password': pwd } });
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html || DEFAULT_BUILDER_HTML, 'text/html');
+      doc.querySelectorAll('script').forEach((el) => el.remove());
+      return `<!doctype html>\n${doc.documentElement.outerHTML}`;
+    } catch {
+      return html || DEFAULT_BUILDER_HTML;
+    }
+  };
+
+  const builderCurrentPage = useMemo(
+    () => builderPages.find((p) => p.slug === builderCurrentSlug) || null,
+    [builderPages, builderCurrentSlug]
+  );
+
+  const openBuilderPage = (slug: string) => {
+    const page = builderPages.find((p) => p.slug === slug);
+    if (!page) return;
+    const sections = getBuilderHtmlSections(page.html || DEFAULT_BUILDER_HTML);
+    setBuilderCurrentSlug(page.slug);
+    setBuilderCodeDraft(page.html || DEFAULT_BUILDER_HTML);
+    setBuilderPreviewHtml(toBuilderVisualPreviewHtml(page.html || DEFAULT_BUILDER_HTML));
+    setBuilderHeadCodeDraft(sections.head);
+    setBuilderBodyCodeDraft(sections.body);
+    setBuilderSelectedPath('');
+    setBuilderSelectedText('');
+    setBuilderSelectedHref('');
+    setBuilderSelectedAlign('left');
+    setBuilderOffsetX(0);
+    setBuilderOffsetY(0);
+    setBuilderVisualOpen(false);
+    setBuilderStep('html');
+  };
+
+  const updateBuilderCurrentTarget = (target: BuilderPageTarget) => {
+    if (!builderCurrentSlug) return;
+    setBuilderPages((prev) =>
+      prev.map((p) => (p.slug === builderCurrentSlug ? { ...p, target, updatedAt: new Date().toISOString() } : p))
+    );
+  };
+
+  const handleBuilderCreateContinue = () => {
+    const slug = normalizeBuilderSlug(builderSetupSlug);
+    const exists = builderPages.find((p) => p.slug === slug);
+    if (exists) {
+      openBuilderPage(exists.slug);
+      return;
+    }
+    const page: BuilderPage = {
+      slug,
+      target: builderSetupTarget,
+      html: injectHtmlExtras(DEFAULT_BUILDER_HTML, builderSetupHeadCode, builderSetupBodyCode),
+      updatedAt: new Date().toISOString(),
+      published: false,
+    };
+    const next = [page, ...builderPages];
+    setBuilderPages(next);
+    setBuilderCurrentSlug(page.slug);
+    setBuilderCodeDraft(page.html);
+    setBuilderPreviewHtml(toBuilderVisualPreviewHtml(page.html));
+    setBuilderHeadCodeDraft(getBuilderAreaCode(page.html, 'header'));
+    setBuilderBodyCodeDraft(getBuilderAreaCode(page.html, 'body'));
+    setBuilderSetupSlug('');
+    setBuilderSetupTarget('header');
+    setBuilderSetupHeadCode('');
+    setBuilderSetupBodyCode('');
+    setBuilderStep('html');
+  };
+
+  const saveBuilderPages = async (opts?: { publish?: boolean; conclude?: boolean }) => {
+    const h = authHeaders();
+    if (!h.Authorization) return;
+    if (!builderCurrentSlug) {
+      alert('Crie ou selecione uma página antes de salvar.');
+      return;
+    }
+    setBuilderSaving(true);
+    try {
+      const html = (builderCodeDraft || DEFAULT_BUILDER_HTML).trim();
+      const nextPages = [...builderPages];
+      const idx = nextPages.findIndex((p) => p.slug === builderCurrentSlug);
+      if (idx >= 0) {
+        nextPages[idx] = {
+          ...nextPages[idx],
+          html,
+          updatedAt: new Date().toISOString(),
+          published: opts?.publish ? true : nextPages[idx].published,
+        };
+      } else {
+        nextPages.unshift({
+          slug: builderCurrentSlug,
+          target: 'body',
+          html,
+          updatedAt: new Date().toISOString(),
+          published: Boolean(opts?.publish),
+        });
+      }
+      const payload = serializeBuilderPagesSetting(nextPages);
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [PAGE_BUILDER_PAGES_SETTING_KEY]: payload }),
+      });
+      if (!res.ok) {
+        alert('Falha ao salvar página.');
+        return;
+      }
+      setBuilderPages(nextPages);
+      setBuilderCodeDraft(html);
+      if (opts?.conclude) setBuilderStep('list');
+      alert('Página salva com sucesso!');
+    } catch {
+      alert('Erro de conexão ao salvar.');
+    } finally {
+      setBuilderSaving(false);
+    }
+  };
+
+  const persistBuilderPagesSetting = async (pages: BuilderPage[]) => {
+    const h = authHeaders();
+    if (!h.Authorization) return false;
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [PAGE_BUILDER_PAGES_SETTING_KEY]: serializeBuilderPagesSetting(pages) }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const openBuilderPreviewNewTab = (mode: 'desktop' | 'mobile') => {
+    const html = (builderCodeDraft || DEFAULT_BUILDER_HTML).trim() || DEFAULT_BUILDER_HTML;
+    const css = mode === 'mobile'
+      ? 'body{background:#e2e8f0 !important;padding:16px !important;} body>*{max-width:390px !important;margin:0 auto !important;box-shadow:0 0 0 1px rgba(2,6,23,.15);} '
+      : '';
+    const withCss = html.includes('</head>')
+      ? html.replace('</head>', `<style>${css}</style></head>`)
+      : `<style>${css}</style>${html}`;
+    const blob = new Blob([withCss], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  // -- FETCHERS (JWT Bearer — não usa mais header x-admin-password na UI) --
+  const validateAdminJwt = async (opts?: { silent?: boolean }, jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) {
+      if (!opts?.silent) alert('Sessão do painel ausente.');
+      setIsAdminLoggedIn(false);
+      localStorage.removeItem(ADMIN_JWT_KEY);
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/users', { headers: h });
+      if (res.ok) {
+        setIsAdminLoggedIn(true);
+        const tok = jwt ?? adminJwt;
+        if (tok) localStorage.setItem(ADMIN_JWT_KEY, tok);
+      } else {
+        if (!opts?.silent) alert('Senha incorreta ou sessão inválida.');
+        setIsAdminLoggedIn(false);
+        localStorage.removeItem(ADMIN_JWT_KEY);
+        setAdminJwt('');
+      }
+    } catch {
+      if (!opts?.silent) alert('Servidor offline.');
+    }
+  };
+
+  const fetchUsers = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    try {
+      const res = await fetch('/api/admin/users', { headers: h });
       if (res.ok) setUsers(await res.json());
-    } catch (err) { console.error('Error fetching users'); }
+    } catch (err) {
+      console.error('Error fetching users');
+    }
   };
 
-  const fetchWebhookLogs = async (pwd: string) => {
+  const fetchWebhookLogs = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
     try {
-      const res = await fetch('/api/admin/webhook-logs', { headers: { 'x-admin-password': pwd } });
+      const res = await fetch('/api/admin/webhook-logs', { headers: h });
       if (res.ok) setWebhookLogs(await res.json());
-    } catch (err) { console.error('Error fetching webhook logs'); }
+    } catch (err) {
+      console.error('Error fetching webhook logs');
+    }
   };
 
-  const fetchEmailSettings = async (pwd: string) => {
+  const fetchEmailSettings = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
     try {
-      const res = await fetch('/api/admin/settings', { headers: { 'x-admin-password': pwd } });
+      const res = await fetch('/api/admin/settings', { headers: h });
       if (res.ok) {
         const data = await res.json();
-        setEmailSettings(prev => ({ ...prev, ...data }));
+        setEmailSettings((prev) => ({ ...prev, ...data }));
+        if (!builderLoadedOnce) {
+          const pagesRaw = String(data?.[PAGE_BUILDER_PAGES_SETTING_KEY] || '').trim();
+          let parsedPages = parseBuilderPagesSetting(pagesRaw);
+          if (!parsedPages.length) {
+            const legacyHtml = String(data?.[PAGE_BUILDER_LEGACY_SETTING_KEY] || '').trim();
+            parsedPages = [{
+              slug: 'pagina-principal',
+              target: 'body',
+              html: legacyHtml || DEFAULT_BUILDER_HTML,
+              updatedAt: new Date().toISOString(),
+            }];
+          }
+          setBuilderPages(parsedPages);
+          setBuilderCurrentSlug(parsedPages[0].slug);
+          setBuilderCodeDraft(parsedPages[0].html || DEFAULT_BUILDER_HTML);
+          setBuilderPreviewHtml(parsedPages[0].html || DEFAULT_BUILDER_HTML);
+          setBuilderLoadedOnce(true);
+        }
       }
-    } catch (err) { console.error('Error fetching email settings'); }
+    } catch (err) {
+      console.error('Error fetching email settings');
+    }
+  };
+
+  const fetchLicenses = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    try {
+      const res = await fetch('/api/admin/licenses', { headers: h });
+      if (res.ok) setLicenses(await res.json());
+    } catch {
+      console.error('fetchLicenses');
+    }
+  };
+
+  const fetchProducts = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    try {
+      const res = await fetch('/api/admin/products', { headers: h });
+      if (res.ok) setProducts(await res.json());
+    } catch {
+      console.error('fetchProducts');
+    }
+  };
+
+  const fetchShortLinks = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    try {
+      const res = await fetch('/api/admin/links', { headers: h });
+      if (res.ok) setShortLinks(await res.json());
+    } catch {
+      console.error('fetchShortLinks');
+    }
+  };
+
+  const fetchMediaAssets = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    try {
+      const res = await fetch('/api/admin/media', { headers: h });
+      if (res.ok) setMediaAssets(await res.json());
+    } catch {
+      console.error('fetchMediaAssets');
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const res = await fetch('/api/admin/courses', { headers: { ...authHeaders() } });
+      if (!res.ok) {
+        const fallback = await fetch('/api/public/courses');
+        const data = await fallback.json().catch(() => []);
+        setCourses(Array.isArray(data) ? data : []);
+        return;
+      }
+      const data = await res.json().catch(() => []);
+      setCourses(Array.isArray(data) ? data : []);
+    } catch {
+      setCourses([]);
+    }
+  };
+
+  const fetchForexSettings = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    try {
+      const res = await fetch('/api/admin/settings', { headers: h });
+      if (res.ok) {
+        const s = await res.json();
+        setForexWebhook(s.forex_webhook_token || '');
+        try {
+          const keys = JSON.parse(s.forex_api_keys || '[]');
+          setForexApiLines(Array.isArray(keys) ? keys.join('\n') : '');
+        } catch {
+          setForexApiLines('');
+        }
+      }
+    } catch {
+      console.error('fetchForexSettings');
+    }
+  };
+
+  const saveMemberBanner = async () => {
+    const h = authHeaders();
+    if (!h.Authorization) return;
+    setBannerSaving(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_hero_background_url: emailSettings.member_hero_background_url ?? '',
+          member_hero_kicker: emailSettings.member_hero_kicker ?? ''
+        })
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        alert(j.error || 'Erro ao salvar.');
+      } else {
+        alert('Banner salvo. Se a URL estiver vazia, a home pode usar a capa do curso em destaque (ver Cursos EAD).');
+        void fetchEmailSettings();
+      }
+    } catch {
+      alert('Erro de conexão.');
+    } finally {
+      setBannerSaving(false);
+    }
+  };
+
+  const loadDashboard = async (jwt: string) => {
+    await validateAdminJwt({ silent: true }, jwt);
+    await Promise.all([
+      fetchUsers(jwt),
+      fetchWebhookLogs(jwt),
+      fetchEmailSettings(jwt),
+      fetchLicenses(jwt),
+      fetchProducts(jwt),
+      fetchShortLinks(jwt),
+      fetchMediaAssets(jwt),
+      fetchForexSettings(jwt),
+    ]);
+    await fetchCourses();
+  };
+
+  const selectedCourse = useMemo(() => courses.find((c: any) => c.id === selectedCourseId) || null, [courses, selectedCourseId]);
+  const selectedModules = (selectedCourse?.modules || []) as any[];
+  const selectedModule = useMemo(
+    () => (selectedModules as any[]).find((m: any) => m.id === selectedModuleId) || null,
+    [selectedModules, selectedModuleId]
+  );
+  const selectedLesson = useMemo(() => {
+    if (!selectedLessonId || !selectedCourse) return null;
+    for (const m of selectedCourse.modules || []) {
+      const l = (m.lessons || []).find((x: any) => x.id === selectedLessonId);
+      if (l) return l;
+    }
+    return null;
+  }, [selectedCourse, selectedLessonId]);
+
+  useEffect(() => {
+    if (!selectedCourseId) {
+      setSelectedModuleId('');
+      setSelectedLessonId('');
+      return;
+    }
+    if (selectedModules.length === 0) {
+      setSelectedModuleId('');
+      setSelectedLessonId('');
+      return;
+    }
+    const stillExists = selectedModules.some((m: any) => m.id === selectedModuleId);
+    if (selectedModuleId && !stillExists) setSelectedModuleId('');
+  }, [selectedCourseId, selectedModules, selectedModuleId]);
+
+  useEffect(() => {
+    setSelectedLessonId('');
+  }, [selectedCourseId, selectedModuleId]);
+
+  useEffect(() => {
+    if (selectedLessonId) {
+      setEadSectionTab('aula');
+      setEadLessonSubtab('editar');
+    }
+  }, [selectedLessonId]);
+
+  useEffect(() => {
+    if (!selectedLessonId && selectedModuleId) {
+      setEadLessonSubtab('nova');
+    }
+  }, [selectedModuleId, selectedLessonId]);
+
+  useEffect(() => {
+    if (!selectedCourseId) {
+      setEadSectionTab('curso');
+    }
+  }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (!selectedCourse) {
+      setEditCourseTitle('');
+      setEditCourseSlug('');
+      setEditCoursePublished(true);
+      setEditCourseProductIds('');
+      setEditCourseSalesPageUrl('');
+      return;
+    }
+    setEditCourseTitle(selectedCourse.title || '');
+    setEditCourseSlug(selectedCourse.slug || '');
+    setEditCoursePublished(selectedCourse.published !== false);
+    setEditCourseProductIds(selectedCourse.productIds || '');
+    setEditCourseSalesPageUrl(selectedCourse.salesPageUrl || '');
+    setEditCourseCoverFile(null);
+  }, [
+    selectedCourseId,
+    selectedCourse?.title,
+    selectedCourse?.slug,
+    selectedCourse?.published,
+    selectedCourse?.productIds,
+    selectedCourse?.salesPageUrl,
+  ]);
+
+  useEffect(() => {
+    setEditModuleTitle(selectedModule?.title || '');
+  }, [selectedModuleId, selectedModule?.title]);
+
+  useEffect(() => {
+    if (!selectedLesson) {
+      setEditLessonTitle('');
+      setEditLessonVideoUrl('');
+      setEditLessonBodyText('');
+      setEditLessonActionLabel('');
+      setEditLessonActionUrl('');
+      return;
+    }
+    setEditLessonTitle(selectedLesson.title || '');
+    setEditLessonVideoUrl(selectedLesson.videoUrl || '');
+    setEditLessonBodyText(selectedLesson.bodyText || '');
+    setEditLessonActionLabel(selectedLesson.actionLabel || '');
+    setEditLessonActionUrl(selectedLesson.actionUrl || '');
+  }, [selectedLessonId, selectedLesson]);
+
+  const mergedClients = useMemo(() => {
+    const byEmail = new Map<string, any>();
+    for (const u of users) {
+      const email = String(u?.email || '').toLowerCase().trim();
+      if (!email) continue;
+      byEmail.set(email, { ...u, _isLicenseOnly: false });
+    }
+    for (const l of licenses) {
+      const email = String((l as { email?: string }).email || '').toLowerCase().trim();
+      if (!email || byEmail.has(email)) continue;
+      byEmail.set(email, {
+        id: `lic_${email}`,
+        email,
+        name: (l as { buyerName?: string }).buyerName || null,
+        password: null,
+        purchases: [],
+        _isLicenseOnly: true,
+      });
+    }
+    return Array.from(byEmail.values());
+  }, [users, licenses]);
+
+  const licensePlansByEmail = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const l of licenses as Array<{ email?: string; plano?: string | null }>) {
+      const email = String(l.email || '').toLowerCase().trim();
+      if (!email) continue;
+      const plan = String(l.plano || '').toLowerCase().trim();
+      if (!plan) continue;
+      if (!m.has(email)) m.set(email, new Set());
+      m.get(email)!.add(plan);
+    }
+    return m;
+  }, [licenses]);
+
+  const licenseStatusSetByEmail = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const l of licenses as Array<{ email?: string; statusLicenca?: string | null; dataExpiracao?: string | null }>) {
+      const email = String(l.email || '').toLowerCase().trim();
+      if (!email) continue;
+      const st = effectiveLicenseStatus(l.statusLicenca, l.dataExpiracao);
+      if (!m.has(email)) m.set(email, new Set());
+      m.get(email)!.add(st);
+    }
+    return m;
+  }, [licenses]);
+
+  const availablePlanFilters = useMemo(() => {
+    const set = new Set<string>();
+    for (const plans of licensePlansByEmail.values()) {
+      for (const p of plans) set.add(p);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [licensePlansByEmail]);
+
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.toLowerCase().trim();
+    return mergedClients.filter((u: any) => {
+      const email = String(u.email || '').toLowerCase().trim();
+      const name = String(u.name || '').toLowerCase().trim();
+      const textOk = !q || email.includes(q) || name.includes(q);
+      if (!textOk) return false;
+
+      const plans = licensePlansByEmail.get(email);
+      if (userPlanFilter !== 'todos' && !plans?.has(userPlanFilter)) return false;
+
+      const statuses = licenseStatusSetByEmail.get(email);
+      if (userStatusFilter === 'sem_licenca') return !statuses || statuses.size === 0;
+      if (userStatusFilter !== 'todos' && !statuses?.has(userStatusFilter)) return false;
+
+      return true;
+    });
+  }, [mergedClients, userSearch, userPlanFilter, userStatusFilter, licensePlansByEmail, licenseStatusSetByEmail]);
+
+  useEffect(() => {
+    setPageUsers(1);
+  }, [userSearch, userPlanFilter, userStatusFilter]);
+
+  useEffect(() => {
+    const tp = Math.max(1, Math.ceil(filteredUsers.length / ADMIN_TABLE_PAGE_SIZE));
+    setPageUsers((p) => Math.min(p, tp));
+  }, [filteredUsers.length]);
+
+  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / ADMIN_TABLE_PAGE_SIZE));
+  const usersPageEff = Math.min(pageUsers, usersTotalPages);
+  const pagedUsers = useMemo(() => {
+    const start = (usersPageEff - 1) * ADMIN_TABLE_PAGE_SIZE;
+    return filteredUsers.slice(start, start + ADMIN_TABLE_PAGE_SIZE);
+  }, [filteredUsers, usersPageEff]);
+
+  useEffect(() => {
+    const tp = Math.max(1, Math.ceil(products.length / ADMIN_TABLE_PAGE_SIZE));
+    setPageProducts((p) => Math.min(p, tp));
+  }, [products.length]);
+
+  const productsTotalPages = Math.max(1, Math.ceil(products.length / ADMIN_TABLE_PAGE_SIZE));
+  const productsPageEff = Math.min(pageProducts, productsTotalPages);
+  const pagedProducts = useMemo(() => {
+    const start = (productsPageEff - 1) * ADMIN_TABLE_PAGE_SIZE;
+    return products.slice(start, start + ADMIN_TABLE_PAGE_SIZE);
+  }, [products, productsPageEff]);
+
+  const licenseCountByEmail = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of licenses) {
+      const k = String((l as { email?: string }).email || '')
+        .toLowerCase()
+        .trim();
+      if (!k) continue;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  }, [licenses]);
+
+  const licenseStatusCountsByEmail = useMemo(() => {
+    const m = new Map<string, Map<string, number>>();
+    for (const l of licenses) {
+      const k = String((l as { email?: string }).email || '')
+        .toLowerCase()
+        .trim();
+      if (!k) continue;
+      const st = effectiveLicenseStatus(
+        (l as { statusLicenca?: string }).statusLicenca,
+        (l as { dataExpiracao?: string | null }).dataExpiracao
+      );
+      if (!m.has(k)) m.set(k, new Map());
+      const inner = m.get(k)!;
+      inner.set(st, (inner.get(st) || 0) + 1);
+    }
+    return m;
+  }, [licenses]);
+
+  const licenseCounters = useMemo(() => {
+    let ativas = 0;
+    let desativadas = 0;
+    let testesAtivos = 0;
+    for (const l of licenses as Array<{ statusLicenca?: string; dataExpiracao?: string | null; plano?: string | null }>) {
+      const st = effectiveLicenseStatus(l.statusLicenca, l.dataExpiracao);
+      const plano = String(l.plano || '').toLowerCase();
+      if (st === 'ativa') ativas++;
+      if (st === 'inativa' || st === 'expirada') desativadas++;
+      if (st === 'ativa' && plano.includes('teste')) testesAtivos++;
+    }
+    return { ativas, desativadas, testesAtivos };
+  }, [licenses]);
+
+  const selectedManualProduct = useMemo(
+    () => products.find((p: any) => String(p.id) === newUserProductId) || null,
+    [products, newUserProductId]
+  );
+
+  useEffect(() => {
+    if (selectedManualProduct?.plano) {
+      setNewUserPlan(String(selectedManualProduct.plano));
+    }
+  }, [selectedManualProduct?.id, selectedManualProduct?.plano]);
+
+  const licensesForClientModal = useMemo(() => {
+    if (!managingAccessFor?.email) return [];
+    const em = String(managingAccessFor.email).toLowerCase().trim();
+    return licenses
+      .filter((l: { email?: string }) => String(l.email || '').toLowerCase().trim() === em)
+      .sort((a: { id: number }, b: { id: number }) => b.id - a.id);
+  }, [managingAccessFor, licenses]);
+
+  const productNameByLicense = useMemo(() => {
+    const normalize = (v: string) =>
+      String(v || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+
+    const csvIncludes = (csv: string, val: string) => {
+      const target = String(val || '').trim();
+      if (!target) return false;
+      return String(csv || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .includes(target);
+    };
+
+    const planKind = (planoRaw: string): 'anual' | 'vitalicio' | 'desafio' | 'outro' => {
+      const plano = normalize(planoRaw);
+      if (plano.includes('vital')) return 'vitalicio';
+      if (plano.includes('anual')) return 'anual';
+      if (plano.includes('teste') || plano.includes('desafio')) return 'desafio';
+      return 'outro';
+    };
+
+    const matchByPlanName = (productName: string, kind: ReturnType<typeof planKind>) => {
+      const n = normalize(productName);
+      if (kind === 'anual') return n.includes('anual');
+      if (kind === 'vitalicio') return n.includes('vitalicio');
+      if (kind === 'desafio') return n.includes('desafio') || n.includes('teste');
+      return false;
+    };
+
+    const fallbackBySystem = new Map<string, string>();
+    for (const p of products as Array<{ systemId?: string; productName?: string }>) {
+      const sidCsv = String(p.systemId || '').trim();
+      const pname = String(p.productName || '').trim();
+      if (!sidCsv || !pname) continue;
+      const ids = sidCsv
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const sid of ids) {
+        if (!fallbackBySystem.has(sid)) fallbackBySystem.set(sid, pname);
+      }
+    }
+
+    return (license: { systemId?: string; plano?: string }) => {
+      const sid = String(license.systemId || '').trim();
+      const kind = planKind(String(license.plano || ''));
+      const candidates = (products as Array<{ systemId?: string; productName?: string }>).filter((p) =>
+        csvIncludes(String(p.systemId || ''), sid)
+      );
+      if (!candidates.length) return sid || '—';
+
+      const byPlan = candidates.find((p) => matchByPlanName(String(p.productName || ''), kind));
+      if (byPlan?.productName) return byPlan.productName;
+
+      return fallbackBySystem.get(sid) || candidates[0]?.productName || sid || '—';
+    };
+  }, [products]);
+
+  useEffect(() => {
+    if (!managingAccessFor) return;
+    setLicenseForm({
+      systemId: '',
+      plano: 'mensal',
+      statusLicenca: 'ativa',
+      dataExpiracao: planExpiryLocalValue('mensal'),
+      numeroConta: '',
+    });
+    setEditingLicenseId(null);
+  }, [managingAccessFor?.id, managingAccessFor?.email]);
+
+  useEffect(() => {
+    const tp = Math.max(1, Math.ceil(webhookLogs.length / ADMIN_TABLE_PAGE_SIZE));
+    setPageWebhooks((p) => Math.min(p, tp));
+  }, [webhookLogs.length]);
+
+  const webhooksPageEff = Math.min(pageWebhooks, Math.max(1, Math.ceil(webhookLogs.length / ADMIN_TABLE_PAGE_SIZE)));
+  const pagedWebhookLogs = useMemo(() => {
+    const start = (webhooksPageEff - 1) * ADMIN_TABLE_PAGE_SIZE;
+    return webhookLogs.slice(start, start + ADMIN_TABLE_PAGE_SIZE);
+  }, [webhookLogs, webhooksPageEff]);
+
+  const slugify = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/[\\u0300-\\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 80);
+
+  const csvToList = (csv: string) => csv.split(',').map((s) => s.trim()).filter(Boolean);
+  const csvAdd = (csv: string, value: string) => {
+    const cur = csvToList(csv);
+    if (cur.includes(value)) return csv;
+    cur.push(value);
+    return cur.join(',');
+  };
+  const csvRemove = (csv: string, value: string) =>
+    csvToList(csv)
+      .filter((x) => x !== value)
+      .join(',');
+
+  const renderProductPicker = (csvValue: string, setCsvValue: (v: string) => void) => {
+    const selectedIds = new Set(csvToList(csvValue));
+    return (
+      <div className="admin-sid-picker">
+        {selectedIds.size === 0 ? (
+          <p className="admin-sid-empty">Curso público — qualquer usuário logado pode acessar.</p>
+        ) : (
+          <div className="admin-sid-selected" role="list">
+            {[...selectedIds].map((pid) => {
+              const p = products.find((pp: any) => String(pp.id) === pid);
+              const label = p ? `${p.productName}` : `Produto #${pid}`;
+              const sid = p?.systemId || '';
+              const offer = p?.offerCode || '';
+              return (
+                <span key={`sel-${pid}`} className="admin-sid-chip admin-sid-chip--selected" role="listitem">
+                  <span className="admin-sid-chip-name">{label}</span>
+                  {sid ? <span className="admin-sid-chip-sid">sys: {sid}</span> : null}
+                  {offer ? <span className="admin-sid-chip-sid">oferta: {offer}</span> : null}
+                  <button
+                    type="button"
+                    className="admin-sid-chip-x"
+                    onClick={() => setCsvValue(csvRemove(csvValue, pid))}
+                    aria-label={`Remover ${label}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+        {products.length > 0 && (
+          <div className="admin-sid-available">
+            <div className="admin-sid-available-label">Produtos cadastrados</div>
+            <div className="admin-sid-chips-row">
+              {products.map((p: any) => {
+                const pid = String(p.id);
+                const isActive = selectedIds.has(pid);
+                const sid = p.systemId || '';
+                const offer = p.offerCode || '';
+                return (
+                  <button
+                    key={`opt-${pid}`}
+                    type="button"
+                    className={`admin-sid-chip${isActive ? ' admin-sid-chip--active' : ''}`}
+                    onClick={() => setCsvValue(isActive ? csvRemove(csvValue, pid) : csvAdd(csvValue, pid))}
+                    title={`${p.productName}${sid ? ` — sys ${sid}` : ''}${offer ? ` — oferta ${offer}` : ''}`}
+                  >
+                    <span className="admin-sid-chip-mark" aria-hidden>
+                      {isActive ? '✓' : '+'}
+                    </span>
+                    <span className="admin-sid-chip-name">{p.productName}</span>
+                    {sid ? <span className="admin-sid-chip-sid">{sid}</span> : null}
+                    {offer ? <span className="admin-sid-chip-sid admin-sid-chip-offer">#{offer}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const handleCreateCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = newCourseTitle.trim();
+    const slug = (newCourseSlug.trim() || slugify(title)).trim();
+    if (!title || !slug) return;
+    try {
+      let coverUrl: string | null = null;
+      if (newCourseCoverFile) {
+        coverUrl = await uploadFile(newCourseCoverFile);
+      }
+      const res = await fetch('/api/admin/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          title,
+          slug,
+          coverUrl,
+          productIds: newCourseProductIds.trim() || null,
+          salesPageUrl: newCourseSalesPageUrl.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || 'Falha ao criar curso.');
+        return;
+      }
+      setNewCourseTitle('');
+      setNewCourseSlug('');
+      setNewCourseCoverFile(null);
+      setNewCourseProductIds('');
+      setNewCourseSalesPageUrl('');
+      await fetchCourses();
+      alert('Curso criado. Com capa, ele pode aparecer no banner da home se não houver imagem fixa em Banner início.');
+    } catch {
+      alert('Servidor offline.');
+    }
+  };
+
+  const handleCreateModule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCourseId) return;
+    const title = newModuleTitle.trim();
+    if (!title) return;
+    try {
+      const res = await fetch('/api/admin/course-modules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ courseId: selectedCourseId, title, sortOrder: 0 }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || 'Falha ao criar módulo.');
+        return;
+      }
+      setNewModuleTitle('');
+      await fetchCourses();
+      alert('Módulo criado.');
+    } catch {
+      alert('Servidor offline.');
+    }
+  };
+
+  const handleCreateLesson = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedModuleId) return;
+    const title = newLessonTitle.trim();
+    if (!title) return;
+    try {
+      const res = await fetch('/api/admin/course-lessons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          moduleId: selectedModuleId,
+          title,
+          sortOrder: 0,
+          ebookId: null,
+          videoUrl: newLessonVideoUrl.trim() || null,
+          bodyText: newLessonBodyText.trim() || null,
+          actionLabel: newLessonActionLabel.trim() || null,
+          actionUrl: newLessonActionUrl.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || 'Falha ao criar aula.');
+        return;
+      }
+      setNewLessonTitle('');
+      setNewLessonVideoUrl('');
+      setNewLessonBodyText('');
+      setNewLessonActionLabel('');
+      setNewLessonActionUrl('');
+      await fetchCourses();
+      alert('Aula criada.');
+    } catch {
+      alert('Servidor offline.');
+    }
+  };
+
+  const handleSaveCourse = async () => {
+    if (!selectedCourseId || !editCourseTitle.trim() || !editCourseSlug.trim()) return;
+    try {
+      let coverUrl: string | undefined = undefined;
+      if (editCourseCoverFile) coverUrl = await uploadFile(editCourseCoverFile);
+      const res = await fetch(`/api/admin/courses/${selectedCourseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          title: editCourseTitle.trim(),
+          slug: editCourseSlug.trim(),
+          published: editCoursePublished,
+          productIds: editCourseProductIds.trim() || null,
+          salesPageUrl: editCourseSalesPageUrl.trim() || null,
+          ...(coverUrl !== undefined ? { coverUrl } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert((d as { error?: string }).error || 'Falha ao salvar curso.');
+        return;
+      }
+      setEditCourseCoverFile(null);
+      await fetchCourses();
+      alert('Curso atualizado.');
+    } catch {
+      alert('Servidor offline.');
+    }
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!selectedCourseId) return;
+    if (!window.confirm('Excluir este curso e todos os módulos e aulas?')) return;
+    try {
+      const res = await fetch(`/api/admin/courses/${selectedCourseId}`, { method: 'DELETE', headers: { ...authHeaders() } });
+      if (!res.ok) {
+        alert('Falha ao excluir.');
+        return;
+      }
+      setSelectedCourseId('');
+      setSelectedModuleId('');
+      setSelectedLessonId('');
+      await fetchCourses();
+    } catch {
+      alert('Erro.');
+    }
+  };
+
+  const handleSaveModule = async () => {
+    if (!selectedModuleId || !editModuleTitle.trim()) return;
+    try {
+      const res = await fetch(`/api/admin/course-modules/${selectedModuleId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ title: editModuleTitle.trim() }),
+      });
+      if (!res.ok) {
+        alert('Falha ao salvar módulo.');
+        return;
+      }
+      await fetchCourses();
+      alert('Módulo atualizado.');
+    } catch {
+      alert('Erro.');
+    }
+  };
+
+  const handleDeleteModule = async () => {
+    if (!selectedModuleId) return;
+    if (!window.confirm('Excluir este módulo e todas as aulas?')) return;
+    try {
+      await fetch(`/api/admin/course-modules/${selectedModuleId}`, { method: 'DELETE', headers: { ...authHeaders() } });
+      setSelectedModuleId('');
+      setSelectedLessonId('');
+      await fetchCourses();
+    } catch {
+      alert('Erro.');
+    }
+  };
+
+  const handleSaveLesson = async () => {
+    if (!selectedLessonId || !editLessonTitle.trim()) return;
+    try {
+      const res = await fetch(`/api/admin/course-lessons/${selectedLessonId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          title: editLessonTitle.trim(),
+          ebookId: null,
+          videoUrl: editLessonVideoUrl.trim() || null,
+          bodyText: editLessonBodyText.trim() || null,
+          actionLabel: editLessonActionLabel.trim() || null,
+          actionUrl: editLessonActionUrl.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        alert('Falha ao salvar aula.');
+        return;
+      }
+      await fetchCourses();
+      alert('Aula atualizada.');
+    } catch {
+      alert('Erro.');
+    }
+  };
+
+  const handleDeleteLesson = async () => {
+    if (!selectedLessonId) return;
+    if (!window.confirm('Excluir esta aula?')) return;
+    try {
+      await fetch(`/api/admin/course-lessons/${selectedLessonId}`, { method: 'DELETE', headers: { ...authHeaders() } });
+      setSelectedLessonId('');
+      await fetchCourses();
+    } catch {
+      alert('Erro.');
+    }
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-      setMasterPassword(token);
-      fetchEbooks(token).then(() => {
-        fetchUsers(token);
-        fetchCategories(token);
-        fetchWebhookLogs(token);
-        fetchEmailSettings(token);
-      });
+    const j = localStorage.getItem(ADMIN_JWT_KEY);
+    const legacyPwd = localStorage.getItem('adminToken');
+    if (j) {
+      setAdminJwt(j);
+      void loadDashboard(j);
+    } else if (legacyPwd) {
+      void (async () => {
+        try {
+          const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: legacyPwd }),
+          });
+          const data = await res.json().catch(() => ({} as { token?: string }));
+          if (res.ok && data.token) {
+            localStorage.setItem(ADMIN_JWT_KEY, data.token);
+            localStorage.removeItem('adminToken');
+            setAdminJwt(data.token);
+            await loadDashboard(data.token);
+          } else {
+            localStorage.removeItem('adminToken');
+          }
+        } catch {
+          localStorage.removeItem('adminToken');
+        }
+      })();
     }
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (masterPassword) {
-      fetchEbooks(masterPassword);
-      fetchCategories(masterPassword);
-      fetchUsers(masterPassword);
-      fetchWebhookLogs(masterPassword);
-      fetchEmailSettings(masterPassword);
+    if (!masterPassword) return;
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: masterPassword }),
+      });
+      const data = await res.json().catch(() => ({} as { error?: string; token?: string }));
+      if (!res.ok) {
+        alert(data.error || 'Senha incorreta.');
+        return;
+      }
+      if (!data.token) {
+        alert('Resposta inválida da API.');
+        return;
+      }
+      setAdminJwt(data.token);
+      localStorage.setItem(ADMIN_JWT_KEY, data.token);
+      localStorage.removeItem('adminToken');
+      setMasterPassword('');
+      await loadDashboard(data.token);
+    } catch {
+      alert('Servidor offline.');
     }
   };
 
@@ -126,13 +1593,43 @@ export const Admin: React.FC = () => {
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
-        body: JSON.stringify({ email: newUserEmail, password: newUserPass })
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          name: String(newUserName || '').trim() || null,
+          email: newUserEmail,
+          password: newUserPass
+        })
       });
       if (res.ok) {
-        alert('Usuário Criado com Sucesso!');
-        setNewUserEmail(''); setNewUserPass('');
-        fetchUsers(masterPassword);
+        if (!selectedManualProduct?.systemId) {
+          alert('Escolha um produto para o cadastro manual.');
+          return;
+        }
+        const licRes = await fetch('/api/admin/licenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            email: String(newUserEmail).toLowerCase().trim(),
+            buyerName: String(newUserName || '').trim() || null,
+            systemId: String(selectedManualProduct.systemId || '').trim(),
+            plano: (newUserPlan || selectedManualProduct.plano || 'mensal').trim(),
+            statusLicenca: 'ativa',
+            numeroConta: '',
+          })
+        });
+        if (!licRes.ok) {
+          const j = await licRes.json().catch(() => ({}));
+          alert(j.error || 'Usuário criado, mas falhou ao criar licença manual.');
+        } else {
+          alert('Cliente e licença criados com sucesso!');
+        }
+        setNewUserName('');
+        setNewUserEmail('');
+        setNewUserPass('');
+        setNewUserProductId('');
+        setNewUserPlan('mensal');
+        void fetchUsers();
+        void fetchLicenses();
       } else {
         const errorData = await res.json();
         alert(errorData.error);
@@ -140,52 +1637,16 @@ export const Admin: React.FC = () => {
     } catch(err) { alert('Erro na comunicação'); }
   };
 
-  const grantAccess = async () => {
-    if (!managingAccessFor || !grantEbookId) return;
-    try {
-      const res = await fetch('/api/admin/purchases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
-        body: JSON.stringify({ userId: managingAccessFor.id, ebookId: grantEbookId })
-      });
-      if (res.ok) {
-        alert('Acesso Concedido!');
-        setGrantEbookId('');
-        fetchUsers(masterPassword); // refresh the list
-        // Close modal implicitly or explicitly update `managingAccessFor`
-        setManagingAccessFor(null);
-      } else {
-        alert('Falha. Usuário provavelmente já possui este livro.');
-      }
-    } catch(err) { alert('Erro.'); }
-  };
-
-  const revokeAccess = async (ebookId: string) => {
-    if (!managingAccessFor) return;
-    if (!window.confirm("Remover este livro da conta do usuário?")) return;
-    try {
-      const res = await fetch(`/api/admin/purchases/${managingAccessFor.id}/${ebookId}`, {
-        method: 'DELETE',
-        headers: { 'x-admin-password': masterPassword }
-      });
-      if (res.ok) {
-        alert('Acesso Revogado!');
-        fetchUsers(masterPassword);
-        setManagingAccessFor(null);
-      }
-    } catch(err) { alert('Erro.'); }
-  };
-
   const handleDeleteUser = async (user: any) => {
     if (!window.confirm(`⚠️ Tem certeza que deseja EXCLUIR permanentemente o usuário ${user.email} e todos os seus históricos e acessos? Essa ação é IRREVERSÍVEL.`)) return;
     try {
       const res = await fetch(`/api/admin/users/${user.id}`, {
         method: 'DELETE',
-        headers: { 'x-admin-password': masterPassword }
+        headers: { ...authHeaders() }
       });
       if (res.ok) {
         alert('Usuário excluído com sucesso!');
-        fetchUsers(masterPassword);
+        fetchUsers();
       } else {
         const errorData = await res.json();
         alert(errorData.error || 'Falha ao excluir usuário.');
@@ -193,87 +1654,14 @@ export const Admin: React.FC = () => {
     } catch(err) { alert('Erro na comunicação com servidor.'); }
   };
 
-  // -- EBOOKS MANAGEMENT --
-  const handleCreateCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    try {
-      const res = await fetch('/api/admin/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
-        body: JSON.stringify({ name: newCategoryName })
-      });
-      const data = await res.json();
-      setCategories([...categories, data]);
-      setCategoryId(data.id);
-      setNewCategoryName('');
-      alert('Categoria criada!');
-    } catch(err) { alert('Erro ao criar categoria.'); }
-  };
-
   const uploadFile = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     const res = await fetch('/api/admin/upload', {
-      method: 'POST', headers: { 'x-admin-password': masterPassword }, body: formData
+      method: 'POST', headers: { ...authHeaders() }, body: formData
     });
     const data = await res.json();
     return data.url;
-  };
-
-    const clearForm = () => {
-    setEditingId(null); setTitle(''); setAuthor(''); setDescription(''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
-    setCoverUrl(''); setPdfUrl(''); setHtmlUrl(''); setExternalUrl(''); setRedirectUrl(''); setSalesUrl(''); setHotmartOffer('');
-    setCategoryId(''); setFeaturedList(''); setIsBonus(false); setParentEbookId(''); setLanguage('pt');
-  };
-
-  const handleEdit = (eb: any) => {
-    setEditingId(eb.id); setTitle(eb.title); setAuthor(eb.author || ''); setDescription(eb.description || '');
-    setCoverUrl(eb.coverUrl); setPdfUrl(eb.pdfUrl || ''); setHtmlUrl(eb.htmlUrl || ''); setExternalUrl(eb.externalUrl || ''); setRedirectUrl(eb.redirectUrl || ''); setSalesUrl(eb.salesUrl);
-    setHotmartOffer(eb.hotmartOffer); setCategoryId(eb.categoryId || '');
-    setFeaturedList(eb.featuredList || ''); setCoverFile(null); setPdfFile(null); setHtmlFile(null);
-    setIsBonus(eb.isBonus || false); setParentEbookId(eb.parentEbookId || ''); setLanguage(eb.language || 'pt');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Excluir este ebook permanentemente?')) return;
-    const res = await fetch(`/api/admin/ebooks/${id}`, { method: 'DELETE', headers: { 'x-admin-password': masterPassword }});
-    if (res.ok) fetchEbooks(masterPassword);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      let finalCoverUrl = coverUrl; let finalPdfUrl = pdfUrl; let finalHtmlUrl = htmlUrl;
-      if (coverFile) finalCoverUrl = await uploadFile(coverFile);
-      if (pdfFile) finalPdfUrl = await uploadFile(pdfFile);
-      if (htmlFile) finalHtmlUrl = await uploadFile(htmlFile);
-      
-      if (!finalCoverUrl) {
-        alert('A capa é obrigatória!'); setIsSubmitting(false); return;
-      }
-      if (!finalPdfUrl && !finalHtmlUrl && !externalUrl && !redirectUrl) {
-        alert('É obrigatório enviar um arquivo (PDF/HTML) ou inserir um Link (Externo/Redirecionamento)!'); setIsSubmitting(false); return;
-      }
-
-      const finalSalesUrl = isBonus ? '' : salesUrl;
-      const finalOfferCode = isBonus ? '' : hotmartOffer;
-
-      const payload = { title, author, description, coverUrl: finalCoverUrl, pdfUrl: finalPdfUrl || null, htmlUrl: finalHtmlUrl || null, externalUrl: externalUrl || null, redirectUrl: redirectUrl || null, salesUrl: finalSalesUrl, hotmartOffer: finalOfferCode, categoryId, featuredList, isBonus, parentEbookId, language };
-      const res = await fetch(editingId ? `/api/admin/ebooks/${editingId}` : '/api/admin/ebooks', {
-        method: editingId ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        alert('Salvo com sucesso!'); fetchEbooks(masterPassword); clearForm();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        alert(`Falha ao salvar. Verifique se o Código da Oferta já não está em uso por outro livro.\nDetalhes: ${data.error || 'Erro interno.'}`);
-      }
-    } catch (err) { alert('Erro de envio.'); } finally { setIsSubmitting(false); }
   };
 
   // LOGIN SCREEN
@@ -284,113 +1672,925 @@ export const Admin: React.FC = () => {
           <h2>Centro de Comando</h2>
           <p>Exclusivo ao Criador</p>
           <input type="password" placeholder="Senha Master" value={masterPassword} onChange={e => setMasterPassword(e.target.value)} required />
+          {import.meta.env.DEV && (
+            <p className="admin-login-dev-hint" style={{ fontSize: '13px', color: '#8ab4b0', marginTop: '8px', lineHeight: 1.4 }}>
+              A senha é a do arquivo <code style={{ color: '#93c5fd' }}>.env</code> (<code style={{ color: '#93c5fd' }}>ADMIN_PASSWORD</code>), padrão <strong style={{ color: 'var(--accent-primary)' }}>AdminTeste@local</strong>. O login agora usa token JWT (não depende de header estranho no navegador).
+            </p>
+          )}
           <button type="submit">Autenticar Sistema</button>
         </form>
       </div>
     );
   }
 
+  const adminTabMeta: Record<string, { title: string; subtitle: string }> = {
+    courses: {
+      title: 'Cursos EAD',
+      subtitle: 'Organize trilhas, módulos e aulas com edição rápida do que já está publicado.',
+    },
+    banner: {
+      title: 'Banner início',
+      subtitle: 'Defina o visual de abertura da área do membro.',
+    },
+    users: {
+      title: 'Clientes',
+      subtitle: 'Cadastro de alunos e licenças EA por e-mail e systemId (produto).',
+    },
+    webhooks: {
+      title: 'Webhook',
+      subtitle: 'Configure integração e acompanhe logs de eventos.',
+    },
+    email: {
+      title: 'E-mail',
+      subtitle: 'Centralize remetente, templates e envios transacionais.',
+    },
+    products: {
+      title: 'Produtos',
+      subtitle: 'Cadastre produtos e versões com organização comercial.',
+    },
+    links: {
+      title: 'WP Links',
+      subtitle: 'Gerencie links curtos, UTM e redirecionamentos como no WordPress.',
+    },
+    media: {
+      title: 'Biblioteca de mídia',
+      subtitle: 'Faça upload de imagens, vídeos e arquivos com link pronto para usar.',
+    },
+    support: {
+      title: 'Suporte',
+      subtitle: 'Defina para onde o cliente será enviado ao clicar em Suporte.',
+    },
+    builder: {
+      title: 'Construtor HTML',
+      subtitle: 'Edite código, clique em elementos e ajuste visualmente.',
+    },
+    forexEA: {
+      title: 'Segurança EA',
+      subtitle: 'Ajuste chaves e proteção da camada operacional.',
+    },
+  };
+  const currentAdminMeta = adminTabMeta[activeTab];
+  const filteredMediaAssets = (() => {
+    const q = mediaSearch.trim().toLowerCase();
+    if (!q) return mediaAssets;
+    return mediaAssets.filter((m: any) => {
+      const name = String(m.originalName || '').toLowerCase();
+      const url = String(m.url || '').toLowerCase();
+      const kind = String(m.kind || '').toLowerCase();
+      return name.includes(q) || url.includes(q) || kind.includes(q);
+    });
+  })();
+
   return (
     <div className="admin-dashboard-wrapper">
-      <div className="admin-dashboard">
-        <header className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', userSelect: 'none' }}>
-          <img src="/logo.png" alt="Readlyme" style={{ height: '38px', pointerEvents: 'none', userSelect: 'none' }} draggable={false} />
-          <h1 style={{ display: 'none' }}>Readlyme | Operações</h1>
-        </div>
-        <div className="admin-tabs">
-          <button className={activeTab === 'ebooks' ? 'active' : ''} onClick={() => setActiveTab('ebooks')}>
-            <BookOpen size={18} /> Livros
-          </button>
-          <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>
-            <Users size={18} /> Clientes
-          </button>
-          <button className={activeTab === 'webhooks' ? 'active' : ''} onClick={() => setActiveTab('webhooks')}>
-            <Webhook size={18} /> Webhook
-          </button>
-          <button className={activeTab === 'email' ? 'active' : ''} onClick={() => setActiveTab('email')}>
-            <Mail size={18} /> E-mail
-          </button>
-          
-          <div style={{ width: '1px', height: '24px', background: 'var(--border-subtle)', margin: '0 8px' }}></div>
-          <button onClick={() => { localStorage.removeItem('adminToken'); window.location.reload(); }} style={{ color: '#ef4444' }}>
-            Sair
-          </button>
-        </div>
-      </header>
-
-      {/* MODAL / OVERLAY FOR MANAGING ACCESS */}
       {managingAccessFor && (
         <div className="admin-modal-overlay">
-          <div className="admin-modal">
-            <h2>Gestão de Acessos</h2>
-            <p>Gerenciando: <strong>{managingAccessFor.email}</strong></p>
-            
-            <div className="access-list">
-              <h4>Livros Liberados Atualmente:</h4>
-              {managingAccessFor.purchases.length === 0 ? <p className="empty-msg">Nenhum livro liberado ainda.</p> : (
-                <ul style={{ padding: '0', listStyle: 'none' }}>
-                  {managingAccessFor.purchases.map((p: any) => (
-                    <li key={p.ebook.id} style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(255,255,255,0.05)', margin: '5px 0', padding: '10px', borderRadius: '4px' }}>
-                      <span>{p.ebook.title}</span>
-                      <button onClick={() => revokeAccess(p.ebook.id)} className="btn-danger-sm">Revogar</button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+          <div className="admin-modal admin-modal--client-licenses">
+            <h2 className="admin-modal-client-title">Cliente e licenças</h2>
+            <p className="admin-modal-meta">
+              <strong>{managingAccessFor.email}</strong>
+              {managingAccessFor.name ? (
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}> — {managingAccessFor.name}</span>
+              ) : null}
+            </p>
+            <p className="admin-modal-lead">
+              O acesso às <strong>trilhas EAD</strong> segue os cursos publicados no painel. As licenças abaixo valem para o robô / EA: o campo{' '}
+              <strong>systemId</strong> deve coincidir com o cadastro em <strong>Produtos</strong> (é ele que define qual conteúdo o cliente pode usar).
+            </p>
 
-            <div className="grant-access-box">
-              <h4>Conceder Novo Acesso Manual:</h4>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <select value={grantEbookId} onChange={e => setGrantEbookId(e.target.value)} style={{ flex: 1, padding: '10px' }}>
-                  <option value="">Selecione um Livro...</option>
-                  {ebooks.filter((eb: any) => !managingAccessFor.purchases.some((p: any) => p.ebookId === eb.id)).map((eb: any) => (
-                    <option key={eb.id} value={eb.id}>{eb.title}</option>
-                  ))}
-                </select>
-                <button onClick={grantAccess} className="btn-primary" disabled={!grantEbookId}>Adicionar</button>
+            <div className="admin-modal-license-list-block">
+              <h3 className="admin-modal-section-title">Licenças deste e-mail ({licensesForClientModal.length})</h3>
+              <div className="admin-modal-license-table-wrap admin-table-scroll">
+                <table className="admin-table" style={{ margin: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>systemId</th>
+                      <th>Produto</th>
+                      <th>Plano</th>
+                      <th>Status</th>
+                      <th>Expira</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {licensesForClientModal.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: 14, color: 'var(--text-secondary)', fontSize: 13 }}>
+                          Nenhuma licença para este e-mail. Crie uma abaixo informando o systemId.
+                        </td>
+                      </tr>
+                    ) : (
+                      licensesForClientModal.map((l: any) => (
+                        <tr key={l.id}>
+                          <td style={{ whiteSpace: 'nowrap' }}>{l.id}</td>
+                          <td>
+                            <code style={{ fontSize: 12 }}>{l.systemId || '—'}</code>
+                          </td>
+                          <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{productNameByLicense(l)}</td>
+                          <td>{l.plano || '—'}</td>
+                          <td>
+                            {(() => {
+                              const st = effectiveLicenseStatus(l.statusLicenca, l.dataExpiracao);
+                              return (
+                                <span className={`admin-license-status-pill admin-license-status-pill--${licenseStatusPillClass(st)}`}>
+                                  {st}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                            {l.dataExpiracao ? new Date(l.dataExpiracao).toLocaleString('pt-BR') : '—'}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                            <div className="admin-modal-license-table-actions">
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              style={{ fontSize: 11, padding: '4px 10px' }}
+                              disabled={licenseModalBusy}
+                              onClick={() => {
+                                setEditingLicenseId(l.id);
+                                setLicenseForm({
+                                  systemId: String(l.systemId || ''),
+                                  plano: String(l.plano || 'mensal'),
+                                  statusLicenca: String(l.statusLicenca || 'ativa'),
+                                  dataExpiracao: isoToDatetimeLocalValue(l.dataExpiracao),
+                                  numeroConta: String(l.numeroConta || ''),
+                                });
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger-sm"
+                              disabled={licenseModalBusy}
+                              onClick={async () => {
+                                if (!window.confirm('Excluir esta licença?')) return;
+                                setLicenseModalBusy(true);
+                                try {
+                                  const res = await fetch(`/api/admin/licenses/${l.id}`, {
+                                    method: 'DELETE',
+                                    headers: { ...authHeaders() },
+                                  });
+                                  if (!res.ok) alert('Erro ao excluir.');
+                                  else void fetchLicenses();
+                                } finally {
+                                  setLicenseModalBusy(false);
+                                }
+                              }}
+                            >
+                              Excluir
+                            </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            <button className="btn-cancel" onClick={() => setManagingAccessFor(null)} style={{ marginTop: '20px', width: '100%' }}>Voltar Painel</button>
+            <div className="admin-modal-license-panel">
+              <h3 className="admin-modal-section-title admin-modal-section-title--panel">
+                {editingLicenseId != null ? `Editar licença #${editingLicenseId}` : 'Nova licença'}
+              </h3>
+              <label className="admin-modal-field-label" htmlFor="license-product-pick">
+                Preencher systemId a partir do produto
+              </label>
+              <select
+                id="license-product-pick"
+                value=""
+                disabled={licenseModalBusy}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  e.currentTarget.value = '';
+                  if (v) setLicenseForm((f) => ({ ...f, systemId: v }));
+                }}
+              >
+                <option value="">Selecione um produto…</option>
+                {products.map((p: any) => (
+                  <option key={p.id} value={p.systemId}>
+                    {p.productName} — {p.systemId}
+                  </option>
+                ))}
+              </select>
+              <label className="admin-modal-field-label" htmlFor="license-system-id">
+                systemId *
+              </label>
+              <input
+                id="license-system-id"
+                value={licenseForm.systemId}
+                onChange={(e) => setLicenseForm((f) => ({ ...f, systemId: e.target.value }))}
+                placeholder="Mesmo valor cadastrado em Produtos"
+                disabled={licenseModalBusy}
+                autoComplete="off"
+              />
+              <div className="admin-modal-license-grid-2">
+                <div className="admin-modal-license-field">
+                  <label className="admin-modal-field-label" htmlFor="license-plano">
+                    Plano
+                  </label>
+                  <select
+                    id="license-plano"
+                    value={licenseForm.plano}
+                    onChange={(e) =>
+                      setLicenseForm((f) => ({
+                        ...f,
+                        plano: e.target.value,
+                        dataExpiracao: planExpiryLocalValue(e.target.value),
+                      }))
+                    }
+                    disabled={licenseModalBusy}
+                  >
+                    {licenseForm.plano && !PLAN_OPTIONS.includes(licenseForm.plano as (typeof PLAN_OPTIONS)[number]) && (
+                      <option value={licenseForm.plano}>{licenseForm.plano}</option>
+                    )}
+                    {PLAN_OPTIONS.map((plan) => (
+                      <option key={plan} value={plan}>
+                        {plan}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="admin-modal-license-field">
+                  <label className="admin-modal-field-label" htmlFor="license-status">
+                    Status
+                  </label>
+                  <select
+                    id="license-status"
+                    value={licenseForm.statusLicenca}
+                    onChange={(e) => setLicenseForm((f) => ({ ...f, statusLicenca: e.target.value }))}
+                    disabled={licenseModalBusy}
+                  >
+                    <option value="ativa">ativa</option>
+                    <option value="inativa">inativa</option>
+                    <option value="expirada">expirada</option>
+                  </select>
+                </div>
+              </div>
+              <label className="admin-modal-field-label" htmlFor="license-expires">
+                Expira em (automático pelo plano)
+              </label>
+              <input
+                id="license-expires"
+                type="datetime-local"
+                value={licenseForm.dataExpiracao}
+                readOnly
+                disabled
+              />
+              <label className="admin-modal-field-label" htmlFor="license-mt5">
+                Nº conta MT5 (opcional)
+              </label>
+              <input
+                id="license-mt5"
+                value={licenseForm.numeroConta}
+                onChange={(e) => setLicenseForm((f) => ({ ...f, numeroConta: e.target.value }))}
+                disabled={licenseModalBusy}
+                autoComplete="off"
+              />
+              <div className="admin-modal-license-actions">
+                {editingLicenseId != null ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={licenseModalBusy || !licenseForm.systemId.trim()}
+                      onClick={async () => {
+                        setLicenseModalBusy(true);
+                        try {
+                          const res = await fetch(`/api/admin/licenses/${editingLicenseId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                            body: JSON.stringify({
+                              email: managingAccessFor.email,
+                              buyerName: managingAccessFor.name || null,
+                              systemId: licenseForm.systemId.trim(),
+                              plano: licenseForm.plano,
+                              statusLicenca: licenseForm.statusLicenca,
+                              dataExpiracao: datetimeLocalToIsoOrNull(licenseForm.dataExpiracao),
+                              numeroConta: licenseForm.numeroConta.trim(),
+                            }),
+                          });
+                          if (!res.ok) alert('Falha ao atualizar licença.');
+                          else {
+                            void fetchLicenses();
+                            setEditingLicenseId(null);
+                            setLicenseForm({
+                              systemId: '',
+                              plano: 'mensal',
+                              statusLicenca: 'ativa',
+                              dataExpiracao: planExpiryLocalValue('mensal'),
+                              numeroConta: '',
+                            });
+                          }
+                        } finally {
+                          setLicenseModalBusy(false);
+                        }
+                      }}
+                    >
+                      {licenseModalBusy ? 'Salvando…' : 'Salvar alterações'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-cancel"
+                      disabled={licenseModalBusy}
+                      onClick={() => {
+                        setEditingLicenseId(null);
+                        setLicenseForm({
+                          systemId: '',
+                          plano: 'mensal',
+                          statusLicenca: 'ativa',
+                          dataExpiracao: planExpiryLocalValue('mensal'),
+                          numeroConta: '',
+                        });
+                      }}
+                    >
+                      Cancelar edição
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={licenseModalBusy || !licenseForm.systemId.trim()}
+                    onClick={async () => {
+                      setLicenseModalBusy(true);
+                      try {
+                        const res = await fetch('/api/admin/licenses', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                          body: JSON.stringify({
+                            email: managingAccessFor.email,
+                            buyerName: managingAccessFor.name || null,
+                            systemId: licenseForm.systemId.trim(),
+                            plano: licenseForm.plano,
+                            statusLicenca: licenseForm.statusLicenca,
+                            dataExpiracao: datetimeLocalToIsoOrNull(licenseForm.dataExpiracao),
+                            numeroConta: licenseForm.numeroConta.trim(),
+                          }),
+                        });
+                        if (!res.ok) alert('Falha ao criar licença.');
+                        else {
+                          void fetchLicenses();
+                          setLicenseForm({
+                            systemId: '',
+                            plano: 'mensal',
+                            statusLicenca: 'ativa',
+                            dataExpiracao: planExpiryLocalValue('mensal'),
+                            numeroConta: '',
+                          });
+                        }
+                      } finally {
+                        setLicenseModalBusy(false);
+                      }
+                    }}
+                  >
+                    {licenseModalBusy ? 'Salvando…' : 'Adicionar licença'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="admin-modal-footer">
+              <button type="button" className="btn-cancel" onClick={() => setManagingAccessFor(null)}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="admin-shell">
+        <aside className="admin-sidebar" aria-label="Menu do painel administrativo">
+          <div className="admin-sidebar-brand">
+            <img src="/logo.png" alt="Readlyme" className="admin-sidebar-logo" draggable={false} />
+            <span className="admin-sidebar-badge">Painel</span>
+          </div>
+          <nav className="admin-sidebar-nav">
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'courses' ? 'active' : ''}`} onClick={() => setActiveTab('courses')}>
+              <GraduationCap size={20} aria-hidden />
+              <span>Cursos EAD</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'banner' ? 'active' : ''}`} onClick={() => setActiveTab('banner')}>
+              <Images size={20} aria-hidden />
+              <span>Banner início</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
+              <Users size={20} aria-hidden />
+              <span>Clientes</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'webhooks' ? 'active' : ''}`} onClick={() => setActiveTab('webhooks')}>
+              <Webhook size={20} aria-hidden />
+              <span>Webhook</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'email' ? 'active' : ''}`} onClick={() => setActiveTab('email')}>
+              <Mail size={20} aria-hidden />
+              <span>E-mail</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'products' ? 'active' : ''}`} onClick={() => setActiveTab('products')}>
+              <Layers size={20} aria-hidden />
+              <span>Produtos</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'links' ? 'active' : ''}`} onClick={() => setActiveTab('links')}>
+              <Link2 size={20} aria-hidden />
+              <span>WP Links</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'media' ? 'active' : ''}`} onClick={() => setActiveTab('media')}>
+              <FolderOpen size={20} aria-hidden />
+              <span>Mídia</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'support' ? 'active' : ''}`} onClick={() => setActiveTab('support')}>
+              <LifeBuoy size={20} aria-hidden />
+              <span>Suporte</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'builder' ? 'active' : ''}`} onClick={() => setActiveTab('builder')}>
+              <Code2 size={20} aria-hidden />
+              <span>Construtor HTML</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'forexEA' ? 'active' : ''}`} onClick={() => setActiveTab('forexEA')}>
+              <Key size={20} aria-hidden />
+              <span>Segurança EA</span>
+            </button>
+          </nav>
+          <div className="admin-sidebar-footer">
+            <button
+              type="button"
+              className="admin-sidebar-logout"
+              onClick={() => {
+                localStorage.removeItem(ADMIN_JWT_KEY);
+                localStorage.removeItem('adminToken');
+                window.location.reload();
+              }}
+            >
+              Sair
+            </button>
+          </div>
+        </aside>
+
+        <div className={`admin-main admin-main--${activeTab}`}>
+      <section className="admin-page-hero" aria-label="Resumo da seção">
+        <h1>{currentAdminMeta?.title || 'Painel'}</h1>
+        <p>{currentAdminMeta?.subtitle || 'Gerencie sua operação com rapidez.'}</p>
+      </section>
+      {activeTab === 'banner' && (
+        <div className="admin-content admin-content--stack">
+          <div className="admin-form">
+            <h2>Banner da página inicial</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.55 }}>
+              O destaque no início da área do membro mostra o selo e as boas-vindas. Se a URL da imagem estiver vazia, o sistema usa a <strong>capa do primeiro curso publicado</strong> (com imagem) como fundo do banner — ideal para o fluxo EAD.
+            </p>
+            <label style={{ display: 'block', marginTop: '14px', marginBottom: '6px', fontWeight: 600 }}>URL da imagem de fundo (opcional)</label>
+            <input
+              type="url"
+              placeholder="https://… ou /uploads/arquivo.webp"
+              value={emailSettings.member_hero_background_url || ''}
+              onChange={(e) => setEmailSettings((p) => ({ ...p, member_hero_background_url: e.target.value }))}
+              style={{ width: '100%', padding: '10px', marginBottom: '14px' }}
+            />
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600 }}>Texto do selo acima do nome (opcional)</label>
+            <input
+              type="text"
+              placeholder="Ex.: Acesso exclusivo"
+              value={emailSettings.member_hero_kicker || ''}
+              onChange={(e) => setEmailSettings((p) => ({ ...p, member_hero_kicker: e.target.value }))}
+              style={{ width: '100%', padding: '10px', marginBottom: '16px' }}
+            />
+            <button type="button" className="btn-primary" onClick={() => void saveMemberBanner()} disabled={bannerSaving}>
+              {bannerSaving ? 'Salvando…' : 'Salvar banner'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: COURSES (EAD) --- */}
+      {activeTab === 'courses' && (
+        <div className="admin-content admin-content--stack admin-ead-tab-root">
+          <div className="admin-ead-shell">
+            <aside className="admin-ead-tree-col" aria-label="Estrutura dos cursos">
+              <div className="admin-ead-tree-head">
+                <h3 className="admin-ead-tree-title">Estrutura</h3>
+                <button type="button" className="btn-secondary" onClick={() => fetchCourses()} title="Atualizar lista">
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+              <p className="admin-ead-tree-hint">Selecione curso, módulo e aula. O painel à direita muda conforme a aba.</p>
+              {courses.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Nenhum curso criado ainda.</p>
+              ) : (
+                <div className="admin-course-tree admin-course-tree--scroll">
+                  {courses.map((c: any) => {
+                    const isSelected = selectedCourseId === c.id;
+                    return (
+                      <div key={c.id} className={`admin-course-node ${isSelected ? 'admin-course-node--active' : ''}`}>
+                        <button
+                          type="button"
+                          className="admin-course-node-header"
+                          onClick={() => {
+                            setSelectedCourseId(isSelected ? '' : c.id);
+                            setSelectedModuleId('');
+                            setSelectedLessonId('');
+                            if (!isSelected) setEadSectionTab('curso');
+                          }}
+                        >
+                          <GraduationCap size={16} />
+                          <span style={{ fontWeight: 700, flex: 1 }}>{c.title}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                            {(c.modules || []).length} mód · {(c.modules || []).reduce((a: number, m: any) => a + (m.lessons?.length || 0), 0)} aulas
+                          </span>
+                        </button>
+
+                        {isSelected &&
+                          (c.modules || []).map((m: any) => {
+                            const isMod = selectedModuleId === m.id;
+                            return (
+                              <div key={m.id} className="admin-module-node">
+                                <button
+                                  type="button"
+                                  className={`admin-module-node-header ${isMod ? 'admin-module-node-header--active' : ''}`}
+                                  onClick={() => {
+                                    setSelectedModuleId(isMod ? '' : m.id);
+                                    setSelectedLessonId('');
+                                    if (!isMod) {
+                                      setEadSectionTab('modulo');
+                                      setEadLessonSubtab('nova');
+                                    }
+                                  }}
+                                >
+                                  <Layers size={14} />
+                                  <span style={{ flex: 1 }}>{m.title}</span>
+                                  <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{(m.lessons || []).length} aulas</span>
+                                </button>
+
+                                {isMod && (
+                                  <ul className="admin-lesson-list">
+                                    {(m.lessons || []).length === 0 ? (
+                                      <li className="admin-lesson-item admin-lesson-item--muted">Nenhuma aula neste módulo.</li>
+                                    ) : (
+                                      (m.lessons || []).map((l: any) => {
+                                        const activeLesson = selectedLessonId === l.id;
+                                        return (
+                                          <li key={l.id}>
+                                            <button
+                                              type="button"
+                                              className={`admin-lesson-item admin-lesson-item--btn ${activeLesson ? 'admin-lesson-item--active' : ''}`}
+                                              onClick={() => {
+                                                setSelectedLessonId(activeLesson ? '' : l.id);
+                                                if (!activeLesson) {
+                                                  setEadSectionTab('aula');
+                                                  setEadLessonSubtab('editar');
+                                                }
+                                              }}
+                                            >
+                                              <ListChecks size={12} />
+                                              <span>{l.title}</span>
+                                              {l.videoUrl && (
+                                                <span style={{ fontSize: 10, color: 'var(--accent-primary)', marginLeft: 'auto' }}>vídeo</span>
+                                              )}
+                                            </button>
+                                          </li>
+                                        );
+                                      })
+                                    )}
+                                  </ul>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </aside>
+
+            <div className="admin-ead-editor-col">
+              <div className="admin-ead-main-tabs" role="tablist" aria-label="Editor EAD">
+                {(['curso', 'modulo', 'aula'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={eadSectionTab === tab}
+                    className={`admin-ead-main-tab ${eadSectionTab === tab ? 'admin-ead-main-tab--active' : ''}`}
+                    onClick={() => setEadSectionTab(tab)}
+                  >
+                    {tab === 'curso' ? 'Curso' : tab === 'modulo' ? 'Módulos' : 'Aulas'}
+                  </button>
+                ))}
+              </div>
+
+              {eadSectionTab === 'curso' && (
+                <div className="admin-ead-panel">
+                  {selectedCourseId && selectedCourse ? (
+                    <div className="admin-form">
+                      <h3>
+                        <Pencil size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> Curso selecionado
+                      </h3>
+                      <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        A capa aparece no banner da home se não houver imagem fixa em &quot;Banner início&quot;.
+                      </p>
+                      <label>Título *</label>
+                      <input value={editCourseTitle} onChange={(e) => setEditCourseTitle(e.target.value)} />
+                      <label>Slug (URL) *</label>
+                      <input value={editCourseSlug} onChange={(e) => setEditCourseSlug(e.target.value)} />
+                      <label>Nova capa (opcional)</label>
+                      <input type="file" accept="image/*" onChange={(e) => setEditCourseCoverFile(e.target?.files?.[0] || null)} />
+
+                      <label style={{ marginTop: 12 }}>Produtos com acesso a este curso</label>
+                      {renderProductPicker(editCourseProductIds, setEditCourseProductIds)}
+                      <small style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
+                        Clique nos produtos abaixo para liberar este curso. Apenas usuários com licença ativa para a combinação <strong>system_id + código da oferta</strong> daquele produto verão o conteúdo. Sem produtos = curso público.
+                      </small>
+
+                      <label style={{ marginTop: 12 }}>Link da página de vendas (para quem não tem acesso)</label>
+                      <input
+                        placeholder="https://seu-dominio.com/oferta"
+                        value={editCourseSalesPageUrl}
+                        onChange={(e) => setEditCourseSalesPageUrl(e.target.value)}
+                      />
+                      <small style={{ color: 'var(--text-secondary)' }}>
+                        Usado quando um aluno sem licença clicar no card bloqueado deste curso.
+                      </small>
+
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                        <input type="checkbox" checked={editCoursePublished} onChange={(e) => setEditCoursePublished(e.target.checked)} />
+                        Curso publicado (visível para alunos)
+                      </label>
+                      <div className="admin-form-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
+                        <button type="button" className="btn-primary" onClick={() => void handleSaveCourse()}>
+                          Salvar alterações do curso
+                        </button>
+                        <button type="button" className="btn-danger-sm" onClick={() => void handleDeleteCourse()}>
+                          Excluir curso
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => {
+                            setSelectedCourseId('');
+                            setSelectedModuleId('');
+                            setSelectedLessonId('');
+                          }}
+                        >
+                          Desmarcar e criar novo curso
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="admin-ead-placeholder">Selecione um curso na coluna &quot;Estrutura&quot; para editar título, slug e publicação.</p>
+                  )}
+
+                  {!selectedCourseId && (
+                    <form className="admin-form" onSubmit={handleCreateCourse}>
+                      <h3>
+                        <GraduationCap size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> Criar novo curso
+                      </h3>
+                      <label>Imagem do card (capa)</label>
+                      <input type="file" accept="image/*" onChange={(e) => setNewCourseCoverFile(e.target?.files?.[0] || null)} />
+                      <label>Título *</label>
+                      <input placeholder="Ex: Formação Robô Forex" value={newCourseTitle} onChange={(e) => setNewCourseTitle(e.target.value)} required />
+                      <label>Slug (URL)</label>
+                      <input placeholder="Auto se vazio" value={newCourseSlug} onChange={(e) => setNewCourseSlug(e.target.value)} />
+
+                      <label style={{ marginTop: 12 }}>Produtos com acesso a este curso</label>
+                      {renderProductPicker(newCourseProductIds, setNewCourseProductIds)}
+                      <small style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
+                        Clique nos produtos abaixo para liberar este curso. Apenas usuários com licença ativa para a combinação <strong>system_id + código da oferta</strong> daquele produto verão o conteúdo. Sem produtos = curso público.
+                      </small>
+
+                      <label style={{ marginTop: 12 }}>Link da página de vendas (para quem não tem acesso)</label>
+                      <input
+                        placeholder="https://seu-dominio.com/oferta"
+                        value={newCourseSalesPageUrl}
+                        onChange={(e) => setNewCourseSalesPageUrl(e.target.value)}
+                      />
+                      <small style={{ color: 'var(--text-secondary)' }}>
+                        Quando um aluno sem acesso clicar no card deste curso, ele será redirecionado para este link.
+                      </small>
+
+                      <div className="admin-form-actions" style={{ marginTop: 12 }}>
+                        <button type="submit">Criar curso</button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {eadSectionTab === 'modulo' && (
+                <div className="admin-ead-panel">
+                  {selectedCourseId ? (
+                    <>
+                      <form className="admin-form" onSubmit={handleCreateModule}>
+                        <h3>
+                          <Layers size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> Novo módulo
+                        </h3>
+                        <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          Dentro de: <strong>{selectedCourse?.title}</strong>
+                        </p>
+                        <label>Título *</label>
+                        <input placeholder="Ex: Primeiros passos" value={newModuleTitle} onChange={(e) => setNewModuleTitle(e.target.value)} required />
+                        <div className="admin-form-actions">
+                          <button type="submit">Criar módulo</button>
+                        </div>
+                      </form>
+
+                      {selectedModuleId ? (
+                        <div className="admin-form">
+                          <h3>
+                            <Layers size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> Editar módulo
+                          </h3>
+                          <label>Título do módulo *</label>
+                          <input value={editModuleTitle} onChange={(e) => setEditModuleTitle(e.target.value)} />
+                          <div className="admin-form-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
+                            <button type="button" className="btn-primary" onClick={() => void handleSaveModule()}>
+                              Salvar módulo
+                            </button>
+                            <button type="button" className="btn-danger-sm" onClick={() => void handleDeleteModule()}>
+                              Excluir módulo
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="admin-ead-placeholder">Selecione um módulo na árvore para renomear ou excluir.</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="admin-ead-placeholder">Selecione um curso na árvore para gerenciar módulos.</p>
+                  )}
+                </div>
+              )}
+
+              {eadSectionTab === 'aula' && (
+                <div className="admin-ead-panel">
+                  <div className="admin-ead-subtabs" role="tablist" aria-label="Aulas">
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`admin-ead-subtab ${eadLessonSubtab === 'nova' ? 'admin-ead-subtab--active' : ''}`}
+                      aria-selected={eadLessonSubtab === 'nova'}
+                      onClick={() => setEadLessonSubtab('nova')}
+                    >
+                      Nova aula
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`admin-ead-subtab ${eadLessonSubtab === 'editar' ? 'admin-ead-subtab--active' : ''}`}
+                      aria-selected={eadLessonSubtab === 'editar'}
+                      onClick={() => setEadLessonSubtab('editar')}
+                    >
+                      Editar aula
+                    </button>
+                  </div>
+
+                  {eadLessonSubtab === 'nova' && (
+                    <>
+                      {selectedModuleId ? (
+                        <form className="admin-form" onSubmit={handleCreateLesson}>
+                          <h3>
+                            <ListChecks size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> Nova aula
+                          </h3>
+                          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            Módulo: <strong>{selectedModules.find((m: any) => m.id === selectedModuleId)?.title}</strong>
+                          </p>
+                          <label>Título *</label>
+                          <input placeholder="Ex: Como instalar o robô" value={newLessonTitle} onChange={(e) => setNewLessonTitle(e.target.value)} required />
+                          <label>Link do vídeo</label>
+                          <input placeholder="YouTube/Vimeo embed URL" value={newLessonVideoUrl} onChange={(e) => setNewLessonVideoUrl(e.target.value)} />
+                          <label>Texto da aula</label>
+                          <textarea
+                            rows={4}
+                            value={newLessonBodyText}
+                            onChange={(e) => setNewLessonBodyText(e.target.value)}
+                            style={{ width: '100%' }}
+                            placeholder="Conteúdo em texto..."
+                          />
+                          <label>Texto do botão</label>
+                          <input placeholder="Ex: Baixar arquivos" value={newLessonActionLabel} onChange={(e) => setNewLessonActionLabel(e.target.value)} />
+                          <label>Link do botão</label>
+                          <input placeholder="https://..." value={newLessonActionUrl} onChange={(e) => setNewLessonActionUrl(e.target.value)} />
+                          <div className="admin-form-actions">
+                            <button type="submit">Criar aula</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <p className="admin-ead-placeholder">Selecione um módulo na árvore para adicionar uma nova aula.</p>
+                      )}
+                    </>
+                  )}
+
+                  {eadLessonSubtab === 'editar' && (
+                    <>
+                      {selectedLessonId ? (
+                        <div className="admin-form">
+                          <h3>
+                            <ListChecks size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> Editar aula publicada
+                          </h3>
+                          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            Alterações valem para todos os alunos assim que você salvar. Curso pode continuar publicado.
+                          </p>
+                          <label>Título *</label>
+                          <input value={editLessonTitle} onChange={(e) => setEditLessonTitle(e.target.value)} />
+                          <label>Link do vídeo</label>
+                          <input value={editLessonVideoUrl} onChange={(e) => setEditLessonVideoUrl(e.target.value)} />
+                          <label>Texto da aula</label>
+                          <textarea rows={6} value={editLessonBodyText} onChange={(e) => setEditLessonBodyText(e.target.value)} style={{ width: '100%' }} />
+                          <label>Texto do botão</label>
+                          <input value={editLessonActionLabel} onChange={(e) => setEditLessonActionLabel(e.target.value)} />
+                          <label>Link do botão</label>
+                          <input value={editLessonActionUrl} onChange={(e) => setEditLessonActionUrl(e.target.value)} />
+                          <div className="admin-form-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
+                            <button type="button" className="btn-primary" onClick={() => void handleSaveLesson()}>
+                              Salvar aula
+                            </button>
+                            <button type="button" className="btn-danger-sm" onClick={() => void handleDeleteLesson()}>
+                              Excluir aula
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="admin-ead-placeholder">Clique em uma aula na árvore ou use a aba &quot;Nova aula&quot; para criar.</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* --- TAB: USERS --- */}
       {activeTab === 'users' && (
-        <div className="admin-content" style={{ flexDirection: 'column' }}>
+        <div className="admin-content admin-content--stack">
           {/* Stats Row */}
           <div className="admin-stats-row">
             <div className="admin-stat-card">
-              <div><div className="stat-number">{users.length}</div><div className="stat-label">Usuários</div></div>
+              <div><div className="stat-number">{mergedClients.length}</div><div className="stat-label">Clientes</div></div>
             </div>
             <div className="admin-stat-card">
-              <div><div className="stat-number">{users.reduce((acc: number, u: any) => acc + u.purchases.length, 0)}</div><div className="stat-label">Acessos Ativos</div></div>
+              <div>
+                <div className="stat-number">{licenseCounters.ativas}</div>
+                <div className="stat-label">Licenças ativas</div>
+              </div>
             </div>
             <div className="admin-stat-card">
-              <div><div className="stat-number">{users.filter((u: any) => !u.password).length}</div><div className="stat-label">Sem Senha</div></div>
+              <div><div className="stat-number">{licenseCounters.desativadas}</div><div className="stat-label">Licenças desativadas</div></div>
+            </div>
+            <div className="admin-stat-card">
+              <div><div className="stat-number">{licenseCounters.testesAtivos}</div><div className="stat-label">Testes ativos</div></div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <form className="admin-form" onSubmit={handleCreateUser}>
+          <form className="admin-form admin-form--client-create" onSubmit={handleCreateUser}>
               <h3><UserPlus size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }}/>Cadastrar Usuário</h3>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                Cadastre alunos ou dê acesso VIP manualmente.
+                Cadastro manual já cria o cliente e a licença ativa com o produto/plano escolhido.
               </p>
-              <label>E-mail *</label>
-              <input type="email" placeholder="email@aluno.com" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required />
-              <label>Senha Provisória *</label>
-              <input type="text" placeholder="Senha123" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} required />
-              <div className="admin-form-actions">
-                <button type="submit">Cadastrar Usuário</button>
+              <div className="admin-client-create-grid">
+                <div className="admin-client-create-field admin-client-create-field--name">
+                  <label>Nome</label>
+                  <input type="text" placeholder="Nome do cliente" value={newUserName} onChange={e => setNewUserName(e.target.value)} />
+                </div>
+                <div className="admin-client-create-field admin-client-create-field--email">
+                  <label>E-mail *</label>
+                  <input type="email" placeholder="email@aluno.com" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required />
+                </div>
+                <div className="admin-client-create-field admin-client-create-field--password">
+                  <label>Senha Provisória *</label>
+                  <input type="text" placeholder="Senha123" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} required />
+                </div>
+                <div className="admin-client-create-field admin-client-create-field--product">
+                  <label>Produto *</label>
+                  <select value={newUserProductId} onChange={(e) => setNewUserProductId(e.target.value)} required>
+                    <option value="">Selecione um produto…</option>
+                    {products.map((p: any) => (
+                      <option key={p.id} value={String(p.id)}>
+                        {p.productName} — {p.systemId}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="admin-client-create-field admin-client-create-field--plan">
+                  <label>Plano *</label>
+                  <select value={newUserPlan} onChange={(e) => setNewUserPlan(e.target.value)} required>
+                    {PLAN_OPTIONS.map((plan) => (
+                      <option key={plan} value={plan}>
+                        {plan}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </form>
+              <div className="admin-form-actions">
+                <button type="submit">Cadastrar cliente + licença</button>
+              </div>
+          </form>
 
-            <div className="admin-table-container" style={{ flex: 2 }}>
-              <h3>Usuários Cadastrados ({users.length})</h3>
+          <div className="admin-table-container">
+              <h3>Clientes ({filteredUsers.length})</h3>
               <div className="admin-search-bar">
                 <Search size={16} className="admin-search-icon" />
                 <input
@@ -400,40 +2600,97 @@ export const Admin: React.FC = () => {
                   onChange={e => setUserSearch(e.target.value)}
                 />
               </div>
+              <div className="admin-clients-filters">
+                <div className="admin-clients-filters-group">
+                  <label htmlFor="client-plan-filter">Plano</label>
+                  <select id="client-plan-filter" value={userPlanFilter} onChange={(e) => setUserPlanFilter(e.target.value)}>
+                    <option value="todos">Todos os planos</option>
+                  {availablePlanFilters.map((plan) => (
+                    <option key={plan} value={plan}>
+                      {plan}
+                    </option>
+                  ))}
+                  </select>
+                </div>
+                <div className="admin-clients-filters-group">
+                  <label htmlFor="client-status-filter">Status</label>
+                  <select id="client-status-filter" value={userStatusFilter} onChange={(e) => setUserStatusFilter(e.target.value)}>
+                    <option value="todos">Todos os status</option>
+                    <option value="ativa">Ativa</option>
+                    <option value="inativa">Inativa</option>
+                    <option value="expirada">Expirada</option>
+                    <option value="sem_licenca">Sem licença</option>
+                  </select>
+                </div>
+              </div>
               <div className="admin-table-scroll">
-              <table className="admin-table">
+              <table className="admin-table admin-clients-table">
                 <thead>
                   <tr>
                     <th>Nome</th>
                     <th>E-mail</th>
-                    <th>Nº Livros</th>
+                    <th>Licenças (EA)</th>
+                    <th>Status</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users
-                    .filter((u: any) => {
-                      if (!userSearch.trim()) return true;
-                      const q = userSearch.toLowerCase();
-                      return u.email.toLowerCase().includes(q) || (u.name && u.name.toLowerCase().includes(q));
-                    })
-                    .map((u: any) => (
+                  {pagedUsers.map((u: any) => (
                     <tr key={u.id}>
                       <td><span style={{ fontWeight: 500 }}>{u.name || <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Sem nome</span>}</span></td>
                       <td>{u.email}</td>
                       <td>
-                        <span style={{ background: u.purchases.length > 0 ? 'rgba(76,175,80,0.15)' : 'rgba(158,158,158,0.15)', padding: '3px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 600, color: u.purchases.length > 0 ? '#66bb6a' : '#9e9e9e' }}>
-                          {u.purchases.length}
-                        </span>
+                        {(() => {
+                          const n = licenseCountByEmail.get(String(u.email).toLowerCase().trim()) || 0;
+                          return (
+                            <span
+                              style={{
+                                background: n > 0 ? 'rgba(59,130,246,0.15)' : 'rgba(158,158,158,0.15)',
+                                padding: '3px 10px',
+                                borderRadius: '12px',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color: n > 0 ? 'var(--accent-primary)' : '#9e9e9e',
+                              }}
+                            >
+                              {n}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td style={{ maxWidth: 280 }}>
+                        {(() => {
+                          const counts = licenseStatusCountsByEmail.get(String(u.email).toLowerCase().trim());
+                          if (!counts || counts.size === 0) {
+                            return <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>—</span>;
+                          }
+                          const parts = Array.from(counts.entries()).sort(([a], [b]) => compareLicenseStatusLabel(a, b));
+                          return (
+                            <div className="admin-client-license-status-wrap">
+                              {parts.map(([st, n]) => (
+                                <span
+                                  key={st}
+                                  className={`admin-license-status-pill admin-license-status-pill--${licenseStatusPillClass(st)}`}
+                                  title={n > 1 ? `${n} licenças` : '1 licença'}
+                                >
+                                  {st}
+                                  {n > 1 ? ` ×${n}` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <button className="btn-primary" onClick={() => setManagingAccessFor(u)} style={{ fontSize: '12px', padding: '6px 14px' }}>
-                            <KeyRound size={14} /> Acessos
+                            <KeyRound size={14} /> Licenças
                           </button>
-                          <button className="btn-icon btn-danger" onClick={() => handleDeleteUser(u)} title="Excluir Usuário">
-                            <Trash2 size={16} />
-                          </button>
+                          {!u._isLicenseOnly && (
+                            <button className="btn-icon btn-danger" onClick={() => handleDeleteUser(u)} title="Excluir Usuário">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -441,257 +2698,431 @@ export const Admin: React.FC = () => {
                 </tbody>
               </table>
             </div>
+              <AdminPagination page={pageUsers} totalItems={filteredUsers.length} onChange={setPageUsers} />
           </div>
-          </div>
+
         </div>
       )}
 
-      {/* --- TAB: EBOOKS --- */}
-      {activeTab === 'ebooks' && (
-        <div className="admin-content">
-          <form className="admin-form" onSubmit={handleSubmit}>
-            {!editingId ? (
-              <>
-                <h3>Adicionar Novo Ebook</h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
-                  Preencha os dados para criar um novo registro na biblioteca.
-                </p>
-              </>
-            ) : (
-              <div style={{ background: 'rgba(69, 196, 176, 0.15)', border: '1px solid var(--accent-primary)', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
-                <h3 style={{ color: 'var(--accent-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Pencil size={18} /> Editando Ebook
-                </h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', marginBottom: '12px' }}>
-                  Atenção: Você está modificando um ebook existente. Para cadastrar um novo, cancele esta edição.
-                </p>
-                <button type="button" onClick={clearForm} style={{ background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-                  ❌ CANCELAR E CADASTRAR NOVO
-                </button>
-              </div>
-            )}
-            
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-              <div style={{ flex: 1 }}>
-                <label>Tipo de Cadastro *</label>
-                <select value={isBonus ? 'bonus' : 'produto'} onChange={e => { setIsBonus(e.target.value === 'bonus'); if (e.target.value === 'produto') setParentEbookId(''); }} className="admin-input-styled">
-                  <option value="produto">Produto Principal</option>
-                  <option value="bonus">Bônus Especial</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label>Idioma do Ebook *</label>
-                <select value={language} onChange={e => setLanguage(e.target.value)} className="admin-input-styled">
-                  <option value="pt">Português (PT)</option>
-                  <option value="es">Espanhol (ES)</option>
-                  <option value="en">Inglês (EN)</option>
-                </select>
-              </div>
-            </div>
+      {activeTab === 'links' && (
+        <div className="admin-content admin-content--stack">
+          <div className="admin-grid-2">
+            <div className="admin-form">
+              <h3>{editingShortLinkId ? 'Editar link curto' : 'Novo link curto'}</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
+                Replica o plugin WP Links: slug, URL de destino, UTMs e smart rules (JSON).
+              </p>
 
-            {isBonus && (
-              <div style={{ background: 'rgba(212,175,55,0.05)', padding: '15px', borderRadius: '8px', border: '1px solid rgba(212,175,55,0.2)', marginBottom: '15px' }}>
-                <label style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}><KeyRound size={16} /> Vincular Bônus ao Produto Pai *</label>
-                <select value={parentEbookId} onChange={e => setParentEbookId(e.target.value)} className="admin-input-styled" required={isBonus}>
-                  <option value="">Selecione o Produto Principal...</option>
-                  {ebooks.filter(e => !e.isBonus).map(eb => (
-                    <option key={eb.id} value={eb.id}>{eb.title}</option>
-                  ))}
-                </select>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', marginBottom: 0 }}>
-                  Todos os clientes que já compraram ou vierem a comprar o Produto Principal ganharão acesso a este Bônus automaticamente.
-                </p>
-              </div>
-            )}
+              <label>Nome interno</label>
+              <input
+                value={shortLinkForm.name}
+                placeholder="Ex.: Campanha Black Friday"
+                onChange={(e) => setShortLinkForm((p) => ({ ...p, name: e.target.value }))}
+              />
 
-            <label>Título do Livro *</label>
-            <input placeholder="Ex: O Poder do Hábito" value={title} onChange={e => setTitle(e.target.value)} required />
-            
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{flex: 1}}>
-                <label>Autor (Opcional)</label>
-                <input placeholder="Ex: Charles Duhigg" value={author} onChange={e => setAuthor(e.target.value)} />
-              </div>
-            </div>
+              <label>Slug</label>
+              <input
+                value={shortLinkForm.slug}
+                placeholder="Ex.: go/oferta-exclusiva"
+                onChange={(e) => setShortLinkForm((p) => ({ ...p, slug: e.target.value }))}
+              />
 
-            <label>Descrição Curta / Subtítulo (Opcional)</label>
-            <input placeholder="Aparecerá abaixo do título na Biblioteca" value={description} onChange={e => setDescription(e.target.value)} />
-            
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <div style={{flex: 1}}>
-                <label>Categoria (Opcional)</label>
-                <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="admin-input-styled">
-                  <option value="">Sem Categoria</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div style={{flex: 1}}>
-                <label>Nova Categoria Rápida</label>
-                <div style={{ display: 'flex', gap: '5px', marginTop: '8px' }}>
-                  <input placeholder="Ex: Ficção" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} style={{ marginTop: 0 }} />
-                  <button type="button" onClick={handleCreateCategory} className="btn-add">+</button>
-                </div>
-              </div>
-            </div>
+              <label>URL destino</label>
+              <input
+                value={shortLinkForm.targetUrl}
+                placeholder="https://wa.me/..."
+                onChange={(e) => setShortLinkForm((p) => ({ ...p, targetUrl: e.target.value }))}
+              />
 
-            <label>Lista Especial / Destaque (Opcional)</label>
-            <input placeholder="Ex: Recomendados pelo Autor" value={featuredList} onChange={e => setFeaturedList(e.target.value)} />
-            
-            <hr style={{ borderColor: 'var(--border-subtle)', margin: '15px 0' }} />
+              <label>Tipo de redirecionamento</label>
+              <select
+                value={String(shortLinkForm.redirectType)}
+                onChange={(e) => setShortLinkForm((p) => ({ ...p, redirectType: Number(e.target.value) || 301 }))}
+              >
+                <option value="301">301 - Permanente</option>
+                <option value="307">307 - Temporário (ofertas)</option>
+                <option value="302">302 - Temporário</option>
+                <option value="308">308 - Permanente</option>
+              </select>
 
-            <label>Capa do Ebook {editingId && !coverFile && coverUrl ? ' - Atual' : '*'}</label>
-            <input type="file" accept="image/*" onChange={e => setCoverFile(e.target?.files?.[0] || null)} required={!editingId && !coverUrl} />
-            
-            {/* File type selector - stacked vertically to avoid overlap */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label>Arquivo PDF {editingId && !pdfFile && pdfUrl ? ' - Atual' : ''}</label>
-                  {pdfUrl && !pdfFile && (
-                    <button type="button" onClick={() => setPdfUrl('')} style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remover Arquivo</button>
-                  )}
-                </div>
-                <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target?.files?.[0] || null)} />
-              </div>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    Arquivo HTML
-                    <span style={{ fontSize: '11px', background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>NOVO</span>
-                    {editingId && !htmlFile && htmlUrl ? ' - Atual' : ''}
-                  </label>
-                  {htmlUrl && !htmlFile && (
-                    <button type="button" onClick={() => setHtmlUrl('')} style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Remover Arquivo</button>
-                  )}
-                </div>
-                <input type="file" accept=".html,text/html" onChange={e => setHtmlFile(e.target?.files?.[0] || null)} />
-              </div>
-            </div>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              ⚡ Envie pelo menos um arquivo (PDF ou HTML) ou insira um Link abaixo. Se houver Link, ele terá prioridade total.
-            </p>
+              <label>UTM params (JSON)</label>
+              <textarea
+                rows={4}
+                style={{ fontFamily: 'monospace', fontSize: 12 }}
+                placeholder='{"utm_source":"instagram","src":"bio"}'
+                value={shortLinkForm.utmParams}
+                onChange={(e) => setShortLinkForm((p) => ({ ...p, utmParams: e.target.value }))}
+              />
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              Link Externo / App Interativo (Opcional)
-              <span style={{ fontSize: '11px', background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>PRIORIDADE</span>
-            </label>
-            <input 
-              placeholder="https://exemplo.com/app-ou-site-interativo" 
-              value={externalUrl} 
-              onChange={e => setExternalUrl(e.target.value)} 
-              style={{ border: externalUrl ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)' }}
-            />
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '10px' }}>
-              Útil para integrar apps exclusivos, dashboards ou sites externos de suporte ao ebook mantendo o usuário dentro da plataforma (Iframe).
-            </p>
+              <label>Smart rules (JSON)</label>
+              <textarea
+                rows={5}
+                style={{ fontFamily: 'monospace', fontSize: 12 }}
+                placeholder='[{"type":"device","value":"mobile","target":"https://..."}]'
+                value={shortLinkForm.smartRules}
+                onChange={(e) => setShortLinkForm((p) => ({ ...p, smartRules: e.target.value }))}
+              />
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              Link de Redirecionamento Direto (Downlod/Site Externo)
-              <span style={{ fontSize: '11px', background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>PRIORIDADE MÁXIMA</span>
-            </label>
-            <input 
-              placeholder="https://exemplo.com/download-do-bonus.zip" 
-              value={redirectUrl} 
-              onChange={e => setRedirectUrl(e.target.value)} 
-              style={{ border: redirectUrl ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)' }}
-            />
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '10px' }}>
-              Ao usar esta opção, o arquivo/link será aberto diretamente em uma nova aba ignorando o leitor interno.
-            </p>
-
-            {!isBonus && (
-              <>
-                <label>Página de Vendas ou Código HTML (Hotmart) *</label>
-                <textarea 
-                  placeholder="https://... ou cole aqui o script do Checkout Widget da Hotmart" 
-                  value={salesUrl} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val.includes('<script') && val.includes('hotmart-fb')) {
-                      const match = val.match(/href=["'](https:\/\/pay\.hotmart\.com\/[^"']+)["']/);
-                      if (match) {
-                        setSalesUrl(match[1]);
-                        alert('Código Hotmart Detectado! A URL do Checkout (Pop-up) foi extraída e convertida automaticamente.');
-                        return;
-                      }
-                    }
-                    setSalesUrl(val);
-                  }} 
-                  rows={3}
-                  required={!isBonus}
-                  style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={shortLinkForm.isActive}
+                  onChange={(e) => setShortLinkForm((p) => ({ ...p, isActive: e.target.checked }))}
                 />
-                
-                <label>Código(s) da Oferta (Hotmart) *</label>
-                <input placeholder="Ex: zct67hul, PROMO123 (Códigos separados por vírgula)" value={hotmartOffer} onChange={e => setHotmartOffer(e.target.value)} required={!isBonus} />
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '10px' }}>
-                  Você pode adicionar múltiplos códigos se tiver valores promocionais diferentes para o mesmo ebook.
-                </p>
-              </>
-            )}
-            
-            <div className="admin-form-actions" style={{ flexDirection: 'column' }}>
-              <button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Enviando...' : (editingId ? '💾 Atualizar Ebook Existente' : 'Cadastrar Novo Ebook')}
-              </button>
-              {editingId && (
-                <button type="button" className="btn-cancel" onClick={clearForm} disabled={isSubmitting}>
-                  Cancelar Edição
-                </button>
-              )}
-            </div>
-          </form>
+                Ativo
+              </label>
 
-          <div className="admin-table-container">
-            <h3>Ebooks Cadastrados ({ebooks.length})</h3>
+              <div className="admin-form-actions">
+                {editingShortLinkId != null && (
+                  <button type="button" className="btn-cancel" onClick={cancelEditShortLink}>
+                    Cancelar edição
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={async () => {
+                    const slug = String(shortLinkForm.slug || '').trim();
+                    const targetUrl = String(shortLinkForm.targetUrl || '').trim();
+                    if (!slug || !targetUrl) {
+                      alert('Preencha slug e URL destino.');
+                      return;
+                    }
+                    const payload = {
+                      ...shortLinkForm,
+                      slug,
+                      targetUrl,
+                      name: String(shortLinkForm.name || '').trim(),
+                      utmParams: String(shortLinkForm.utmParams || '').trim(),
+                      smartRules: String(shortLinkForm.smartRules || '').trim(),
+                    };
+                    const url = editingShortLinkId != null ? `/api/admin/links/${editingShortLinkId}` : '/api/admin/links';
+                    const method = editingShortLinkId != null ? 'PUT' : 'POST';
+                    const res = await fetch(url, {
+                      method,
+                      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                      body: JSON.stringify(payload),
+                    });
+                    if (!res.ok) {
+                      const j = await res.json().catch(() => ({} as { error?: string }));
+                      alert(j.error || 'Falha ao salvar link.');
+                      return;
+                    }
+                    alert(editingShortLinkId != null ? 'Link atualizado.' : 'Link criado.');
+                    cancelEditShortLink();
+                    void fetchShortLinks();
+                  }}
+                >
+                  {editingShortLinkId != null ? 'Salvar alterações' : 'Criar link'}
+                </button>
+              </div>
+            </div>
+
+            <div className="admin-form">
+              <h3>Como usar</h3>
+              <ul style={{ paddingLeft: 18, color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: 13 }}>
+                <li>O link curto final fica em <code>{window.location.origin}/SUA-SLUG</code>.</li>
+                <li><code>utmParams</code> aceita JSON de chave/valor e é anexado automaticamente.</li>
+                <li><code>smartRules</code> aceita array JSON com regras de <code>device</code> ou <code>geo</code>.</li>
+                <li>Regra de exemplo: <code>{'{"type":"device","value":"mobile","target":"https://m.site.com"}'}</code>.</li>
+                <li>Você pode importar os dados do WordPress com o script de migração SQL.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="admin-table-container admin-table-container--full">
+            <h3>Links cadastrados ({shortLinks.length})</h3>
             <div className="admin-table-scroll">
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Capa</th>
-                    <th>Título</th>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Slug</th>
+                    <th>Destino</th>
                     <th>Tipo</th>
-                    <th>Categoria</th>
-                    <th>Destaque</th>
-                    <th>Oferta</th>
-                    <th>Ações</th>
+                    <th>Cliques</th>
+                    <th>Status</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {ebooks.map(eb => (
-                    <tr key={eb.id}>
-                      <td><img src={eb.coverUrl} alt={eb.title} /></td>
-                      <td>
-                        <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                           {eb.language === 'es' ? '🇪🇸' : eb.language === 'en' ? '🇺🇸' : '🇧🇷'} {eb.title}
-                        </div>
-                        {eb.isBonus && (
-                          <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px', background: 'rgba(212,175,55,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
-                            🎁 Bônus de: {ebooks.find(p => p.id === eb.parentEbookId)?.title || 'Desconhecido'}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        {eb.redirectUrl && <span style={{ background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>REDIRECT</span>}
-                        {eb.externalUrl && !eb.redirectUrl && <span style={{ background: 'rgba(212,175,55,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>LINK</span>}
-                        {eb.htmlUrl && !eb.redirectUrl && <span style={{ background: 'rgba(69,196,176,0.2)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>HTML</span>}
-                        {eb.pdfUrl && !eb.redirectUrl && <span style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>PDF</span>}
-                        {!eb.htmlUrl && !eb.pdfUrl && !eb.externalUrl && !eb.redirectUrl && <span style={{ color: '#ef4444', fontSize: '12px' }}>⚠ Sem arquivo</span>}
-                      </td>
-                      <td>{eb.category?.name || '-'}</td>
-                      <td><span className="badge-highlight">{eb.featuredList || '-'}</span></td>
-                      <td><code>{eb.hotmartOffer}</code></td>
-                      <td>
-                        <div className="admin-actions">
-                          <button className="btn-icon" onClick={() => handleEdit(eb)} title="Editar"><Pencil size={18} /></button>
-                          <button className="btn-icon btn-danger" onClick={() => handleDelete(eb.id)} title="Excluir"><Trash2 size={18} /></button>
-                        </div>
+                  {shortLinks.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: 24, color: 'var(--text-secondary)' }}>
+                        Nenhum link cadastrado.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    shortLinks.map((link: any) => (
+                      <tr key={link.id}>
+                        <td>{link.id}</td>
+                        <td>{link.name || '—'}</td>
+                        <td><code>{link.slug}</code></td>
+                        <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={link.targetUrl}>
+                          {link.targetUrl}
+                        </td>
+                        <td>{link.redirectType}</td>
+                        <td>{Number(link.clicks || 0).toLocaleString('pt-BR')}</td>
+                        <td>
+                          <span className={`admin-license-status-pill admin-license-status-pill--${link.isActive ? 'ativa' : 'inativa'}`}>
+                            {link.isActive ? 'ativo' : 'inativo'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="admin-actions admin-actions--wrap">
+                            <button type="button" className="btn-secondary-sm" onClick={() => startEditShortLink(link)}>
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary-sm"
+                              onClick={() => {
+                                const full = `${window.location.origin}/${String(link.slug || '').replace(/^\/+/, '')}`;
+                                navigator.clipboard.writeText(full);
+                                alert('Link copiado: ' + full);
+                              }}
+                            >
+                              Copiar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger-sm"
+                              onClick={async () => {
+                                if (!window.confirm('Excluir este link?')) return;
+                                const res = await fetch(`/api/admin/links/${link.id}`, {
+                                  method: 'DELETE',
+                                  headers: { ...authHeaders() },
+                                });
+                                if (!res.ok) {
+                                  const j = await res.json().catch(() => ({} as { error?: string }));
+                                  alert(j.error || 'Falha ao excluir.');
+                                  return;
+                                }
+                                if (editingShortLinkId === link.id) cancelEditShortLink();
+                                void fetchShortLinks();
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'media' && (
+        <div className="admin-content admin-content--stack">
+          <div className="admin-grid-2">
+            <div className="admin-form">
+              <h3>Upload de mídia</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
+                Envie imagens, vídeos, áudios e arquivos para gerar links públicos de uso em páginas ou download.
+              </p>
+
+              <label>Arquivo</label>
+              <input
+                type="file"
+                onChange={(e) => setMediaFile(e.target?.files?.[0] || null)}
+              />
+              {mediaFile && (
+                <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Selecionado: <strong>{mediaFile.name}</strong> ({Math.max(1, Math.round(mediaFile.size / 1024))} KB)
+                </p>
+              )}
+
+              <div className="admin-form-actions">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!mediaFile || mediaUploading}
+                  onClick={async () => {
+                    if (!mediaFile) return;
+                    setMediaUploading(true);
+                    try {
+                      const form = new FormData();
+                      form.append('file', mediaFile);
+                      const res = await fetch('/api/admin/media', {
+                        method: 'POST',
+                        headers: { ...authHeaders() },
+                        body: form
+                      });
+                      if (!res.ok) {
+                        const j = await res.json().catch(() => ({} as { error?: string }));
+                        alert(j.error || 'Falha ao enviar mídia.');
+                        return;
+                      }
+                      alert('Mídia enviada com sucesso!');
+                      setMediaFile(null);
+                      void fetchMediaAssets();
+                    } catch {
+                      alert('Erro de conexão no upload.');
+                    } finally {
+                      setMediaUploading(false);
+                    }
+                  }}
+                >
+                  {mediaUploading ? 'Enviando...' : 'Enviar mídia'}
+                </button>
+              </div>
+            </div>
+
+            <div className="admin-form">
+              <h3>Como usar os links</h3>
+              <ul style={{ paddingLeft: 18, color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: 13 }}>
+                <li><strong>Link direto:</strong> use em páginas, botões, banners ou embeds.</li>
+                <li><strong>Link download:</strong> força download para arquivos.</li>
+                <li>Os arquivos ficam armazenados no servidor e listados nesta biblioteca.</li>
+                <li>Você pode copiar URL com um clique e reutilizar em qualquer campanha.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="admin-table-container admin-table-container--full">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <h3>Biblioteca ({filteredMediaAssets.length})</h3>
+              <div className="admin-search-bar" style={{ marginBottom: 0, minWidth: 260 }}>
+                <Search className="admin-search-icon" size={16} />
+                <input
+                  value={mediaSearch}
+                  onChange={(e) => setMediaSearch(e.target.value)}
+                  placeholder="Buscar por nome, tipo ou URL..."
+                />
+              </div>
+            </div>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Arquivo</th>
+                    <th>Tamanho</th>
+                    <th>Criado em</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredMediaAssets.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: 26, color: 'var(--text-secondary)' }}>
+                        Nenhuma mídia encontrada.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredMediaAssets.map((m: any) => {
+                      const kind = String(m.kind || 'arquivo');
+                      const icon =
+                        kind === 'imagem' ? <ImageIcon size={15} /> :
+                        kind === 'video' ? <Film size={15} /> :
+                        kind === 'audio' ? <Music2 size={15} /> :
+                        <FileIcon size={15} />;
+                      const fullUrl = `${window.location.origin}${String(m.url || '')}`;
+                      const downloadUrl = `${window.location.origin}/api/public/media/${m.id}/download`;
+                      return (
+                        <tr key={m.id}>
+                          <td>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              {icon}
+                              <span>{kind}</span>
+                            </span>
+                          </td>
+                          <td style={{ maxWidth: 400 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 3 }}>{m.originalName}</div>
+                            <code>{m.url}</code>
+                          </td>
+                          <td>{Math.max(1, Math.round(Number(m.sizeBytes || 0) / 1024))} KB</td>
+                          <td>{new Date(m.createdAt).toLocaleString('pt-BR')}</td>
+                          <td>
+                            <div className="admin-actions admin-actions--wrap">
+                              <button type="button" className="btn-secondary-sm" onClick={() => { navigator.clipboard.writeText(fullUrl); alert('Link direto copiado!'); }}>
+                                Copiar URL
+                              </button>
+                              <button type="button" className="btn-secondary-sm" onClick={() => { navigator.clipboard.writeText(downloadUrl); alert('Link de download copiado!'); }}>
+                                Copiar download
+                              </button>
+                              <button type="button" className="btn-secondary-sm" onClick={() => window.open(fullUrl, '_blank', 'noopener,noreferrer')}>
+                                Abrir
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-danger-sm"
+                                onClick={async () => {
+                                  if (!window.confirm(`Excluir "${m.originalName}" da biblioteca?`)) return;
+                                  const res = await fetch(`/api/admin/media/${m.id}`, {
+                                    method: 'DELETE',
+                                    headers: { ...authHeaders() }
+                                  });
+                                  if (!res.ok) {
+                                    const j = await res.json().catch(() => ({} as { error?: string }));
+                                    alert(j.error || 'Falha ao excluir mídia.');
+                                    return;
+                                  }
+                                  void fetchMediaAssets();
+                                }}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'support' && (
+        <div className="admin-content">
+          <div className="admin-form">
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LifeBuoy size={18} /> Configuração de Suporte
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
+              Defina o link que será aberto quando o cliente clicar em <strong>Suporte</strong> no menu da área de membros.
+            </p>
+
+            <label>Link de suporte</label>
+            <input
+              type="url"
+              placeholder="https://wa.me/5511999999999"
+              value={emailSettings.member_support_url || ''}
+              onChange={(e) => setEmailSettings((prev) => ({ ...prev, member_support_url: e.target.value }))}
+            />
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+              Exemplo WhatsApp: <code>https://wa.me/5511999999999</code> ou <code>https://wa.me/5511999999999?text=Ol%C3%A1</code>
+            </p>
+
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ marginTop: '14px' }}
+              onClick={async () => {
+                const value = String(emailSettings.member_support_url || '').trim();
+                try {
+                  const res = await fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ key: 'member_support_url', value }),
+                  });
+                  if (!res.ok) throw new Error('Erro ao salvar');
+                  alert('Link de suporte salvo com sucesso!');
+                } catch {
+                  alert('Não foi possível salvar o link de suporte.');
+                }
+              }}
+            >
+              Salvar link de suporte
+            </button>
           </div>
         </div>
       )}
@@ -729,11 +3160,11 @@ export const Admin: React.FC = () => {
             </div>
 
             <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(102,187,106,0.08)', borderRadius: '8px', border: '1px solid rgba(102,187,106,0.2)' }}>
-              <h4 style={{ color: '#66bb6a', marginBottom: '8px' }}>⚙️ Como Funciona</h4>
+              <h4 style={{ color: 'var(--accent-primary)', marginBottom: '8px' }}>⚙️ Como Funciona</h4>
               <ul style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.8', paddingLeft: '20px' }}>
                 <li><strong>Compra Aprovada:</strong> O sistema cria o usuário automaticamente e libera o livro correspondente ao <code>Código da Oferta</code></li>
                 <li><strong>Reembolso/Cancelamento:</strong> O acesso ao livro é revogado automaticamente</li>
-                <li>O <strong>Código da Oferta</strong> cadastrado no ebook deve ser igual ao ID do produto ou código da oferta na Hotmart</li>
+                <li>O <strong>Código da Oferta</strong> na Hotmart deve corresponder ao produto configurado para liberação automática</li>
               </ul>
             </div>
           </div>
@@ -742,12 +3173,12 @@ export const Admin: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h3>Log de Eventos ({webhookLogs.length})</h3>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button className="btn-icon" onClick={() => fetchWebhookLogs(masterPassword)} title="Atualizar">
+                <button className="btn-icon" onClick={() => void fetchWebhookLogs()} title="Atualizar">
                   <RefreshCw size={16} />
                 </button>
                 <button className="btn-icon btn-danger" onClick={async () => {
                   if (!window.confirm('Limpar todos os logs?')) return;
-                  await fetch('/api/admin/webhook-logs', { method: 'DELETE', headers: { 'x-admin-password': masterPassword } });
+                  await fetch('/api/admin/webhook-logs', { method: 'DELETE', headers: { ...authHeaders() } });
                   setWebhookLogs([]);
                 }} title="Limpar Logs">
                   <Trash size={16} />
@@ -772,7 +3203,7 @@ export const Admin: React.FC = () => {
                   {webhookLogs.length === 0 ? (
                     <tr><td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>Nenhum evento recebido ainda. Configure o webhook na Hotmart e faça uma compra teste.</td></tr>
                   ) : (
-                    webhookLogs.map(log => (
+                    pagedWebhookLogs.map(log => (
                       <tr key={log.id}>
                         <td style={{ whiteSpace: 'nowrap', fontSize: '11px' }}>{new Date(log.createdAt).toLocaleString('pt-BR')}</td>
                         <td><code>{log.event}</code></td>
@@ -804,6 +3235,9 @@ export const Admin: React.FC = () => {
                 </tbody>
               </table>
             </div>
+              {webhookLogs.length > 0 && (
+                <AdminPagination page={pageWebhooks} totalItems={webhookLogs.length} onChange={setPageWebhooks} />
+              )}
           </div>
         </div>
       )}
@@ -811,7 +3245,7 @@ export const Admin: React.FC = () => {
       {/* --- TAB: EMAIL CONFIG --- */}
       {activeTab === 'email' && (
         <div className="admin-content">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '800px' }}>
+          <div className="admin-page-frame">
             <div className="admin-form">
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Mail size={20} /> Configurações de E-mail</h3>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>
@@ -852,10 +3286,10 @@ export const Admin: React.FC = () => {
               <hr style={{ borderColor: 'var(--border-subtle)', margin: '20px 0' }} />
 
               <div style={{ 
-                background: 'rgba(69, 196, 176, 0.05)', 
+                background: 'rgba(59, 130, 246, 0.05)', 
                 padding: '20px', 
                 borderRadius: '12px', 
-                border: '1px solid rgba(69, 196, 176, 0.1)', 
+                border: '1px solid rgba(59, 130, 246, 0.1)', 
                 marginBottom: '20px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -890,47 +3324,9 @@ export const Admin: React.FC = () => {
                   onChange={e => setEmailSettings(p => ({ ...p, reset_template_pt: e.target.value }))}
                   style={{ fontFamily: 'monospace', fontSize: '12px' }}
                 />
-              </div>
-
-              <div style={{ 
-                background: 'rgba(255, 255, 255, 0.03)', 
-                padding: '20px', 
-                borderRadius: '12px', 
-                border: '1px solid var(--border-subtle)', 
-                marginBottom: '25px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                <h4 style={{ margin: '0 0 5px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇪🇸 Español</h4>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ marginTop: '0' }}>Correo de Bienvenida</label>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
-                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{country}}'}, {'{{app_url}}'}
-                  </p>
-                </div>
-                <textarea
-                  rows={5}
-                  placeholder="HTML del correo en ES (vacio = predeterminado)"
-                  value={emailSettings.welcome_template_es}
-                  onChange={e => setEmailSettings(p => ({ ...p, welcome_template_es: e.target.value }))}
-                  style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '10px' }}
-                />
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ marginTop: '0' }}>Recuperación de Contraseña</label>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
-                    Placeholders: {'{{name}}'}, {'{{reset_link}}'}, {'{{country}}'}
-                  </p>
-                </div>
-                <textarea
-                  rows={5}
-                  placeholder="HTML del correo de reset en ES (vacio = predeterminado)"
-                  value={emailSettings.reset_template_es}
-                  onChange={e => setEmailSettings(p => ({ ...p, reset_template_es: e.target.value }))}
-                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
-                />
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
+                  Apenas templates em português são editáveis aqui. Compradores de países hispanohablantes seguem recebendo o modelo padrão em espanhol do sistema.
+                </p>
               </div>
 
               <button
@@ -942,12 +3338,16 @@ export const Admin: React.FC = () => {
                   try {
                     const res = await fetch('/api/admin/settings', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'x-admin-password': masterPassword },
-                      body: JSON.stringify(emailSettings)
+                      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                      body: JSON.stringify({
+                        ...emailSettings,
+                        welcome_template_es: '',
+                        reset_template_es: ''
+                      })
                     });
                     if (res.ok) {
                       alert('Configurações salvas com sucesso!');
-                      fetchEmailSettings(masterPassword);
+                      void fetchEmailSettings();
                     } else {
                       alert('Erro ao salvar configurações.');
                     }
@@ -984,6 +3384,568 @@ export const Admin: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'products' && (
+        <div className="admin-content admin-content--stack">
+          <div className="admin-grid-2">
+            <div className="admin-form">
+              <h3>{editingProductId ? 'Editar produto' : 'Cadastro do produto'}</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
+                {editingProductId
+                  ? 'Altere os dados do produto e clique em salvar. O download do robô continua no painel ao lado.'
+                  : 'Configure o produto e o vínculo Hotmart → system_id. O arquivo do robô fica ao lado.'}
+              </p>
+              <label>Nome</label>
+              <input value={newProduct.productName} onChange={e => setNewProduct(p => ({ ...p, productName: e.target.value }))} />
+              <label>system_id</label>
+              <input
+                value={newProduct.systemId}
+                onChange={e => setNewProduct(p => ({ ...p, systemId: e.target.value }))}
+                placeholder="Ex.: 4102900 ou 4102900,5162473 (separe por vírgula)"
+              />
+              <small style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                Use vírgulas para vincular o produto a vários sistemas (cria/ativa uma licença para cada um).
+              </small>
+              <label>offer_code (Hotmart)</label>
+              <input
+                value={newProduct.offerCode}
+                onChange={e => setNewProduct(p => ({ ...p, offerCode: e.target.value }))}
+                placeholder="Ex.: dghySD ou dghySD,abcDEF (separe por vírgula)"
+              />
+              <small style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                Suporta vários códigos de oferta apontando para este produto.
+              </small>
+              <label>plano</label>
+              <select value={newProduct.plano} onChange={e => setNewProduct(p => ({ ...p, plano: e.target.value }))}>
+                {PLAN_OPTIONS.map((plan) => (
+                  <option key={plan} value={plan}>
+                    {plan}
+                  </option>
+                ))}
+              </select>
+
+              <div className="admin-form-actions">
+                {editingProductId != null && (
+                  <button type="button" className="btn-cancel" onClick={cancelEditProduct}>
+                    Cancelar edição
+                  </button>
+                )}
+                <button type="button" className="btn-primary" onClick={async () => {
+              if (!newProduct.productName.trim() || !newProduct.systemId.trim()) {
+                alert('Preencha nome e system_id.');
+                return;
+              }
+              const isEdit = editingProductId != null;
+              const res = await fetch(
+                isEdit ? `/api/admin/products/${editingProductId}` : '/api/admin/products',
+                {
+                  method: isEdit ? 'PUT' : 'POST',
+                  headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                  body: JSON.stringify(newProduct),
+                }
+              );
+              if (res.ok) {
+                alert(isEdit ? 'Produto atualizado.' : 'Produto cadastrado.');
+                void fetchProducts();
+                cancelEditProduct();
+              } else alert('Falha ao salvar produto.');
+                }}>{editingProductId ? 'Salvar alterações' : 'Cadastrar produto'}</button>
+              </div>
+            </div>
+
+            <div className="admin-form">
+              <h3>Download do robô</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
+                Selecione um produto na tabela para enviar/atualizar o arquivo e a versão.
+              </p>
+              {selectedProductForDownload ? (
+                <>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    Produto: <strong>{selectedProductForDownload.productName}</strong> — <code>{selectedProductForDownload.systemId}</code>
+                  </p>
+                  <label>Upload do executável/zip</label>
+                  <input type="file" onChange={e => setRobotFile(e.target?.files?.[0] || null)} />
+                  <label>Versão (opcional)</label>
+                  <input
+                    value={String(selectedProductForDownload.downloadVersion || '')}
+                    onChange={e => setSelectedProductForDownload((prev: any) => ({ ...prev, downloadVersion: e.target.value }))}
+                    placeholder="ex: 1.0.3"
+                  />
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={!robotFile && !selectedProductForDownload.downloadVersion}
+                      onClick={async () => {
+                        try {
+                          let downloadUrl = selectedProductForDownload.downloadUrl as string | null;
+                          let downloadFileName = selectedProductForDownload.downloadFileName as string | null;
+                          if (robotFile) {
+                            const url = await uploadFile(robotFile);
+                            downloadUrl = url;
+                            downloadFileName = robotFile.name;
+                          }
+                          const res = await fetch(`/api/admin/products/${selectedProductForDownload.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                            body: JSON.stringify({
+                              downloadUrl,
+                              downloadFileName,
+                              downloadVersion: selectedProductForDownload.downloadVersion || null
+                            })
+                          });
+                          if (res.ok) {
+                            alert('Download do robô atualizado.');
+                            setRobotFile(null);
+                            setSelectedProductForDownload(null);
+                            void fetchProducts();
+                          } else alert('Falha ao salvar.');
+                        } catch {
+                          alert('Falha no upload.');
+                        }
+                      }}
+                    >
+                      Salvar download
+                    </button>
+                    {selectedProductForDownload.downloadUrl && (
+                      <button
+                        type="button"
+                        className="btn-danger-sm"
+                        onClick={async () => {
+                          if (!window.confirm('Remover o arquivo de download desse produto?')) return;
+                          const res = await fetch(`/api/admin/products/${selectedProductForDownload.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                            body: JSON.stringify({ downloadUrl: null, downloadFileName: null })
+                          });
+                          if (res.ok) {
+                            alert('Removido.');
+                            setRobotFile(null);
+                            setSelectedProductForDownload(null);
+                            void fetchProducts();
+                          } else alert('Falha.');
+                        }}
+                      >
+                        Remover arquivo
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p style={{ color: 'var(--text-secondary)' }}>Nenhum produto selecionado.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="admin-table-container admin-table-container--full">
+            <h3>Produtos ({products.length})</h3>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr><th>ID</th><th>Nome</th><th>systemId</th><th>Download</th><th>Versão</th><th /></tr>
+                </thead>
+                <tbody>
+                  {pagedProducts.map((p: any) => (
+                    <tr key={p.id}>
+                      <td>{p.id}</td>
+                      <td>{p.productName}</td>
+                      <td>
+                        <div className="admin-csv-pills">
+                          {String(p.systemId || '')
+                            .split(',')
+                            .map((v: string) => v.trim())
+                            .filter(Boolean)
+                            .map((v: string) => (
+                              <code key={v} className="admin-csv-pill">{v}</code>
+                            ))}
+                        </div>
+                      </td>
+                      <td>
+                        {p.downloadUrl ? (
+                          <a className="admin-table-link" href={p.downloadUrl} target="_blank" rel="noreferrer">
+                            {p.downloadFileName ? p.downloadFileName : 'arquivo'}
+                          </a>
+                        ) : (
+                          <span className="admin-table-muted">—</span>
+                        )}
+                      </td>
+                      <td>{p.downloadVersion || '—'}</td>
+                      <td>
+                        <div className="admin-actions admin-actions--wrap">
+                        <button
+                          type="button"
+                          className={`btn-secondary-sm ${editingProductId === p.id ? 'active' : ''}`}
+                          onClick={() => startEditProduct(p)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary-sm"
+                          onClick={() => { setSelectedProductForDownload(p); setRobotFile(null); cancelEditProduct(); }}
+                        >
+                          Gerenciar download
+                        </button>
+                        <button type="button" className="btn-danger-sm" onClick={async () => {
+                          if (!window.confirm('Excluir produto?')) return;
+                          if (editingProductId === p.id) cancelEditProduct();
+                          await fetch(`/api/admin/products/${p.id}`, { method: 'DELETE', headers: { ...authHeaders() } });
+                          void fetchProducts();
+                        }}>Excluir</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+              <AdminPagination page={pageProducts} totalItems={products.length} onChange={setPageProducts} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'builder' && (
+        <div className="admin-content admin-content--stack">
+          {builderStep === 'list' && (
+            <div className="admin-form">
+              <div className="admin-builder-list-head">
+                <h3>Páginas HTML ({builderPages.length})</h3>
+                <button type="button" className="btn-primary" onClick={() => setBuilderStep('setup')}>
+                  Criar nova página
+                </button>
+              </div>
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Slug</th>
+                      <th>Status</th>
+                      <th>Atualizada</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {builderPages.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>
+                          Nenhuma página cadastrada ainda.
+                        </td>
+                      </tr>
+                    ) : (
+                      builderPages.map((p) => (
+                        <tr key={p.slug}>
+                          <td><code>{p.slug}</code></td>
+                          <td>
+                            <span className={`admin-license-status-pill admin-license-status-pill--${p.published ? 'ativa' : 'inativa'}`}>
+                              {p.published ? 'publicada' : 'rascunho'}
+                            </span>
+                          </td>
+                          <td>{new Date(p.updatedAt).toLocaleString('pt-BR')}</td>
+                          <td>
+                            <div className="admin-actions admin-actions--wrap">
+                              <button type="button" className="btn-secondary-sm" onClick={() => openBuilderPage(p.slug)}>Editar</button>
+                              <button
+                                type="button"
+                                className="btn-secondary-sm"
+                                onClick={() => {
+                                  const base = normalizeBuilderSlug(`${p.slug}-copia`);
+                                  let slug = base;
+                                  let i = 2;
+                                  while (builderPages.some((x) => x.slug === slug)) {
+                                    slug = `${base}-${i++}`;
+                                  }
+                                  const copy: BuilderPage = { ...p, slug, published: false, updatedAt: new Date().toISOString() };
+                                  const next = [copy, ...builderPages];
+                                  setBuilderPages(next);
+                                  void persistBuilderPagesSetting(next);
+                                }}
+                              >
+                                Duplicar
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-secondary-sm"
+                                onClick={() => {
+                                  const cleanSlug = normalizeBuilderSlug(p.slug);
+                                  const pageUrl = `${window.location.origin}/${encodeURIComponent(cleanSlug)}`;
+                                  navigator.clipboard.writeText(pageUrl);
+                                  alert('URL da página copiada!');
+                                }}
+                              >
+                                Copiar URL
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-danger-sm"
+                                onClick={() => {
+                                  if (!window.confirm(`Excluir página "${p.slug}"?`)) return;
+                                  setBuilderPages((prev) => {
+                                    const next = prev.filter((x) => x.slug !== p.slug);
+                                    void persistBuilderPagesSetting(next);
+                                    return next;
+                                  });
+                                  if (builderCurrentSlug === p.slug) {
+                                    setBuilderCurrentSlug('');
+                                    setBuilderCodeDraft(DEFAULT_BUILDER_HTML);
+                                  }
+                                }}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {builderStep === 'setup' && (
+            <div className="admin-form">
+              <h3>Criar nova página</h3>
+              <p className="admin-builder-meta">Etapa 1: configure slug e códigos opcionais de <code>head</code> e <code>body</code>.</p>
+              <label>Slug da página</label>
+              <input value={builderSetupSlug} onChange={(e) => setBuilderSetupSlug(e.target.value)} placeholder="ex: oferta-principal" />
+              <label>Área</label>
+              <select value={builderSetupTarget} onChange={(e) => setBuilderSetupTarget(e.target.value as BuilderPageTarget)}>
+                <option value="header">header</option>
+                <option value="body">body</option>
+              </select>
+              <label>Código extra no HEAD (opcional)</label>
+              <textarea rows={6} value={builderSetupHeadCode} onChange={(e) => setBuilderSetupHeadCode(e.target.value)} placeholder="Meta Pixel, GTM, scripts..." />
+              <label>Código extra no BODY (opcional)</label>
+              <textarea rows={6} value={builderSetupBodyCode} onChange={(e) => setBuilderSetupBodyCode(e.target.value)} placeholder="Snippets de body..." />
+              <div className="admin-form-actions">
+                <button type="button" className="btn-cancel" onClick={() => setBuilderStep('list')}>Cancelar</button>
+                <button type="button" className="btn-primary" onClick={handleBuilderCreateContinue}>Continuar</button>
+              </div>
+            </div>
+          )}
+
+          {builderStep === 'html' && (
+            <div className="admin-form admin-builder-panel">
+              <div className="admin-builder-list-head">
+                <h3>HTML da página {builderCurrentPage ? <code>{builderCurrentPage.slug}</code> : ''}</h3>
+                <button type="button" className="btn-secondary-sm" onClick={() => setBuilderStep('list')}>Voltar à lista</button>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
+                Etapa 2: cole ou edite o HTML, depois salve e conclua ou abra o editor visual.
+              </p>
+              <label>Área da página (head/body)</label>
+              <select
+                value={builderCurrentPage?.target || 'body'}
+                onChange={(e) => updateBuilderCurrentTarget(e.target.value as BuilderPageTarget)}
+                disabled={!builderCurrentSlug}
+              >
+                <option value="header">header</option>
+                <option value="body">body</option>
+              </select>
+              <label>Código do HEAD (scripts/pixel/GTM)</label>
+              <textarea
+                rows={6}
+                value={builderHeadCodeDraft}
+                onChange={(e) => {
+                  const nextHead = e.target.value;
+                  setBuilderHeadCodeDraft(nextHead);
+                  setBuilderCodeDraft((prev) => setBuilderHtmlSections(prev, { head: nextHead, body: builderBodyCodeDraft }));
+                }}
+                style={{ width: '100%', fontFamily: 'monospace', fontSize: 12 }}
+                placeholder="Ex: pixel, GTM, scripts, metas..."
+                disabled={!builderCurrentSlug}
+              />
+              <label>HTML (conteúdo da página)</label>
+              <textarea
+                rows={22}
+                value={builderBodyCodeDraft}
+                onChange={(e) => {
+                  const nextBody = e.target.value;
+                  setBuilderBodyCodeDraft(nextBody);
+                  setBuilderCodeDraft((prev) => setBuilderHtmlSections(prev, { head: builderHeadCodeDraft, body: nextBody }));
+                }}
+                style={{ width: '100%', fontFamily: 'monospace', fontSize: 12, minHeight: 520 }}
+                placeholder="Cole aqui o HTML do conteúdo da página (body)..."
+                disabled={!builderCurrentSlug}
+              />
+              <div className="admin-form-actions">
+                <button
+                  type="button"
+                  className="btn-secondary-sm"
+                  disabled={!builderCurrentSlug}
+                  onClick={() => {
+                    const html = (builderCodeDraft || '').trim() || DEFAULT_BUILDER_HTML;
+                    setBuilderPreviewHtml(toBuilderVisualPreviewHtml(html));
+                    setBuilderVisualOpen(true);
+                  }}
+                >
+                  Editor visual
+                </button>
+                <button type="button" className="btn-primary" disabled={builderSaving} onClick={() => void saveBuilderPages({ conclude: true })}>
+                  {builderSaving ? 'Salvando…' : 'Salvar e concluir'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {builderVisualOpen && (
+            <div className="admin-modal-overlay admin-builder-visual-overlay">
+              <div className="admin-modal admin-builder-visual-modal">
+                <div className="admin-builder-visual-head">
+                  <h2>Edição visual</h2>
+                  <div className="admin-builder-visual-head-actions">
+                    <button type="button" className={`btn-secondary-sm ${builderPreviewMode === 'desktop' ? 'active' : ''}`} onClick={() => setBuilderPreviewMode('desktop')}>
+                      Desktop
+                    </button>
+                    <button type="button" className={`btn-secondary-sm ${builderPreviewMode === 'mobile' ? 'active' : ''}`} onClick={() => setBuilderPreviewMode('mobile')}>
+                      Mobile
+                    </button>
+                    <button type="button" className="btn-secondary-sm" onClick={() => openBuilderPreviewNewTab(builderPreviewMode)}>
+                      Visualizar
+                    </button>
+                    <button type="button" className="btn-primary" disabled={builderSaving} onClick={() => void saveBuilderPages({ publish: true })}>
+                      {builderSaving ? 'Salvando…' : 'Salvar e publicar'}
+                    </button>
+                    <button type="button" className="btn-cancel" onClick={() => setBuilderVisualOpen(false)}>
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+                <div className="admin-builder-visual-body">
+                  <div className={`admin-builder-preview-shell admin-builder-preview-shell--${builderPreviewMode}`}>
+                    <iframe
+                      ref={builderIframeRef}
+                      className="admin-builder-preview"
+                      title="Preview visual do construtor"
+                      srcDoc={builderPreviewHtml || DEFAULT_BUILDER_HTML}
+                      onLoad={handleBuilderIframeLoad}
+                    />
+                  </div>
+                  <aside className="admin-builder-inspector">
+                    <h4>Editar conteúdo</h4>
+                    <p className="admin-builder-inspector-help">
+                      {builderSelectedPath
+                        ? 'Elemento selecionado. Edite os campos abaixo.'
+                        : 'Clique em um elemento no preview para editar.'}
+                    </p>
+                    <label>Texto</label>
+                    <textarea
+                      rows={4}
+                      value={builderSelectedText}
+                      onChange={(e) => {
+                        setBuilderSelectedText(e.target.value);
+                        applyBuilderVisualValues({ text: e.target.value });
+                      }}
+                      disabled={!builderSelectedPath}
+                    />
+                    <label>Link (href)</label>
+                    <input
+                      value={builderSelectedHref}
+                      onChange={(e) => {
+                        setBuilderSelectedHref(e.target.value);
+                        applyBuilderVisualValues({ href: e.target.value });
+                      }}
+                      placeholder="https://..."
+                      disabled={!builderSelectedPath}
+                    />
+                    <div className="admin-builder-inspector-grid">
+                      <div>
+                        <label>Cor do texto</label>
+                        <input
+                          type="color"
+                          value={builderSelectedTextColor}
+                          onChange={(e) => {
+                            setBuilderSelectedTextColor(e.target.value);
+                            applyBuilderVisualValues({ textColor: e.target.value });
+                          }}
+                          disabled={!builderSelectedPath}
+                        />
+                      </div>
+                      <div>
+                        <label>Cor de fundo</label>
+                        <input
+                          type="color"
+                          value={builderSelectedBgColor}
+                          onChange={(e) => {
+                            setBuilderSelectedBgColor(e.target.value);
+                            applyBuilderVisualValues({ bgColor: e.target.value });
+                          }}
+                          disabled={!builderSelectedPath}
+                        />
+                      </div>
+                    </div>
+                    <label>Alinhamento</label>
+                    <div className="admin-builder-align-row">
+                      <button type="button" className={`btn-secondary-sm ${builderSelectedAlign === 'left' ? 'active' : ''}`} disabled={!builderSelectedPath} onClick={() => { setBuilderSelectedAlign('left'); applyBuilderVisualValues({ align: 'left' }); }}>Esquerda</button>
+                      <button type="button" className={`btn-secondary-sm ${builderSelectedAlign === 'center' ? 'active' : ''}`} disabled={!builderSelectedPath} onClick={() => { setBuilderSelectedAlign('center'); applyBuilderVisualValues({ align: 'center' }); }}>Centro</button>
+                      <button type="button" className={`btn-secondary-sm ${builderSelectedAlign === 'right' ? 'active' : ''}`} disabled={!builderSelectedPath} onClick={() => { setBuilderSelectedAlign('right'); applyBuilderVisualValues({ align: 'right' }); }}>Direita</button>
+                    </div>
+                    <div className="admin-builder-inspector-grid admin-builder-inspector-grid--offsets">
+                      <div>
+                        <label>Mais para cima/baixo (px)</label>
+                        <input
+                          type="number"
+                          value={builderOffsetY}
+                          onChange={(e) => {
+                            const v = Number(e.target.value || 0);
+                            setBuilderOffsetY(v);
+                            applyBuilderVisualValues({ offsetY: v });
+                          }}
+                          disabled={!builderSelectedPath}
+                        />
+                      </div>
+                      <div>
+                        <label>Mais para esquerda/direita (px)</label>
+                        <input
+                          type="number"
+                          value={builderOffsetX}
+                          onChange={(e) => {
+                            const v = Number(e.target.value || 0);
+                            setBuilderOffsetX(v);
+                            applyBuilderVisualValues({ offsetX: v });
+                          }}
+                          disabled={!builderSelectedPath}
+                        />
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'forexEA' && (
+        <div className="admin-content">
+          <div className="admin-form">
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Key size={20} /> Segurança EA / Webhook</h3>
+            <label>Token do webhook (Hotmart / header hottok)</label>
+            <input type="password" value={forexWebhook} onChange={e => setForexWebhook(e.target.value)} />
+            <label>API Keys para validação (uma por linha)</label>
+            <textarea rows={6} value={forexApiLines} onChange={e => setForexApiLines(e.target.value)} style={{ width: '100%', fontFamily: 'monospace' }} />
+            <button type="button" className="btn-primary" onClick={async () => {
+              const keys = forexApiLines.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+              const res = await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify({ forex_webhook_token: forexWebhook, forex_api_keys: JSON.stringify(keys) })
+              });
+              if (res.ok) alert('Salvo');
+              else alert('Erro ao salvar');
+            }}>Salvar</button>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 12 }}>
+              URL do webhook de licenças: <code>{typeof window !== 'undefined' ? window.location.origin : ''}/api/forex-rendimento/v1/webhook</code>
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              Ver arquivo no projeto: <code>docs/EA_API.md</code>
+            </p>
+          </div>
+        </div>
+      )}
+
+        </div>
       </div>
     </div>
   );

@@ -11,6 +11,14 @@ import './PDFReader.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+function memberHeaders(userId: string, json = false): Record<string, string> {
+  const h: Record<string, string> = { 'x-user-id': userId };
+  const tok = localStorage.getItem('ebookpro_token');
+  if (tok) h['Authorization'] = `Bearer ${tok}`;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+}
+
 interface HighlightData {
   id: string;
   pageNumber: number;
@@ -62,7 +70,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
 
   // Fetch highlights from DB
   useEffect(() => {
-    fetch(`/api/highlights/${ebookId}`, { headers: { 'x-user-id': userId } })
+    fetch(`/api/highlights/${ebookId}`, { headers: memberHeaders(userId) })
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setHighlights(data); })
       .catch(console.error);
@@ -111,7 +119,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
           try {
             const res = await fetch('/api/highlights', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+              headers: memberHeaders(userId, true),
               body: JSON.stringify({ ebookId, pageNumber, text, color: activeHighlightColor })
             });
             const newHighlight = await res.json();
@@ -146,7 +154,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
     try {
       await fetch(`/api/highlights/${id}`, {
         method: 'DELETE',
-        headers: { 'x-user-id': userId }
+        headers: memberHeaders(userId)
       });
       setHighlights(prev => prev.filter(h => h.id !== id));
     } catch (err) { console.error(err); }

@@ -1,0 +1,100 @@
+import express from 'express';
+import iconv from 'iconv-lite';
+import type { PrismaClient } from '@prisma/client';
+import { getForexApiKeys, getForexWebhookToken } from '../lib/apiSettings.js';
+import { checkRateLimit } from '../lib/rateLimitMem.js';
+import { log } from '../lib/logger.js';
+import { validateLicenseHandler } from './licenseService.js';
+import { processLicenseWebhook } from './webhookLicenseProcessor.js';
+import { submitPerformance } from './performanceSubmit.js';
+import { getRankingResponse } from './rankingService.js';
+
+function clientIp(req: express.Request): string {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string') return xf.split(',')[0]!.trim();
+  return req.socket.remoteAddress || 'unknown';
+}
+
+export function registerForexRoutes(app: express.Application, prisma: PrismaClient) {
+  const router = express.Router();
+
+  const validate = async (req: express.Request, res: express.Response) => {
+    const started = Date.now();
+    const ip = clientIp(req);
+    if (!checkRateLimit(`rate_limit_${ip}`, 60, 60_000)) {
+      return res.status(429).json({ status: 'error', message: 'Rate limit exceeded. Try again later.' });
+    }
+    const apiKey = String(req.headers['x-api-key'] || '');
+    const keys = await getForexApiKeys(prisma);
+    if (!keys.length || !keys.includes(apiKey)) {
+      return res.status(403).json({ status: 'error', message: 'Unauthorized: invalid or missing X-API-Key' });
+    }
+    const out = await validateLicenseHandler(prisma, req.body || {});
+    res.status(out.status).json(out.json);
+    log('DEBUG', `validate_license ${Date.now() - started}ms`);
+  };
+
+  router.post('/validate_license', validate);
+
+  router.post('/webhook', async (req, res) => {
+    const token =
+      String(req.headers['hottok'] || req.headers['x-hotmart-hottok'] || req.headers['x-webhook-token'] || '');
+    const expected = await getForexWebhookToken(prisma);
+    if (!expected) {
+      log('SECURITY', 'Webhook rejeitado: forex_webhook_token não configurado');
+      return res.status(500).json({
+        status: 'error',
+        message: 'Configuration Error: Webhook Token not set in settings'
+      });
+    }
+    if (token !== expected) {
+      log('SECURITY', 'Webhook token inválido');
+      return res.status(401).json({ status: 'error', message: 'Unauthorized: Invalid Webhook Token' });
+    }
+
+    const raw = JSON.stringify(req.body);
+    const logRow = await prisma.licenseWebhookRawLog.create({ data: { rawData: raw, processed: false } });
+
+    try {
+      const result = await processLicenseWebhook(prisma, (req.body || {}) as Record<string, unknown>);
+      await prisma.licenseWebhookRawLog.update({ where: { id: logRow.id }, data: { processed: true } });
+      if (!result.ok) return res.status(result.status).json({ status: 'error', message: result.message });
+      return res.status(200).json({ status: 'success', message: result.message });
+    } catch (e) {
+      log('ERROR', 'Webhook process error', { err: String(e) });
+      return res.status(400).json({ status: 'error', message: String(e) });
+    }
+  });
+
+  router.post('/submit_performance', async (req, res) => {
+    const out = await submitPerformance(prisma, (req.body || {}) as Record<string, unknown>);
+    res.status(out.status).json(out.json);
+  });
+
+  router.get('/get_ranking', async (req, res) => {
+    const period = parseInt(String(req.query.period || '7'), 10);
+    const ranking = await getRankingResponse(prisma, period);
+    res.json(ranking);
+  });
+
+  router.get('/download_setup', async (req, res) => {
+    const id = parseInt(String(req.query.id || '0'), 10);
+    if (!id) return res.status(400).json({ status: 'error', message: 'ID do setup não informado.' });
+    const row = await prisma.rankingEntry.findUnique({ where: { id }, select: { setupFile: true } });
+    if (!row?.setupFile) return res.status(404).json({ status: 'error', message: 'Setup não encontrado.' });
+    let setup = row.setupFile;
+    if (setup.includes('\n')) {
+      setup = setup.replace(/\n/g, '\r\n').replace(/\r\r\n/g, '\r\n');
+    } else if (setup.includes('\\n')) {
+      setup = setup.replace(/\\n/g, '\r\n');
+    }
+    const buf = iconv.encode(setup, 'win1252');
+    res.setHeader('Content-Type', 'text/plain; charset=Windows-1252');
+    res.setHeader('Content-Disposition', `attachment; filename="setup_trader_${id}.set"`);
+    res.setHeader('Content-Length', String(buf.length));
+    res.send(buf);
+  });
+
+  app.use('/api/forex-rendimento/v1', router);
+  app.post('/api/forex-rendimento/v2/validate_license', validate);
+}

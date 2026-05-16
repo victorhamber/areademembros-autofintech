@@ -2,9 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Banco local em arquivo (não exige PostgreSQL instalado).
+// Para produção com PostgreSQL: provider = "postgresql" e url = env("DATABASE_URL").
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
@@ -15,6 +17,7 @@ model User {
   country   String?
   purchases Purchase[]
   wishlists Wishlist[]
+  progress  LessonProgress[]
   createdAt DateTime   @default(now())
 }
 
@@ -25,28 +28,30 @@ model Category {
 }
 
 model Ebook {
-  id            String    @id @default(uuid())
-  title         String
-  author        String?
-  description   String?
-  coverUrl      String
-  pdfUrl        String?           
-  htmlUrl       String?           
-  salesUrl      String            
-  hotmartOffer  String    
-  categoryId    String?
-  category      Category? @relation(fields: [categoryId], references: [id])
-  featuredList  String?
-  purchases     Purchase[]
-  wishlists     Wishlist[]
-  externalUrl   String?
-  redirectUrl   String?
-  isBonus       Boolean   @default(false)
-  parentEbookId String?
-  parentEbook   Ebook?    @relation("EbookBonuses", fields: [parentEbookId], references: [id])
-  bonuses       Ebook[]   @relation("EbookBonuses")
-  language      String    @default("pt")
-  createdAt     DateTime  @default(now())
+  id               String    @id @default(uuid())
+  title            String
+  author           String?
+  description      String?
+  coverUrl         String
+  pdfUrl           String?
+  htmlUrl          String?
+  salesUrl         String
+  hotmartOffer     String
+  licenseSystemId  String?
+  categoryId       String?
+  category         Category? @relation(fields: [categoryId], references: [id])
+  featuredList     String?
+  purchases        Purchase[]
+  wishlists        Wishlist[]
+  externalUrl      String?
+  redirectUrl      String?
+  isBonus          Boolean   @default(false)
+  parentEbookId    String?
+  parentEbook      Ebook?    @relation("EbookBonuses", fields: [parentEbookId], references: [id])
+  bonuses          Ebook[]   @relation("EbookBonuses")
+  language         String    @default("pt")
+  lessons          CourseLesson[]
+  createdAt        DateTime  @default(now())
 }
 
 model Purchase {
@@ -59,7 +64,7 @@ model Purchase {
   lastPage   Int      @default(0)
   createdAt  DateTime @default(now())
 
-  @@unique([userId, ebookId]) 
+  @@unique([userId, ebookId])
 }
 
 model Wishlist {
@@ -74,13 +79,13 @@ model Wishlist {
 }
 
 model Highlight {
-  id          String   @id @default(uuid())
-  userId      String
-  ebookId     String
-  pageNumber  Int
-  text        String
-  color       String   @default("yellow")
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  userId     String
+  ebookId    String
+  pageNumber Int
+  text       String
+  color      String   @default("yellow")
+  createdAt  DateTime @default(now())
 }
 
 model WebhookLog {
@@ -99,4 +104,208 @@ model Setting {
   id    String @id @default(uuid())
   key   String @unique
   value String
+}
+
+/// Licenças (paridade wp_forex_licenses)
+model License {
+  id                Int       @id @default(autoincrement())
+  email             String
+  buyerName         String?
+  numeroConta       String    @default("")
+  eventId           String    @unique
+  plano             String    @default("mensal")
+  statusLicenca     String    @default("inativa")
+  dataExpiracao     DateTime?
+  dataCancelamento  DateTime?
+  dataAtivacao      DateTime?
+  systemId          String    @default("")
+  /// Código da oferta originário do webhook/compra. Pareado com systemId define o produto.
+  offerCode         String?
+  subscriberCode    String?
+  createdAt         DateTime  @default(now())
+
+  @@index([email, statusLicenca])
+  @@index([systemId, dataExpiracao])
+  @@index([email, numeroConta, systemId])
+  @@index([email, offerCode])
+  @@index([dataExpiracao])
+}
+
+/// Produtos / ofertas (paridade wp_forex_products)
+model Product {
+  id          Int     @id @default(autoincrement())
+  productName String
+  systemId    String
+  description String?
+  offerCode   String?
+  plano       String?
+  downloadUrl String?
+  downloadFileName String?
+  downloadVersion String?
+
+  @@index([offerCode])
+}
+
+/// Log bruto de webhooks de licença
+model LicenseWebhookRawLog {
+  id         Int      @id @default(autoincrement())
+  rawData    String
+  processed  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+/// Webhooks de saída (cadastro)
+model OutgoingWebhook {
+  id              Int       @id @default(autoincrement())
+  destinationUrl  String
+  events          String
+  status          String    @default("active")
+  createdAt       DateTime  @default(now())
+  lastTriggered   DateTime?
+}
+
+/// Ranking / performance (paridade wp_forex_ranking)
+model RankingEntry {
+  id            Int      @id @default(autoincrement())
+  emailHash     String
+  numeroConta   String
+  systemId      String
+  corretora     String   @default("")
+  ativo         String   @default("")
+  lucro         Float    @default(0)
+  lucroPercent  Float    @default(0)
+  drawdown      Float    @default(0)
+  saldoInicial  Float    @default(0)
+  saldoFinal    Float    @default(0)
+  depositos     Float    @default(0)
+  setupFile     String
+  timestamp     DateTime @default(now())
+
+  @@index([emailHash, numeroConta, systemId, corretora, ativo])
+  @@index([timestamp])
+}
+
+/// Formulário trial (paridade wp_forex_form_builder)
+model TrialForm {
+  id        Int      @id @default(autoincrement())
+  formName  String
+  systemId  String   @unique
+  fields    String
+  styles    String?
+  settings  String?
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Histórico trial / anti-reativação
+model TrialHistory {
+  id         Int       @id @default(autoincrement())
+  email      String
+  systemId   String
+  eventId    String
+  trialStart DateTime  @default(now())
+  trialEnd   DateTime?
+  status     String    @default("active")
+  ipAddress  String?
+  userAgent  String?
+
+  @@unique([email, systemId])
+  @@index([email, status])
+  @@index([systemId, status])
+}
+
+/// Curso EAD
+model Course {
+  id              String         @id @default(uuid())
+  title           String
+  slug            String         @unique
+  coverUrl        String?        // imagem do card do aluno
+  published       Boolean        @default(true)
+  sortOrder       Int            @default(0)
+  modules         CourseModule[]
+  createdAt       DateTime       @default(now())
+  /// CSV de system_id que liberam o curso (compat. legada). Vazio/null = ignorado.
+  licenseSystemId String?
+  /// CSV de IDs de produto que liberam o curso. Vazio/null = público.
+  productIds      String?
+  /// URL da página de vendas para quem clicar sem acesso.
+  salesPageUrl    String?
+}
+
+model CourseModule {
+  id        String         @id @default(uuid())
+  courseId  String
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int            @default(0)
+  lessons   CourseLesson[]
+}
+
+model CourseLesson {
+  id        String   @id @default(uuid())
+  moduleId  String
+  module    CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int      @default(0)
+  ebookId   String?
+  ebook     Ebook?   @relation(fields: [ebookId], references: [id], onDelete: SetNull)
+  videoUrl  String?  // youtube/vimeo/link mp4
+  bodyText  String?  // texto da aula
+  actionLabel String? // texto do botão
+  actionUrl String?  // link do botão
+  progress  LessonProgress[]
+}
+
+model LessonProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  percent     Int      @default(0)
+  completed   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, lessonId])
+}
+
+/// WP Links (encurtador + smart routing)
+model ShortLink {
+  id           Int             @id @default(autoincrement())
+  name         String          @default("")
+  slug         String          @unique
+  targetUrl    String
+  redirectType Int             @default(301)
+  smartRules   String?
+  utmParams    String?
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  clicks       ShortLinkClick[]
+}
+
+model ShortLinkClick {
+  id          Int       @id @default(autoincrement())
+  linkId      Int
+  link        ShortLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  clickedAt   DateTime  @default(now())
+  ipAddress   String    @default("")
+  countryCode String    @default("")
+  regionCode  String    @default("")
+  deviceType  String    @default("desktop")
+  referrer    String    @default("")
+
+  @@index([linkId])
+  @@index([clickedAt])
+}
+
+model MediaAsset {
+  id           String   @id @default(uuid())
+  originalName String
+  storedName   String
+  url          String
+  mimeType     String?
+  kind         String   @default("arquivo")
+  sizeBytes    Int      @default(0)
+  createdAt    DateTime @default(now())
 }

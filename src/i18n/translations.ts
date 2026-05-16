@@ -2,24 +2,72 @@ export type Lang = 'pt' | 'es';
 
 const translations = {
   pt: {
-    // ── Login ──
-    login_subtitle: 'Faça login com seu E-mail da compra',
+    // ── Login (tom comercial AutoFinTech) ──
+    login_kicker: 'Área de membros',
+    login_brand_title: 'AutoFinTech',
+    login_support_text:
+      'Entre com o e-mail da sua compra ou da licença ativa. Aqui você valida o robô, acompanha o ranking e baixa tudo o que está liberado no seu plano — em um só lugar.',
+    login_subtitle: 'Use o mesmo e-mail da Hotmart ou da licença ativa. Sua conta é o centro de comando do seu acesso.',
     login_email_label: 'E-mail',
     login_email_placeholder: 'seu@email.com',
     login_password_label: 'Senha',
-    login_btn: 'Entrar na Plataforma',
+    login_btn: 'Entrar na minha conta',
     login_loading: 'Autenticando...',
-    login_footer: 'Ainda não tem acesso?',
-    login_footer_link: 'Ver vitrine de Ebooks',
+    login_footer: 'Quer conhecer antes de comprar?',
+    login_footer_link: 'Ver vitrine e ofertas',
     login_error_fields: 'Preencha e-mail e senha.',
-    login_error_connection: 'Erro de conexão com o servidor. Tente novamente mais tarde.',
+    login_error_connection:
+      'Não conseguimos conectar ao servidor. Confira sua internet e tente de novo. Em ambiente local, suba a API com npm run dev:full ou npm run dev:api.',
+    login_trial_link: 'Quero 7 dias de teste grátis',
+    trial_title: 'Teste grátis',
+    trial_desc: 'Preencha os dados abaixo. Em poucos minutos você recebe acesso de teste por 7 dias e entra com o mesmo e-mail.',
+    trial_name_label: 'Seu nome',
+    trial_name_placeholder: 'Ex: João',
+    trial_product_label: 'Produto',
+    trial_product_placeholder: 'Selecione o produto',
+    trial_password_label: 'Crie uma senha',
+    trial_password_hint: 'A senha será definida no seu primeiro login.',
+    trial_submit: 'Liberar meu teste agora',
+    trial_loading: 'Ativando...',
+    trial_success: 'Teste grátis liberado! Agora faça login com seu e-mail e a senha criada.',
+    trial_back_login: 'Voltar ao login',
 
     // ── Showcase ──
-    showcase_title: 'Nossa Vitrine',
-    showcase_description: 'Explore nossos produtos disponíveis para você.',
-    showcase_buy_btn: 'Comprar Agora',
+    showcase_title: 'Vitrine AutoFinTech',
+    showcase_description: 'Veja o que está disponível e escolha o plano ideal para o seu operacional no Forex.',
+    showcase_buy_btn: 'Quero comprar agora',
     showcase_back_btn: 'Voltar ao Login',
-    showcase_details_title: 'Detalhes do Ebook',
+    showcase_details_title: 'Detalhes do produto',
+    showcase_tag_premium: 'Produto',
+
+    // ── Member shell (layout aluno) ──
+    member_area_badge: 'Área de membros',
+    home_member_chip: 'Área de membros',
+    home_brand_logo_alt: 'AutoFinTech',
+    home_active_accesses: '{count} conteúdo(s) liberado(s) na sua conta',
+    home_guest_name: 'Trader',
+    hero_kicker: 'Acesso exclusivo',
+    member_sidebar_hint: 'Navegação',
+
+    // ── Courses (EAD) ──
+    courses_loading: 'Carregando trilhas...',
+    courses_empty: 'Nenhuma trilha publicada ainda. O administrador pode cadastrar cursos no painel.',
+    courses_hub_title: 'Centro de estudos',
+    courses_hub_subtitle: 'Acompanhe módulos, marque lições e siga sua trilha.',
+    courses_main_track: 'Trilha principal',
+    courses_main_track_cta: 'Abrir trilha',
+    courses_modules_count: 'módulos',
+    courses_lessons_total: 'lições',
+    courses_module_progress: 'Progresso do módulo',
+    courses_lesson_done: 'Concluída',
+    courses_lesson_open: 'Abrir aula',
+    courses_lesson_no_access: 'Sem acesso',
+    courses_lesson_check: 'Feito',
+    courses_kpi_lessons: 'Lições',
+    courses_kpi_done: 'Concluídas',
+    courses_kpi_progress: 'Em andamento',
+    courses_progress_global: 'Progresso geral',
+    courses_continue_btn: 'Continuar estudos',
 
     // ── Greeting ──
     greeting_morning: 'Bom dia',
@@ -27,33 +75,81 @@ const translations = {
     greeting_evening: 'Boa noite',
 
     // ── Home ──
-    hero_subtitle_default: 'Sua próxima grande leitura te espera.',
-    hero_subtitle_book: 'Destaque',
-    search_placeholder: 'Buscar por título ou autor...',
-    no_results: 'Nenhum livro encontrado para',
+    hero_subtitle_default: 'Seu painel de materiais, cursos e downloads — tudo alinhado à sua licença e à sua compra.',
+    hero_subtitle_book: 'Sugestão para você',
+    hero_banner_aria: 'Destaque da página inicial — boas-vindas',
+    search_placeholder: 'Buscar',
+    no_results: 'Nenhum material encontrado para',
     search_results_title: 'Resultados para',
-    no_sales_url: 'Este livro ainda não possui uma página de vendas cadastrada.',
-    section_my_books: 'Meus Livros',
-    section_new_releases: 'Lançamentos',
-    section_most_read: 'Mais Lidos',
-    section_wishlist: 'Lista de Desejos',
+    no_sales_url: 'Este conteúdo ainda não tem link de compra configurado. Fale com o suporte se precisar de acesso.',
+    section_my_books: 'O que já está liberado para você',
+    section_unlocked_access: 'Acessos liberados para você',
+    section_unlock_exclusive: 'Desbloqueie seu acesso exclusivo',
+    section_new_releases: 'Novidades',
+    section_most_read: 'Em destaque',
+    section_wishlist: 'Quero ver depois',
     category_all: 'Tudo',
 
-    // ── Library ──
-    library_title: 'Sua Biblioteca',
-    library_empty_title: 'Sua biblioteca está vazia',
-    library_empty_desc: 'Os livros que você comprar vão aparecer aqui, prontos para leitura instantânea.',
-    continue_reading: 'Continuar Leitura',
-    all_books: 'Todos os Livros',
+    // ── Downloads (conteúdos liberados) ──
+    downloads_title: 'Downloads e arquivos',
+    downloads_empty_title: 'Nenhum download disponível ainda',
+    downloads_empty_desc:
+      'Assim que sua compra ou sua licença ativa liberar arquivos (robô, atualizações, materiais), eles aparecem aqui para baixar com segurança.',
+    downloads_section_entitled: 'Arquivos liberados na sua conta',
+    downloads_loading: 'Carregando downloads...',
+    continue_reading: 'Continuar de onde parei',
+    all_books: 'Catálogo completo',
+    home_courses_section: 'Trilhas EAD',
+    home_courses_sub: 'Cursos com vídeo, texto e materiais — abra para estudar.',
+    search_courses_title: 'Trilhas encontradas',
     page_label: 'Página',
 
     // ── Bottom nav ──
-    nav_home: 'Vitrine',
-    nav_library: 'Biblioteca',
+    nav_home: 'Início',
+    nav_downloads: 'Downloads',
+    nav_courses: 'Cursos',
+    nav_validation: 'Validar licença',
+    nav_ranking: 'Ranking',
+    nav_support: 'Suporte',
     nav_profile: 'Perfil',
+    support_not_configured: 'Link de suporte ainda não configurado.',
+
+    // ── Painel de validação (EA / robô) — sem termos internos de admin ──
+    validation_title: 'Validação da licença',
+    validation_intro:
+      'Informe o e-mail desta conta, o produto que você tem liberado e o número da conta no MetaTrader. É o mesmo fluxo que o robô usa para ativar — rápido e direto.',
+    validation_email_label: 'E-mail da conta',
+    validation_system_label: 'Produto liberado',
+    validation_system_placeholder: 'Selecione o produto',
+    validation_account_label: 'Número da conta (MetaTrader)',
+    validation_submit: 'Validar minha licença',
+    validation_valid: 'Licença válida.',
+    validation_invalid: 'Não foi possível validar. Confira o produto, a conta e se sua licença está ativa.',
+    validation_loading: 'Validando...',
+    validation_no_products:
+      'Não encontramos produtos vinculados ao seu e-mail. Se você já comprou, aguarde a liberação ou fale com o suporte.',
+
+    // ── Ranking (top usuários) ──
+    ranking_title: 'Ranking',
+    ranking_intro:
+      'Top 10 do período — ranking atualizado conforme os robôs enviam desempenho. Use para acompanhar quem está no jogo com consistência.',
+    ranking_period_label: 'Período (dias)',
+    ranking_loading: 'Carregando ranking...',
+    ranking_empty_title: 'Ainda não há ranking',
+    ranking_empty: 'Sem dados de ranking neste período.',
+    ranking_table_title: 'Top 10',
+    ranking_table_hint: 'Ordenado por lucro (%)',
+    ranking_col_rank: '#',
+    ranking_col_user: 'Usuário',
+    ranking_col_broker: 'Corretora',
+    ranking_col_robot: 'Robô',
+    ranking_col_profit: 'Lucro %',
+    ranking_col_setup: 'Setup',
+    ranking_download_setup: 'Baixar setup (.set)',
 
     // ── Profile ──
-    profile_books_count: 'livro(s) na sua biblioteca',
+    profile_books_count: 'conteúdos liberados na sua conta',
+    profile_area_hint: 'Seu acesso é pelas trilhas em Início e Cursos.',
     profile_section_account: 'Conta',
     profile_section_about: 'Sobre',
     profile_email: 'E-mail',
@@ -100,21 +196,22 @@ const translations = {
     install_understood: 'Entendi',
 
     // ── PDF Reader ──
-    pdf_loading: 'Baixando livro da nuvem...',
+    pdf_loading: 'Carregando conteúdo...',
     pdf_complete: 'concluído',
     pdf_highlight_mode: 'Modo Marca-texto ativado: Selecione o texto na tela',
     pdf_highlight_cancel: 'Cancelar',
     pdf_choose_color: 'Escolher cor:',
     pdf_highlights_title: 'Destaques',
-    pdf_highlights_empty: 'Selecione um texto no livro para destacar.',
+    pdf_highlights_empty: 'Selecione um texto no material para destacar.',
     pdf_highlight_page: 'Pág.',
     pdf_page_highlights: 'destaque(s)',
 
     // ── BookRow / BookCard ──
-    book_locked: 'Comprar',
-    badge_purchased: 'COMPRADO',
+    book_locked: 'Ver oferta',
+    badge_purchased: 'LIBERADO',
     badge_bonus: 'BÔNUS',
-    pdf_not_found: 'Conteúdo não encontrado para este livro (Arquivo ou Link).',
+    badge_course: 'TRILHA EAD',
+    pdf_not_found: 'Conteúdo não encontrado para este material (arquivo ou link).',
 
     // ── Forgot/Reset Password ──
     forgot_password_link: 'Esqueceu sua senha?',
@@ -135,24 +232,74 @@ const translations = {
   },
 
   es: {
-    // ── Login ──
-    login_subtitle: 'Inicia sesión con el E-mail de tu compra',
+    // ── Login (tono comercial AutoFinTech) ──
+    login_kicker: 'Área de miembros',
+    login_brand_title: 'AutoFinTech',
+    login_support_text:
+      'Entra con el e-mail de tu compra o de tu licencia activa. Aquí validas el robot, sigues el ranking y descargas todo lo liberado en tu plano — en un solo lugar.',
+    login_subtitle:
+      'Usa el mismo e-mail de Hotmart o de tu licencia activa. Tu cuenta es el centro de mando de tu acceso.',
     login_email_label: 'E-mail',
     login_email_placeholder: 'tu@email.com',
     login_password_label: 'Contraseña',
-    login_btn: 'Entrar a la Plataforma',
+    login_btn: 'Entrar a mi cuenta',
     login_loading: 'Autenticando...',
-    login_footer: '¿Aún no tienes acceso?',
-    login_footer_link: 'Ver catálogo de Ebooks',
+    login_footer: '¿Quieres conocer antes de comprar?',
+    login_footer_link: 'Ver vitrina y ofertas',
     login_error_fields: 'Completa el e-mail y la contraseña.',
-    login_error_connection: 'Error de conexión con el servidor. Inténtalo más tarde.',
+    login_error_connection:
+      'No pudimos conectar con el servidor. Revisa tu internet e inténtalo de nuevo. En local, inicia la API con npm run dev:full o npm run dev:api.',
+    login_trial_link: 'Quiero 7 días de prueba gratis',
+    trial_title: 'Prueba gratis',
+    trial_desc:
+      'Completa los datos. En pocos minutos recibes acceso de prueba por 7 días e inicias sesión con el mismo e-mail.',
+    trial_name_label: 'Tu nombre',
+    trial_name_placeholder: 'Ej: Juan',
+    trial_product_label: 'Producto',
+    trial_product_placeholder: 'Selecciona el producto',
+    trial_password_label: 'Crea una contraseña',
+    trial_password_hint: 'La contraseña se define en tu primer inicio de sesión.',
+    trial_submit: 'Liberar mi prueba ahora',
+    trial_loading: 'Activando...',
+    trial_success: '¡Prueba liberada! Ahora inicia sesión con tu e-mail y la contraseña creada.',
+    trial_back_login: 'Volver al login',
 
     // ── Showcase ──
-    showcase_title: 'Nuestro Catálogo',
-    showcase_description: 'Explora nuestros productos disponibles para ti.',
-    showcase_buy_btn: 'Comprar Ahora',
+    showcase_title: 'Vitrina AutoFinTech',
+    showcase_description: 'Mira lo disponible y elige el plano ideal para tu operativa en Forex.',
+    showcase_buy_btn: 'Quiero comprar ahora',
     showcase_back_btn: 'Volver al Login',
-    showcase_details_title: 'Detalles del Ebook',
+    showcase_details_title: 'Detalles del producto',
+    showcase_tag_premium: 'Producto',
+
+    // ── Member shell (layout aluno) ──
+    member_area_badge: 'Área de miembros',
+    home_member_chip: 'Área de miembros',
+    home_brand_logo_alt: 'AutoFinTech',
+    home_active_accesses: '{count} contenido(s) liberado(s) en tu cuenta',
+    home_guest_name: 'Trader',
+    hero_kicker: 'Acceso exclusivo',
+    member_sidebar_hint: 'Navegación',
+
+    // ── Courses (EAD) ──
+    courses_loading: 'Cargando rutas...',
+    courses_empty: 'Aún no hay rutas publicadas. El administrador puede crear cursos en el panel.',
+    courses_hub_title: 'Centro de estudios',
+    courses_hub_subtitle: 'Sigue módulos, marca lecciones y continúa tu ruta.',
+    courses_main_track: 'Ruta principal',
+    courses_main_track_cta: 'Abrir ruta',
+    courses_modules_count: 'módulos',
+    courses_lessons_total: 'lecciones',
+    courses_module_progress: 'Progreso del módulo',
+    courses_lesson_done: 'Completada',
+    courses_lesson_open: 'Abrir clase',
+    courses_lesson_no_access: 'Sin acceso',
+    courses_lesson_check: 'Hecho',
+    courses_kpi_lessons: 'Lecciones',
+    courses_kpi_done: 'Completadas',
+    courses_kpi_progress: 'En progreso',
+    courses_progress_global: 'Progreso general',
+    courses_continue_btn: 'Continuar estudio',
 
     // ── Greeting ──
     greeting_morning: 'Buenos días',
@@ -160,33 +307,83 @@ const translations = {
     greeting_evening: 'Buenas noches',
 
     // ── Home ──
-    hero_subtitle_default: 'Tu próxima gran lectura te espera.',
-    hero_subtitle_book: 'Destacado',
-    search_placeholder: 'Buscar por título o autor...',
-    no_results: 'Ningún libro encontrado para',
+    hero_subtitle_default:
+      'Tu panel de materiales, cursos y descargas — todo alineado a tu licencia y a tu compra.',
+    hero_subtitle_book: 'Sugerencia para ti',
+    hero_banner_aria: 'Destacado de la página de inicio — bienvenida',
+    search_placeholder: 'Buscar',
+    no_results: 'Ningún material encontrado para',
     search_results_title: 'Resultados para',
-    no_sales_url: 'Este libro aún no tiene una página de ventas registrada.',
-    section_my_books: 'Mis Libros',
+    no_sales_url:
+      'Este contenido aún no tiene enlace de compra configurado. Contacta soporte si necesitas acceso.',
+    section_my_books: 'Lo que ya está liberado para ti',
+    section_unlocked_access: 'Accesos liberados para ti',
+    section_unlock_exclusive: 'Desbloquea tu acceso exclusivo',
     section_new_releases: 'Novedades',
-    section_most_read: 'Más Leídos',
-    section_wishlist: 'Lista de Deseos',
+    section_most_read: 'Destacados',
+    section_wishlist: 'Ver más tarde',
     category_all: 'Todo',
 
-    // ── Library ──
-    library_title: 'Tu Biblioteca',
-    library_empty_title: 'Tu biblioteca está vacía',
-    library_empty_desc: 'Los libros que compres aparecerán aquí, listos para lectura instantánea.',
-    continue_reading: 'Continuar Leyendo',
-    all_books: 'Todos los Libros',
+    // ── Downloads ──
+    downloads_title: 'Descargas y archivos',
+    downloads_empty_title: 'Aún no hay descargas disponibles',
+    downloads_empty_desc:
+      'Cuando tu compra o licencia activa libere archivos (robot, actualizaciones, materiales), aparecerán aquí para descargar con seguridad.',
+    downloads_section_entitled: 'Archivos liberados en tu cuenta',
+    downloads_loading: 'Cargando descargas...',
+    continue_reading: 'Continuar donde lo dejé',
+    all_books: 'Catálogo completo',
+    home_courses_section: 'Rutas EAD',
+    home_courses_sub: 'Cursos con video, texto y materiales — ábrelos para estudiar.',
+    search_courses_title: 'Rutas encontradas',
     page_label: 'Página',
 
     // ── Bottom nav ──
-    nav_home: 'Catálogo',
-    nav_library: 'Biblioteca',
+    nav_home: 'Inicio',
+    nav_downloads: 'Descargas',
+    nav_courses: 'Cursos',
+    nav_validation: 'Validar licencia',
+    nav_ranking: 'Ranking',
+    nav_support: 'Soporte',
     nav_profile: 'Perfil',
+    support_not_configured: 'El enlace de soporte aún no está configurado.',
+
+    // ── Panel de validación ──
+    validation_title: 'Validación de la licencia',
+    validation_intro:
+      'Indica el e-mail de esta cuenta, el producto que tienes liberado y el número de cuenta en MetaTrader. Es el mismo flujo que usa el robot para activar — rápido y directo.',
+    validation_email_label: 'E-mail de la cuenta',
+    validation_system_label: 'Producto liberado',
+    validation_system_placeholder: 'Selecciona el producto',
+    validation_account_label: 'Número de cuenta (MetaTrader)',
+    validation_submit: 'Validar mi licencia',
+    validation_valid: 'Licencia válida.',
+    validation_invalid: 'No se pudo validar. Revisa el producto, la cuenta y que tu licencia esté activa.',
+    validation_loading: 'Validando...',
+    validation_no_products:
+      'No encontramos productos vinculados a tu e-mail. Si ya compraste, espera la liberación o contacta soporte.',
+
+    // ── Ranking ──
+    ranking_title: 'Ranking',
+    ranking_intro:
+      'Top 10 del período — ranking actualizado según los robots envían rendimiento. Úsalo para ver quién está en juego con consistencia.',
+    ranking_period_label: 'Período (días)',
+    ranking_loading: 'Cargando ranking...',
+    ranking_empty_title: 'Aún no hay ranking',
+    ranking_empty: 'Sin datos de ranking en este período.',
+    ranking_table_title: 'Top 10',
+    ranking_table_hint: 'Ordenado por beneficio (%)',
+    ranking_col_rank: '#',
+    ranking_col_user: 'Usuario',
+    ranking_col_broker: 'Bróker',
+    ranking_col_robot: 'Robot',
+    ranking_col_profit: 'Beneficio %',
+    ranking_col_setup: 'Setup',
+    ranking_download_setup: 'Descargar setup (.set)',
 
     // ── Profile ──
-    profile_books_count: 'libro(s) en tu biblioteca',
+    profile_books_count: 'contenidos liberados en tu cuenta',
+    profile_area_hint: 'Tu acceso es por las rutas en Inicio y Cursos.',
     profile_section_account: 'Cuenta',
     profile_section_about: 'Acerca de',
     profile_email: 'E-mail',
@@ -233,21 +430,22 @@ const translations = {
     install_understood: 'Entendido',
 
     // ── PDF Reader ──
-    pdf_loading: 'Descargando libro de la nube...',
+    pdf_loading: 'Cargando contenido...',
     pdf_complete: 'completado',
     pdf_highlight_mode: 'Modo Resaltado activado: Selecciona el texto en pantalla',
     pdf_highlight_cancel: 'Cancelar',
     pdf_choose_color: 'Elegir color:',
     pdf_highlights_title: 'Resaltados',
-    pdf_highlights_empty: 'Selecciona un texto en el libro para resaltar.',
+    pdf_highlights_empty: 'Selecciona un texto en el material para resaltar.',
     pdf_highlight_page: 'Pág.',
     pdf_page_highlights: 'resaltado(s)',
 
     // ── BookRow / BookCard ──
-    book_locked: 'Comprar',
-    badge_purchased: 'COMPRADO',
+    book_locked: 'Ver oferta',
+    badge_purchased: 'LIBERADO',
     badge_bonus: 'BONO',
-    pdf_not_found: 'Contenido no encontrado para este libro (Archivo o Link).',
+    badge_course: 'RUTA EAD',
+    pdf_not_found: 'Contenido no encontrado para este material (archivo o enlace).',
 
     // ── Forgot/Reset Password ──
     forgot_password_link: '¿Olvidaste tu contraseña?',

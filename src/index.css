@@ -1,15 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
 :root {
-  /* Premium Dark Navy & Readlyme Teal Theme Palette */
-  --bg-main: #0B1121;
-  --bg-secondary: #131A2B;
-  --bg-card: rgba(19, 26, 43, 0.8);
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --accent-primary: #45C4B0; /* Readlyme Teal */
-  --accent-primary-hover: #5AD3C0;
-  --border-subtle: rgba(255, 255, 255, 0.08);
+  /* Tema escuro + acento azul (fintech / leitura calma) */
+  --bg-main: #0e0e0e;
+  --bg-secondary: #141414;
+  --bg-card: #181818;
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --accent-primary: #3b82f6;
+  --accent-primary-hover: #60a5fa;
+  --accent-soft: rgba(59, 130, 246, 0.28);
+  --border-subtle: rgba(255, 255, 255, 0.12);
   
-  --font-main: 'Inter', sans-serif;
+  --font-main: 'Poppins', 'Inter', sans-serif;
   
   --spacing-sm: 8px;
   --spacing-md: 16px;
@@ -45,6 +48,39 @@ html, body {
   /* Allow natural scrolling/pull-to-refresh on the body if needed, or handled by inner containers */
 }
 
+/* Scrollbar moderna (global) */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(96, 165, 250, 0.62) rgba(255, 255, 255, 0.06);
+}
+
+/* WebKit (Chrome/Edge/Safari) */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.82), rgba(59, 130, 246, 0.72));
+  border: 2px solid rgba(14, 14, 14, 0.9);
+  border-radius: 999px;
+  min-height: 40px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(147, 197, 253, 0.95), rgba(96, 165, 250, 0.9));
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+
 input, textarea, [contenteditable="true"] {
   user-select: text;
 }
@@ -74,7 +110,7 @@ button {
     display: none !important;
   }
   body, html {
-    background-color: #000 !important;
+    background-color: #0e0e0e !important;
     color: #fff !important;
   }
 }

@@ -1,53 +1,109 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BookRow } from '../components/BookRow';
 import { Search } from 'lucide-react';
 import { t } from '../i18n/translations';
 import type { Lang } from '../i18n/translations';
+import { SHOW_LANGUAGE_SWITCHER } from '../i18n/featureFlags';
 import './Home.css';
 
 interface HomeProps {
-  books: any[];
-  onRead: (title: string, coverUrl: string) => void;
-  onToggleWishlist: (id: string) => void;
+  onOpenCourse?: (slug: string) => void;
   isLoading?: boolean;
   userEmail?: string | null;
   userName?: string | null;
   lang: Lang;
   setLang: (l: Lang) => void;
+  authHeaders?: (json?: boolean) => Record<string, string>;
 }
 
-export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isLoading, userEmail, userName, lang, setLang }) => {
+type MemberHeroConfig = { backgroundUrl: string | null; kicker: string | null };
+
+type PublicCourse = {
+  id: string;
+  title: string;
+  slug: string;
+  coverUrl?: string | null;
+  modules?: { lessons?: unknown[] }[];
+  isPublic?: boolean;
+  hasAccess?: boolean;
+  salesPageUrl?: string | null;
+  requiredSystemIds?: string[];
+};
+
+const COURSE_CARD_PREFIX = 'course:';
+
+export const Home: React.FC<HomeProps> = ({
+  onOpenCourse,
+  isLoading,
+  userEmail,
+  userName,
+  lang,
+  setLang,
+  authHeaders,
+}) => {
   const tr = t(lang);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [memberHero, setMemberHero] = useState<MemberHeroConfig | null>(null);
+  const [publishedCourses, setPublishedCourses] = useState<PublicCourse[]>([]);
 
-  // FILTER BY LANGUAGE (Default to 'pt' for older records without language field)
-  // Hide bonuses from the main general view unless accessed directly or featured 
-  // Wait, user still wants to click to see salesUrl.
-  const activeBooks = books.filter(b => (b.language || 'pt') === lang);
+  const courseRowItems = useMemo(() => {
+    const trs = t(lang);
+    return publishedCourses.map(c => {
+      const modCount = c.modules?.length ?? 0;
+      const lessonCount =
+        c.modules?.reduce((acc, m) => acc + (Array.isArray(m.lessons) ? m.lessons.length : 0), 0) ?? 0;
+      const cover = typeof c.coverUrl === 'string' && c.coverUrl.trim() ? c.coverUrl.trim() : '';
+      const hasAccess = c.hasAccess !== false;
+      return {
+        id: `${COURSE_CARD_PREFIX}${c.slug}`,
+        title: c.title,
+        author: '',
+        description: `${modCount} ${trs.courses_modules_count} · ${lessonCount} ${trs.courses_lessons_total}`,
+        coverUrl: cover,
+        hasAccess,
+        salesUrl: c.salesPageUrl || undefined,
+        isWishlisted: false,
+        isBonus: false,
+        isCourse: true,
+        hideInfo: true,
+        hideAccessBadge: true,
+        language: lang,
+      };
+    });
+  }, [publishedCourses, lang]);
 
-  // Reset category pill when lang changes so label matches
-  useEffect(() => { setSelectedCategory(''); }, [lang]);
+  const unlockedCourseItems = useMemo(
+    () => courseRowItems.filter((item) => item.hasAccess !== false),
+    [courseRowItems]
+  );
+
+  const lockedCourseItems = useMemo(
+    () => courseRowItems.filter((item) => item.hasAccess === false),
+    [courseRowItems]
+  );
+
+  const lockedCourseItemsCompact = useMemo(
+    () => lockedCourseItems.map((item) => ({ ...item, hideInfo: true })),
+    [lockedCourseItems]
+  );
 
   const handleBookClick = (id: string, hasAccess: boolean) => {
-    const book = books.find(b => b.id === id);
-    if (!book) return;
-    
+    if (!id.startsWith(COURSE_CARD_PREFIX)) return;
+    const slug = id.slice(COURSE_CARD_PREFIX.length);
+    if (!slug) return;
     if (hasAccess) {
-      onRead(book.title, book.coverUrl);
+      onOpenCourse?.(slug);
+      return;
+    }
+    const course = publishedCourses.find(c => c.slug === slug);
+    const url = course?.salesPageUrl;
+    if (url) {
+      window.location.href = url;
     } else {
-      if (book.salesUrl) {
-        if (book.salesUrl.includes('pay.hotmart.com')) {
-          return;
-        }
-        window.open(book.salesUrl, '_blank');
-      } else {
-        alert(tr.no_sales_url);
-      }
+      alert('Este curso é exclusivo para clientes da oferta. Você ainda não tem licença para acessá-lo.');
     }
   };
 
-  // DYNAMIC GREETING
   const getGreeting = () => {
     const hour = new Date().getHours();
     const name = userName || (userEmail ? userEmail.split('@')[0].charAt(0).toUpperCase() + userEmail.split('@')[0].slice(1) : '');
@@ -56,106 +112,77 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     return `${tr.greeting_evening}, ${name}!`;
   };
 
-  // DYNAMIC HERO BANNER - Auto-rotating carousel
-  const [heroIndex, setHeroIndex] = useState(0);
-  const booksWithCovers = activeBooks.filter(b => b.coverUrl && !b.isBonus);
-  
   useEffect(() => {
-    if (booksWithCovers.length <= 1) return;
-    const interval = setInterval(() => {
-      setHeroIndex(prev => (prev + 1) % booksWithCovers.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [booksWithCovers.length]);
-  
-  // HOTMART WIDGET SPA RACE CONDITION FIX
+    let cancelled = false;
+    fetch('/api/public/member-hero')
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: unknown) => {
+        if (cancelled || !d || typeof d !== 'object') return;
+        const o = d as Record<string, unknown>;
+        const backgroundUrl = typeof o.backgroundUrl === 'string' ? o.backgroundUrl : null;
+        const kicker = typeof o.kicker === 'string' ? o.kicker : null;
+        setMemberHero({ backgroundUrl, kicker });
+      })
+      .catch(() => {
+        if (!cancelled) setMemberHero({ backgroundUrl: null, kicker: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
-    if (!isLoading && books.length > 0) {
-      const timer = setTimeout(() => {
-        const id = 'hotmart-logic-script';
-        const existing = document.getElementById(id);
-        if (existing) existing.remove();
-        
-        const script = document.createElement('script');
-        script.id = id;
-        script.src = 'https://static.hotmart.com/checkout/widget.min.js';
-        script.async = true;
-        document.body.appendChild(script);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading, books.length]);
+    let cancelled = false;
+    const headers = authHeaders ? authHeaders() : undefined;
+    fetch('/api/public/courses', headers ? { headers } : undefined)
+      .then(r => (r.ok ? r.json() : []))
+      .then((data: unknown) => {
+        if (cancelled) return;
+        setPublishedCourses(Array.isArray(data) ? (data as PublicCourse[]) : []);
+      })
+      .catch(() => {
+        if (!cancelled) setPublishedCourses([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authHeaders]);
 
-  const heroBook = booksWithCovers.length > 0 ? booksWithCovers[heroIndex % booksWithCovers.length] : null;
+  const q = searchQuery.trim().toLowerCase();
+  const courseSearchMatches = q ? courseRowItems.filter(b => b.title.toLowerCase().includes(q)) : [];
 
-  // SEARCH FILTER
-  const filteredBooks = searchQuery.trim()
-    ? activeBooks.filter(b => 
-        // Se for Bônus e o usuário não possui, esconde da busca
-        !(b.isBonus && !b.hasAccess) && 
-        (b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (b.author && b.author.toLowerCase().includes(searchQuery.toLowerCase())))
-      )
-    : null;
+  const searchResults = q !== '' ? courseSearchMatches : null;
 
-  // Sections (Filter out bonuses from standard shelves except for 'myBooks' and 'wishlist')
-  const myBooks = activeBooks.filter(b => b.hasAccess);
-  const mostRead = [...activeBooks]
-    .filter(b => !b.isBonus && (b._count?.purchases || 0) > 0)
-    .sort((a,b) => (b._count?.purchases || 0) - (a._count?.purchases || 0));
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const newReleases = [...activeBooks]
-    .filter(b => !b.isBonus && new Date(b.createdAt || 0).getTime() > thirtyDaysAgo.getTime())
-    .sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-    .slice(0, 10);
-  const wishlisted = activeBooks.filter(b => b.isWishlisted);
+  const heroFullbleedStyle: React.CSSProperties | undefined =
+    memberHero?.backgroundUrl && memberHero.backgroundUrl.length > 0
+      ? {
+          backgroundImage: `url(${memberHero.backgroundUrl})`,
+          backgroundSize: '100% auto',
+          backgroundPosition: 'center top',
+          backgroundRepeat: 'no-repeat',
+        }
+      : undefined;
 
-  const categoriesMap = new Map<string, any[]>();
-  const featuredMap = new Map<string, any[]>();
+  const heroKickerText = (memberHero?.kicker && memberHero.kicker.trim()) || tr.hero_kicker;
 
-  activeBooks.forEach(book => {
-    // Only put bonuses in categories/featured if explicitly marked, usually we might hide them, but let's just make sure
-    if (book.isBonus && !book.hasAccess) return; // Optional: hide unowned bonuses from categories
-
-    if (book.category && book.category.name) {
-      if (!categoriesMap.has(book.category.name)) categoriesMap.set(book.category.name, []);
-      categoriesMap.get(book.category.name)!.push(book);
-    }
-    if (book.featuredList) {
-      if (!featuredMap.has(book.featuredList)) featuredMap.set(book.featuredList, []);
-      featuredMap.get(book.featuredList)!.push(book);
-    }
-  });
-
-  // "All" pill label comes from translations
-  const allLabel = tr.category_all;
-  const categoryNames = [allLabel, ...Array.from(categoriesMap.keys()).sort()];
-  const activeCategory = selectedCategory || allLabel;
-
-  const isCategoryMatch = (b: any) => activeCategory === allLabel || b.category?.name === activeCategory;
-
-  const displayMyBooks = myBooks.filter(isCategoryMatch);
-  const displayMostRead = mostRead.filter(isCategoryMatch);
-  const displayNewReleases = newReleases.filter(isCategoryMatch);
-  const displayWishlisted = wishlisted.filter(isCategoryMatch);
-
-  // Loading skeleton
   if (isLoading) {
     return (
-      <div style={{ paddingBottom: 'var(--spacing-lg)' }}>
-        <div className="hero-banner hero-skeleton"></div>
+      <div className="home-page home-page--fullbleed" style={{ paddingBottom: 'var(--spacing-lg)' }}>
+        <div className="hero-fullbleed hero-fullbleed--netflix">
+          <div className="hero-wrapper">
+            <div className="hero-banner hero-skeleton hero-banner--netflix" aria-hidden />
+          </div>
+        </div>
         <div className="home-content">
           <div className="skeleton-row">
             <div className="skeleton-title"></div>
             <div className="skeleton-cards">
-              {[1,2,3,4].map(i => <div key={i} className="skeleton-card"><div className="skeleton-cover"></div><div className="skeleton-text"></div></div>)}
-            </div>
-          </div>
-          <div className="skeleton-row">
-            <div className="skeleton-title"></div>
-            <div className="skeleton-cards">
-              {[1,2,3].map(i => <div key={i} className="skeleton-card"><div className="skeleton-cover"></div><div className="skeleton-text"></div></div>)}
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="skeleton-card">
+                  <div className="skeleton-cover"></div>
+                  <div className="skeleton-text"></div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -163,120 +190,104 @@ export const Home: React.FC<HomeProps> = ({ books, onRead, onToggleWishlist, isL
     );
   }
 
-  const isHeroHotmart = heroBook && !heroBook.hasAccess && heroBook.salesUrl?.includes('pay.hotmart.com');
-
   return (
-    <div style={{ paddingBottom: 'var(--spacing-lg)' }}>
-      <div className="hero-wrapper">
-        {/* ── Language Switcher (Moved outside banner to avoid click bubbling) ── */}
-        <div className="lang-switcher">
-          <button
-            className={`lang-btn ${lang === 'pt' ? 'active' : ''}`}
-            onClick={() => setLang('pt')}
-            title="Português"
-            aria-label="Português"
+    <div className="home-page home-page--fullbleed" style={{ paddingBottom: 'var(--spacing-lg)' }}>
+      <div className="hero-fullbleed hero-fullbleed--netflix" style={heroFullbleedStyle}>
+        <div className="hero-wrapper">
+          <div
+            className="hero-banner hero-banner--netflix"
+            role="region"
+            aria-label={tr.hero_banner_aria}
           >
-            🇧🇷
-          </button>
-          <button
-            className={`lang-btn ${lang === 'es' ? 'active' : ''}`}
-            onClick={() => setLang('es')}
-            title="Español"
-            aria-label="Español"
-          >
-            🇪🇸
-          </button>
+            <div className="hero-inner">
+              <div className="hero-content">
+                <p className="hero-kicker">{heroKickerText}</p>
+                <h1 className="hero-greeting">{getGreeting()}</h1>
+              </div>
+            </div>
+            <div className="hero-overlay" aria-hidden />
+          </div>
         </div>
 
-        {isHeroHotmart && heroBook ? (
-          <a 
-            href={heroBook.salesUrl}
-            className="hero-banner hotmart-fb" 
-            onClick={() => handleBookClick(heroBook.id, heroBook.hasAccess)}
-            style={{ cursor: 'pointer', backgroundImage: `url(${heroBook.coverUrl})`, display: 'flex', textDecoration: 'none' }}
-          >
-            <div className="hero-content">
-              <h1 className="hero-greeting">{getGreeting()}</h1>
-              <p className="hero-subtitle">
-                {heroBook ? `${tr.hero_subtitle_book}: ${heroBook.title}` : tr.hero_subtitle_default}
-              </p>
-            </div>
-            <div className="hero-overlay"></div>
-          </a>
-        ) : (
-          <div 
-            className="hero-banner" 
-            onClick={() => heroBook && handleBookClick(heroBook.id, heroBook.hasAccess)}
-            style={{ cursor: heroBook ? 'pointer' : 'default', ...(heroBook ? { backgroundImage: `url(${heroBook.coverUrl})` } : {}) }}
-          >
-            <div className="hero-content">
-              <h1 className="hero-greeting">{getGreeting()}</h1>
-              <p className="hero-subtitle">
-                {heroBook ? `${tr.hero_subtitle_book}: ${heroBook.title}` : tr.hero_subtitle_default}
-              </p>
-            </div>
-            <div className="hero-overlay"></div>
+      </div>
+
+      <div className="search-container search-container--row">
+        <div className="search-field-wrap">
+          <Search size={18} className="search-icon" />
+          <input
+            type="text"
+            placeholder={tr.search_placeholder}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+        </div>
+        {SHOW_LANGUAGE_SWITCHER && (
+          <div className="lang-switcher lang-switcher--toolbar" aria-label="Idioma">
+            <button
+              type="button"
+              className={`lang-btn ${lang === 'pt' ? 'active' : ''}`}
+              onClick={() => setLang('pt')}
+              title="Português"
+              aria-label="Português"
+            >
+              🇧🇷
+            </button>
+            <button
+              type="button"
+              className={`lang-btn ${lang === 'es' ? 'active' : ''}`}
+              onClick={() => setLang('es')}
+              title="Español"
+              aria-label="Español"
+            >
+              🇪🇸
+            </button>
           </div>
         )}
       </div>
 
-      {/* SEARCH BAR */}
-      <div className="search-container">
-        <Search size={18} className="search-icon" />
-        <input 
-          type="text" 
-          placeholder={tr.search_placeholder}
-          value={searchQuery} 
-          onChange={e => setSearchQuery(e.target.value)} 
-          className="search-input"
-        />
-      </div>
-
-      {/* CATEGORY PILLS */}
-      {!searchQuery && categoryNames.length > 1 && (
-        <div className="category-pills-container">
-          {categoryNames.map(cat => (
-            <button
-              key={cat}
-              className={`category-pill ${activeCategory === cat ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(cat)}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="home-content">
-        {/* SEARCH RESULTS MODE */}
-        {filteredBooks !== null ? (
-          filteredBooks.length > 0 ? (
-            <BookRow title={`${tr.search_results_title} "${searchQuery}"`} books={filteredBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />
+        {searchResults !== null ? (
+          searchResults.length > 0 ? (
+            <BookRow
+              title={`${tr.search_results_title} "${searchQuery}"`}
+              books={searchResults}
+              onBookClick={handleBookClick}
+              onToggleWishlist={() => {}}
+              lang={lang}
+            />
           ) : (
             <div className="empty-search">
-              <p>{tr.no_results} "<strong>{searchQuery}</strong>"</p>
+              <p>
+                {tr.no_results} "<strong>{searchQuery}</strong>"
+              </p>
             </div>
           )
-        ) : (
+        ) : courseRowItems.length > 0 ? (
           <>
-            {displayMyBooks.length > 0 && <BookRow title={tr.section_my_books} books={displayMyBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />}
-            
-            {Array.from(featuredMap.entries()).map(([listName, lstBooks]) => {
-              const displayFeatured = lstBooks.filter(isCategoryMatch);
-              if (displayFeatured.length === 0) return null;
-              return <BookRow key={`featured-${listName}`} title={listName} books={displayFeatured} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />;
-            })}
-
-            {displayNewReleases.length > 0 && <BookRow title={tr.section_new_releases} books={displayNewReleases} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />}
-            {displayMostRead.length > 0 && <BookRow title={tr.section_most_read} books={displayMostRead} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />}
-            
-            {Array.from(categoriesMap.entries()).map(([catName, catBooks]) => {
-              if (activeCategory !== allLabel && catName !== activeCategory) return null;
-              return <BookRow key={`cat-${catName}`} title={catName} books={catBooks} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />;
-            })}
-
-            {displayWishlisted.length > 0 && <BookRow title={tr.section_wishlist} books={displayWishlisted} onBookClick={handleBookClick} onToggleWishlist={onToggleWishlist} lang={lang} />}
+            {unlockedCourseItems.length > 0 && (
+              <BookRow
+                title={tr.section_unlocked_access}
+                books={unlockedCourseItems}
+                onBookClick={handleBookClick}
+                onToggleWishlist={() => {}}
+                lang={lang}
+              />
+            )}
+            {lockedCourseItems.length > 0 && (
+              <BookRow
+                title={tr.section_unlock_exclusive}
+                books={lockedCourseItemsCompact}
+                onBookClick={handleBookClick}
+                onToggleWishlist={() => {}}
+                lang={lang}
+              />
+            )}
           </>
+        ) : (
+          <div className="empty-search">
+            <p>{tr.courses_empty}</p>
+          </div>
         )}
       </div>
     </div>

@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Ambiente local (não versionar)
+.env
+!.env.example
+
+# SQLite local (Prisma)
+prisma/dev.db
+prisma/dev.db-journal
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -73,11 +73,14 @@ export const BookRow: React.FC<BookRowProps> = ({ title, books, lang = 'pt', onB
             title={book.title}
             author={book.author || ''}
             description={book.description || ''}
-            coverUrl={book.coverUrl}
+            coverUrl={book.coverUrl || ''}
             hasAccess={book.hasAccess}
             isWishlisted={book.isWishlisted}
             salesUrl={book.salesUrl}
             isBonus={book.isBonus}
+            isCourse={Boolean(book.isCourse)}
+            hideInfo={Boolean(book.hideInfo)}
+            hideAccessBadge={Boolean(book.hideAccessBadge)}
             lang={lang}
             onClick={handleClick}
             onToggleWishlist={handleWishlist}
