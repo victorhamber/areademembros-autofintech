@@ -7,7 +7,7 @@ const translations = {
     login_brand_title: 'AutoFinTech',
     login_support_text:
       'Entre com o e-mail da sua compra ou da licença ativa. Aqui você valida o robô, acompanha o ranking e baixa tudo o que está liberado no seu plano — em um só lugar.',
-    login_subtitle: 'Use o mesmo e-mail da Hotmart ou da licença ativa. Sua conta é o centro de comando do seu acesso.',
+    login_subtitle: 'Utilize o e-mail da sua compra para acessar sua área de membros.',
     login_email_label: 'E-mail',
     login_email_placeholder: 'seu@email.com',
     login_password_label: 'Senha',
@@ -237,8 +237,7 @@ const translations = {
     login_brand_title: 'AutoFinTech',
     login_support_text:
       'Entra con el e-mail de tu compra o de tu licencia activa. Aquí validas el robot, sigues el ranking y descargas todo lo liberado en tu plano — en un solo lugar.',
-    login_subtitle:
-      'Usa el mismo e-mail de Hotmart o de tu licencia activa. Tu cuenta es el centro de mando de tu acceso.',
+    login_subtitle: 'Utiliza el e-mail de tu compra para acceder a tu área de miembros.',
     login_email_label: 'E-mail',
     login_email_placeholder: 'tu@email.com',
     login_password_label: 'Contraseña',
