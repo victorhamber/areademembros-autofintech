@@ -20,6 +20,9 @@ dist-ssr
 prisma/dev.db
 prisma/dev.db-journal
 
+# Exportações temporárias de migração
+tmp/sqlite-export.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
