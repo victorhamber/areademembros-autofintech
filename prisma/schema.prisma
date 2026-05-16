@@ -2,11 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Banco local em arquivo (não exige PostgreSQL instalado).
-// Para produção com PostgreSQL: provider = "postgresql" e url = env("DATABASE_URL").
+// Produção: PostgreSQL via DATABASE_URL (EasyPanel).
+// Desenvolvimento local: use DATABASE_URL no .env (Postgres) ou sqlite com provider/url temporários.
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
