@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, Image as ImageIcon, Film, Music2, File as FileIcon } from 'lucide-react';
+import { resolveProductForLicense } from '@shared/licenseProductMatch';
 import './Admin.css';
 
 const ADMIN_TABLE_PAGE_SIZE = 12;
@@ -1142,65 +1143,12 @@ export const Admin: React.FC = () => {
   }, [managingAccessFor, licenses]);
 
   const productNameByLicense = useMemo(() => {
-    const normalize = (v: string) =>
-      String(v || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .trim();
-
-    const csvIncludes = (csv: string, val: string) => {
-      const target = String(val || '').trim();
-      if (!target) return false;
-      return String(csv || '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .includes(target);
-    };
-
-    const planKind = (planoRaw: string): 'anual' | 'vitalicio' | 'desafio' | 'outro' => {
-      const plano = normalize(planoRaw);
-      if (plano.includes('vital')) return 'vitalicio';
-      if (plano.includes('anual')) return 'anual';
-      if (plano.includes('teste') || plano.includes('desafio')) return 'desafio';
-      return 'outro';
-    };
-
-    const matchByPlanName = (productName: string, kind: ReturnType<typeof planKind>) => {
-      const n = normalize(productName);
-      if (kind === 'anual') return n.includes('anual');
-      if (kind === 'vitalicio') return n.includes('vitalicio');
-      if (kind === 'desafio') return n.includes('desafio') || n.includes('teste');
-      return false;
-    };
-
-    const fallbackBySystem = new Map<string, string>();
-    for (const p of products as Array<{ systemId?: string; productName?: string }>) {
-      const sidCsv = String(p.systemId || '').trim();
-      const pname = String(p.productName || '').trim();
-      if (!sidCsv || !pname) continue;
-      const ids = sidCsv
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      for (const sid of ids) {
-        if (!fallbackBySystem.has(sid)) fallbackBySystem.set(sid, pname);
-      }
-    }
-
-    return (license: { systemId?: string; plano?: string }) => {
-      const sid = String(license.systemId || '').trim();
-      const kind = planKind(String(license.plano || ''));
-      const candidates = (products as Array<{ systemId?: string; productName?: string }>).filter((p) =>
-        csvIncludes(String(p.systemId || ''), sid)
+    return (license: { systemId?: string; plano?: string; offerCode?: string }) => {
+      const matched = resolveProductForLicense(
+        products as Array<{ id: number; systemId?: string; productName?: string; offerCode?: string; plano?: string }>,
+        license
       );
-      if (!candidates.length) return sid || '—';
-
-      const byPlan = candidates.find((p) => matchByPlanName(String(p.productName || ''), kind));
-      if (byPlan?.productName) return byPlan.productName;
-
-      return fallbackBySystem.get(sid) || candidates[0]?.productName || sid || '—';
+      return matched?.productName || String(license.systemId || '').trim() || '—';
     };
   }, [products]);
 
@@ -1638,20 +1586,32 @@ export const Admin: React.FC = () => {
   };
 
   const handleDeleteUser = async (user: any) => {
-    if (!window.confirm(`⚠️ Tem certeza que deseja EXCLUIR permanentemente o usuário ${user.email} e todos os seus históricos e acessos? Essa ação é IRREVERSÍVEL.`)) return;
+    const isLicenseOnly = Boolean(user._isLicenseOnly);
+    const msg = isLicenseOnly
+      ? `⚠️ Excluir TODAS as licenças EA do e-mail ${user.email}? Não há conta de área de membros — apenas as licenças serão removidas.`
+      : `⚠️ Tem certeza que deseja EXCLUIR permanentemente o usuário ${user.email}, suas licenças EA e todos os históricos? Essa ação é IRREVERSÍVEL.`;
+    if (!window.confirm(msg)) return;
     try {
-      const res = await fetch(`/api/admin/users/${user.id}`, {
-        method: 'DELETE',
-        headers: { ...authHeaders() }
-      });
+      const res = isLicenseOnly
+        ? await fetch(`/api/admin/license-clients?email=${encodeURIComponent(user.email)}`, {
+            method: 'DELETE',
+            headers: { ...authHeaders() },
+          })
+        : await fetch(`/api/admin/users/${user.id}`, {
+            method: 'DELETE',
+            headers: { ...authHeaders() },
+          });
       if (res.ok) {
-        alert('Usuário excluído com sucesso!');
-        fetchUsers();
+        alert(isLicenseOnly ? 'Licenças removidas com sucesso!' : 'Usuário excluído com sucesso!');
+        void fetchUsers();
+        void fetchLicenses();
       } else {
         const errorData = await res.json();
-        alert(errorData.error || 'Falha ao excluir usuário.');
+        alert(errorData.error || 'Falha ao excluir.');
       }
-    } catch(err) { alert('Erro na comunicação com servidor.'); }
+    } catch (err) {
+      alert('Erro na comunicação com servidor.');
+    }
   };
 
   const uploadFile = async (file: File) => {
@@ -2686,11 +2646,13 @@ export const Admin: React.FC = () => {
                           <button className="btn-primary" onClick={() => setManagingAccessFor(u)} style={{ fontSize: '12px', padding: '6px 14px' }}>
                             <KeyRound size={14} /> Licenças
                           </button>
-                          {!u._isLicenseOnly && (
-                            <button className="btn-icon btn-danger" onClick={() => handleDeleteUser(u)} title="Excluir Usuário">
-                              <Trash2 size={16} />
-                            </button>
-                          )}
+                          <button
+                            className="btn-icon btn-danger"
+                            onClick={() => handleDeleteUser(u)}
+                            title={u._isLicenseOnly ? 'Excluir licenças deste e-mail' : 'Excluir usuário e licenças'}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>

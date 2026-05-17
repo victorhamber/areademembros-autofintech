@@ -20,6 +20,8 @@
     "db:migrate:wordpress:dry": "node scripts/migrate-wordpress-mariadb-to-app.mjs --dry-run",
     "db:consolidate:products": "node scripts/consolidate-three-products.mjs",
     "db:consolidate:products:dry": "node scripts/consolidate-three-products.mjs --dry-run",
+    "db:fix:license-products": "node scripts/fix-license-products-by-plan.mjs",
+    "db:fix:license-products:dry": "node scripts/fix-license-products-by-plan.mjs --dry-run",
     "dev:api": "tsx server/index.ts",
     "dev:full": "concurrently -n api,web -c cyan,magenta \"npm run dev:api\" \"npm run dev\"",
     "server": "npx prisma db push --accept-data-loss && tsx server/index.ts",

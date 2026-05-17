@@ -94,6 +94,16 @@ export function registerAdminForexRoutes(
     res.json({ success: true });
   });
 
+  /** Remove todas as licenças EA de um e-mail (cliente sem conta User). */
+  app.delete('/api/admin/license-clients', adminAuth, async (req, res) => {
+    const email = String(req.query.email || '')
+      .toLowerCase()
+      .trim();
+    if (!email) return res.status(400).json({ error: 'E-mail obrigatório.' });
+    const result = await prisma.license.deleteMany({ where: { email } });
+    res.json({ success: true, deleted: result.count });
+  });
+
   app.get('/api/admin/products', adminAuth, async (_req, res) => {
     res.json(await prisma.product.findMany({ orderBy: { id: 'asc' } }));
   });

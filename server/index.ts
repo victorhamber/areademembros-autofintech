@@ -1022,12 +1022,17 @@ app.delete('/api/admin/purchases/:userId/:ebookId', adminAuthMiddleware, async (
 app.delete('/api/admin/users/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const id = String(req.params.id);
-    
+    const user = await prisma.user.findUnique({ where: { id }, select: { email: true } });
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
     // Cleanup user relations first
     await prisma.purchase.deleteMany({ where: { userId: id } });
     await prisma.wishlist.deleteMany({ where: { userId: id } });
     await prisma.highlight.deleteMany({ where: { userId: id } });
-    
+    await prisma.license.deleteMany({
+      where: { email: String(user.email).toLowerCase().trim() },
+    });
+
     // Delete user
     await prisma.user.delete({ where: { id } });
     
