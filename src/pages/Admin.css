@@ -817,8 +817,9 @@
   box-shadow: 0 12px 40px rgba(0,0,0,0.4);
 }
 .admin-modal--client-licenses {
-  max-width: min(96vw, 760px);
-  max-height: 90vh;
+  width: min(98vw, 1120px);
+  max-width: min(98vw, 1120px);
+  max-height: 92vh;
   overflow-y: auto;
   color-scheme: dark;
 }
@@ -901,13 +902,65 @@
   max-height: min(52vh, 420px);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: auto;
   background: var(--bg-main);
 }
 
 .admin-modal--client-licenses .admin-modal-license-table-wrap .admin-table {
   margin-top: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th,
+.admin-modal--client-licenses .admin-table--client-licenses td {
+  padding: 8px 10px;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th:nth-child(1),
+.admin-modal--client-licenses .admin-table--client-licenses td:nth-child(1) {
+  width: 48px;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th:nth-child(2),
+.admin-modal--client-licenses .admin-table--client-licenses td:nth-child(2) {
+  width: 88px;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th:nth-child(3),
+.admin-modal--client-licenses .admin-table--client-licenses td:nth-child(3) {
+  width: 22%;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th:nth-child(4),
+.admin-modal--client-licenses .admin-table--client-licenses td:nth-child(4) {
+  width: 72px;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th:nth-child(5),
+.admin-modal--client-licenses .admin-table--client-licenses td:nth-child(5) {
+  width: 100px;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th:nth-child(6),
+.admin-modal--client-licenses .admin-table--client-licenses td:nth-child(6) {
+  width: 72px;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th:nth-child(7),
+.admin-modal--client-licenses .admin-table--client-licenses td:nth-child(7) {
+  width: 118px;
+}
+
+.admin-modal--client-licenses .admin-table--client-licenses th:nth-child(8),
+.admin-modal--client-licenses .admin-table--client-licenses td:nth-child(8) {
+  width: 148px;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .admin-modal--client-licenses .admin-modal-license-panel {
@@ -949,9 +1002,10 @@
 
 .admin-modal-license-table-actions {
   display: inline-flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
   vertical-align: middle;
 }
 
@@ -959,9 +1013,10 @@
 .admin-modal-license-table-actions .btn-danger-sm {
   display: inline-flex;
   align-items: center;
-  width: 100%;
-  min-width: 88px;
+  width: auto;
+  min-width: 0;
   justify-content: center;
+  white-space: nowrap;
 }
 
 .admin-client-license-status-wrap {

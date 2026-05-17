@@ -1754,8 +1754,8 @@ export const Admin: React.FC = () => {
                 Licenças deste e-mail ({licensesForClientModal.length})
                 {modalLicensesLoading ? ' — carregando…' : ''}
               </h3>
-              <div className="admin-modal-license-table-wrap admin-table-scroll">
-                <table className="admin-table" style={{ margin: 0 }}>
+              <div className="admin-modal-license-table-wrap">
+                <table className="admin-table admin-table--client-licenses" style={{ margin: 0 }}>
                   <thead>
                     <tr>
                       <th>ID</th>
@@ -1804,7 +1804,9 @@ export const Admin: React.FC = () => {
                             })()}
                           </td>
                           <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                            {l.dataExpiracao ? new Date(l.dataExpiracao).toLocaleString('pt-BR') : '—'}
+                            {l.dataExpiracao
+                              ? new Date(l.dataExpiracao).toLocaleDateString('pt-BR')
+                              : '—'}
                           </td>
                           <td style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                             <div className="admin-modal-license-table-actions">
