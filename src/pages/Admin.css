@@ -898,10 +898,11 @@
 }
 
 .admin-modal--client-licenses .admin-modal-license-table-wrap {
-  max-height: 220px;
+  max-height: min(52vh, 420px);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: auto;
   background: var(--bg-main);
 }
 

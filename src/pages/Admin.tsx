@@ -197,6 +197,8 @@ export const Admin: React.FC = () => {
   const [newUserProductId, setNewUserProductId] = useState('');
   const [newUserPlan, setNewUserPlan] = useState('mensal');
   const [managingAccessFor, setManagingAccessFor] = useState<any | null>(null);
+  const [modalClientLicenses, setModalClientLicenses] = useState<any[]>([]);
+  const [modalLicensesLoading, setModalLicensesLoading] = useState(false);
   const [licenseForm, setLicenseForm] = useState({
     systemId: '',
     plano: 'mensal',
@@ -769,6 +771,34 @@ export const Admin: React.FC = () => {
     }
   };
 
+  const fetchClientLicenses = async (email: string, jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    const em = String(email || '').toLowerCase().trim();
+    if (!em) {
+      setModalClientLicenses([]);
+      return;
+    }
+    setModalLicensesLoading(true);
+    try {
+      const res = await fetch(`/api/admin/licenses?email=${encodeURIComponent(em)}`, { headers: h });
+      if (res.ok) {
+        const rows = await res.json();
+        setModalClientLicenses(Array.isArray(rows) ? rows : []);
+      }
+    } catch {
+      console.error('fetchClientLicenses');
+    } finally {
+      setModalLicensesLoading(false);
+    }
+  };
+
+  const refreshLicensesAfterModalChange = (email?: string) => {
+    void fetchLicenses();
+    const em = email || managingAccessFor?.email;
+    if (em) void fetchClientLicenses(em);
+  };
+
   const fetchProducts = async (jwt?: string) => {
     const h = authHeaders(jwt);
     if (!h.Authorization) return;
@@ -1135,12 +1165,8 @@ export const Admin: React.FC = () => {
   }, [selectedManualProduct?.id, selectedManualProduct?.plano]);
 
   const licensesForClientModal = useMemo(() => {
-    if (!managingAccessFor?.email) return [];
-    const em = String(managingAccessFor.email).toLowerCase().trim();
-    return licenses
-      .filter((l: { email?: string }) => String(l.email || '').toLowerCase().trim() === em)
-      .sort((a: { id: number }, b: { id: number }) => b.id - a.id);
-  }, [managingAccessFor, licenses]);
+    return [...modalClientLicenses].sort((a: { id: number }, b: { id: number }) => b.id - a.id);
+  }, [modalClientLicenses]);
 
   const productNameByLicense = useMemo(() => {
     return (license: { systemId?: string; plano?: string; offerCode?: string }) => {
@@ -1153,7 +1179,11 @@ export const Admin: React.FC = () => {
   }, [products]);
 
   useEffect(() => {
-    if (!managingAccessFor) return;
+    if (!managingAccessFor?.email) {
+      setModalClientLicenses([]);
+      return;
+    }
+    void fetchClientLicenses(managingAccessFor.email);
     setLicenseForm({
       systemId: '',
       plano: 'mensal',
@@ -1162,6 +1192,7 @@ export const Admin: React.FC = () => {
       numeroConta: '',
     });
     setEditingLicenseId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- email do modal
   }, [managingAccessFor?.id, managingAccessFor?.email]);
 
   useEffect(() => {
@@ -1719,7 +1750,10 @@ export const Admin: React.FC = () => {
             </p>
 
             <div className="admin-modal-license-list-block">
-              <h3 className="admin-modal-section-title">Licenças deste e-mail ({licensesForClientModal.length})</h3>
+              <h3 className="admin-modal-section-title">
+                Licenças deste e-mail ({licensesForClientModal.length})
+                {modalLicensesLoading ? ' — carregando…' : ''}
+              </h3>
               <div className="admin-modal-license-table-wrap admin-table-scroll">
                 <table className="admin-table" style={{ margin: 0 }}>
                   <thead>
@@ -1728,15 +1762,22 @@ export const Admin: React.FC = () => {
                       <th>systemId</th>
                       <th>Produto</th>
                       <th>Plano</th>
+                      <th>Nº conta MT5</th>
                       <th>Status</th>
                       <th>Expira</th>
                       <th />
                     </tr>
                   </thead>
                   <tbody>
-                    {licensesForClientModal.length === 0 ? (
+                    {modalLicensesLoading ? (
                       <tr>
-                        <td colSpan={7} style={{ padding: 14, color: 'var(--text-secondary)', fontSize: 13 }}>
+                        <td colSpan={8} style={{ padding: 14, color: 'var(--text-secondary)', fontSize: 13 }}>
+                          Carregando licenças…
+                        </td>
+                      </tr>
+                    ) : licensesForClientModal.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ padding: 14, color: 'var(--text-secondary)', fontSize: 13 }}>
                           Nenhuma licença para este e-mail. Crie uma abaixo informando o systemId.
                         </td>
                       </tr>
@@ -1749,6 +1790,9 @@ export const Admin: React.FC = () => {
                           </td>
                           <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{productNameByLicense(l)}</td>
                           <td>{l.plano || '—'}</td>
+                          <td style={{ fontSize: 12, fontFamily: 'monospace' }}>
+                            {String(l.numeroConta || '').trim() || '—'}
+                          </td>
                           <td>
                             {(() => {
                               const st = effectiveLicenseStatus(l.statusLicenca, l.dataExpiracao);
@@ -1795,7 +1839,7 @@ export const Admin: React.FC = () => {
                                     headers: { ...authHeaders() },
                                   });
                                   if (!res.ok) alert('Erro ao excluir.');
-                                  else void fetchLicenses();
+                                  else refreshLicensesAfterModalChange();
                                 } finally {
                                   setLicenseModalBusy(false);
                                 }
@@ -1936,7 +1980,7 @@ export const Admin: React.FC = () => {
                           });
                           if (!res.ok) alert('Falha ao atualizar licença.');
                           else {
-                            void fetchLicenses();
+                            refreshLicensesAfterModalChange();
                             setEditingLicenseId(null);
                             setLicenseForm({
                               systemId: '',
@@ -1994,7 +2038,7 @@ export const Admin: React.FC = () => {
                         });
                         if (!res.ok) alert('Falha ao criar licença.');
                         else {
-                          void fetchLicenses();
+                          refreshLicensesAfterModalChange();
                           setLicenseForm({
                             systemId: '',
                             plano: 'mensal',

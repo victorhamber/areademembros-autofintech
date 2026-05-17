@@ -30,8 +30,15 @@ export function registerAdminForexRoutes(
   prisma: PrismaClient,
   adminAuth: (req: express.Request, res: express.Response, next: express.NextFunction) => void
 ) {
-  app.get('/api/admin/licenses', adminAuth, async (_req, res) => {
-    const rows = await prisma.license.findMany({ orderBy: { id: 'desc' }, take: 2000 });
+  app.get('/api/admin/licenses', adminAuth, async (req, res) => {
+    const email = String(req.query.email || '')
+      .toLowerCase()
+      .trim();
+    const rows = await prisma.license.findMany({
+      where: email ? { email } : undefined,
+      orderBy: { id: 'desc' },
+      ...(email ? {} : { take: 10000 }),
+    });
     res.json(rows);
   });
 
