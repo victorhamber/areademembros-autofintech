@@ -16,6 +16,7 @@ import { registerEadAndTrialRoutes } from './routes/eadAndTrial.js';
 import { registerAdminForexRoutes } from './routes/adminForex.js';
 import { startScheduledJobs } from './jobs/scheduler.js';
 import { userHasMemberAccess } from './lib/userAccess.js';
+import { verifyUserPassword } from './lib/verifyUserPassword.js';
 import { adminAuthMiddleware } from './middleware/adminAuth.js';
 import { resolveAdminPassword } from './lib/adminPassword.js';
 import { ensureDevTestAccount } from './lib/ensureDevTestAccount.js';
@@ -438,8 +439,8 @@ app.post('/api/auth/login', async (req, res) => {
       return res.json({ id: user.id, email: user.email, name: user.name, token });
     }
     
-    // Validate Existing User
-    if (user && user.password === password) {
+    // Validate Existing User (texto puro legado ou hash WordPress)
+    if (user && verifyUserPassword(String(password || ''), user.password)) {
       const ok = await userHasMemberAccess(prisma, user.id);
       if (!ok) {
         return res.status(401).json({ error: 'Sem acesso ativo: é necessário compra ou licença ativa.' });
@@ -597,7 +598,7 @@ app.put('/api/profile/password', async (req, res) => {
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { currentPassword, newPassword } = req.body;
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || user.password !== currentPassword) {
+    if (!user || !verifyUserPassword(String(currentPassword || ''), user.password)) {
       return res.status(400).json({ error: 'Senha atual incorreta.' });
     }
     await prisma.user.update({ where: { id: userId }, data: { password: newPassword } });
