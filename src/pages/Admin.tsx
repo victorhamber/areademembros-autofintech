@@ -101,6 +101,64 @@ function compareLicenseStatusLabel(a: string, b: string): number {
   return a.localeCompare(b, 'pt');
 }
 
+const ADMIN_JWT_KEY = 'ebookpro_admin_jwt';
+const ADMIN_UI_KEY = 'ebookpro_admin_ui';
+
+type AdminTab =
+  | 'courses'
+  | 'users'
+  | 'webhooks'
+  | 'email'
+  | 'products'
+  | 'forexEA'
+  | 'banner'
+  | 'builder'
+  | 'support'
+  | 'links'
+  | 'media';
+
+const ADMIN_TABS: AdminTab[] = [
+  'courses',
+  'users',
+  'webhooks',
+  'email',
+  'products',
+  'forexEA',
+  'banner',
+  'builder',
+  'support',
+  'links',
+  'media',
+];
+
+type AdminUiState = {
+  tab?: AdminTab;
+  eadSectionTab?: 'curso' | 'modulo' | 'aula';
+  selectedCourseId?: string;
+  selectedModuleId?: string;
+  selectedLessonId?: string;
+};
+
+function loadAdminUi(): AdminUiState {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_UI_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as AdminUiState;
+  } catch {
+    return {};
+  }
+}
+
+function patchAdminUi(patch: Partial<AdminUiState>) {
+  const next = { ...loadAdminUi(), ...patch };
+  sessionStorage.setItem(ADMIN_UI_KEY, JSON.stringify(next));
+}
+
+function readStoredAdminTab(): AdminTab {
+  const tab = loadAdminUi().tab;
+  return tab && ADMIN_TABS.includes(tab) ? tab : 'courses';
+}
+
 function AdminPagination({
   page,
   totalItems,
@@ -144,19 +202,22 @@ function AdminPagination({
 }
 
 export const Admin: React.FC = () => {
-  const ADMIN_JWT_KEY = 'ebookpro_admin_jwt';
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const savedUi = useMemo(() => loadAdminUi(), []);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => !!localStorage.getItem(ADMIN_JWT_KEY));
+  const [authBootstrapping, setAuthBootstrapping] = useState(() => !!localStorage.getItem(ADMIN_JWT_KEY));
   const [masterPassword, setMasterPassword] = useState('');
-  const [adminJwt, setAdminJwt] = useState('');
+  const [adminJwt, setAdminJwt] = useState(() => localStorage.getItem(ADMIN_JWT_KEY) || '');
 
   const authHeaders = (jwtOverride?: string): Record<string, string> => {
     const t = jwtOverride ?? adminJwt;
     return t ? { Authorization: `Bearer ${t}` } : {};
   };
 
-  const [activeTab, setActiveTab] = useState<
-    'courses' | 'users' | 'webhooks' | 'email' | 'products' | 'forexEA' | 'banner' | 'builder' | 'support' | 'links' | 'media'
-  >('courses');
+  const [activeTab, setActiveTabState] = useState<AdminTab>(readStoredAdminTab);
+  const setActiveTab = (tab: AdminTab) => {
+    setActiveTabState(tab);
+    patchAdminUi({ tab });
+  };
 
   const [users, setUsers] = useState<any[]>([]);
   const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
@@ -168,9 +229,9 @@ export const Admin: React.FC = () => {
   const [newCourseCoverFile, setNewCourseCoverFile] = useState<File | null>(null);
   const [newCourseProductIds, setNewCourseProductIds] = useState('');
   const [newCourseSalesPageUrl, setNewCourseSalesPageUrl] = useState('');
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
-  const [selectedModuleId, setSelectedModuleId] = useState<string>('');
-  const [selectedLessonId, setSelectedLessonId] = useState<string>('');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(savedUi.selectedCourseId || '');
+  const [selectedModuleId, setSelectedModuleId] = useState<string>(savedUi.selectedModuleId || '');
+  const [selectedLessonId, setSelectedLessonId] = useState<string>(savedUi.selectedLessonId || '');
   const [editCourseTitle, setEditCourseTitle] = useState('');
   const [editCourseSlug, setEditCourseSlug] = useState('');
   const [editCoursePublished, setEditCoursePublished] = useState(true);
@@ -240,7 +301,17 @@ export const Admin: React.FC = () => {
   const builderIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   /** Abas internas do editor EAD (painel direito). */
-  const [eadSectionTab, setEadSectionTab] = useState<'curso' | 'modulo' | 'aula'>('curso');
+  const [eadSectionTab, setEadSectionTabState] = useState<'curso' | 'modulo' | 'aula'>(
+    savedUi.eadSectionTab === 'modulo' || savedUi.eadSectionTab === 'aula' ? savedUi.eadSectionTab : 'curso'
+  );
+  const setEadSectionTab = (tab: 'curso' | 'modulo' | 'aula') => {
+    setEadSectionTabState(tab);
+    patchAdminUi({ eadSectionTab: tab });
+  };
+
+  useEffect(() => {
+    patchAdminUi({ selectedCourseId, selectedModuleId, selectedLessonId });
+  }, [selectedCourseId, selectedModuleId, selectedLessonId]);
   const [eadLessonSubtab, setEadLessonSubtab] = useState<'nova' | 'editar'>('nova');
 
   // -- EMAIL SETTINGS STATE --
@@ -832,9 +903,11 @@ export const Admin: React.FC = () => {
     }
   };
 
-  const fetchCourses = async () => {
+  const fetchCourses = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
     try {
-      const res = await fetch('/api/admin/courses', { headers: { ...authHeaders() } });
+      const res = await fetch('/api/admin/courses', { headers: { ...h } });
       if (!res.ok) {
         const fallback = await fetch('/api/public/courses');
         const data = await fallback.json().catch(() => []);
@@ -896,18 +969,22 @@ export const Admin: React.FC = () => {
   };
 
   const loadDashboard = async (jwt: string) => {
-    await validateAdminJwt({ silent: true }, jwt);
-    await Promise.all([
-      fetchUsers(jwt),
-      fetchWebhookLogs(jwt),
-      fetchEmailSettings(jwt),
-      fetchLicenses(jwt),
-      fetchProducts(jwt),
-      fetchShortLinks(jwt),
-      fetchMediaAssets(jwt),
-      fetchForexSettings(jwt),
-    ]);
-    await fetchCourses();
+    try {
+      await validateAdminJwt({ silent: true }, jwt);
+      await Promise.all([
+        fetchUsers(jwt),
+        fetchWebhookLogs(jwt),
+        fetchEmailSettings(jwt),
+        fetchLicenses(jwt),
+        fetchProducts(jwt),
+        fetchShortLinks(jwt),
+        fetchMediaAssets(jwt),
+        fetchForexSettings(jwt),
+        fetchCourses(jwt),
+      ]);
+    } finally {
+      setAuthBootstrapping(false);
+    }
   };
 
   const selectedCourse = useMemo(() => courses.find((c: any) => c.id === selectedCourseId) || null, [courses, selectedCourseId]);
@@ -1513,8 +1590,10 @@ export const Admin: React.FC = () => {
     const legacyPwd = localStorage.getItem('adminToken');
     if (j) {
       setAdminJwt(j);
+      setAuthBootstrapping(true);
       void loadDashboard(j);
     } else if (legacyPwd) {
+      setAuthBootstrapping(true);
       void (async () => {
         try {
           const res = await fetch('/api/admin/login', {
@@ -1530,11 +1609,15 @@ export const Admin: React.FC = () => {
             await loadDashboard(data.token);
           } else {
             localStorage.removeItem('adminToken');
+            setAuthBootstrapping(false);
           }
         } catch {
           localStorage.removeItem('adminToken');
+          setAuthBootstrapping(false);
         }
       })();
+    } else {
+      setAuthBootstrapping(false);
     }
   }, []);
 
@@ -1657,6 +1740,13 @@ export const Admin: React.FC = () => {
 
   // LOGIN SCREEN
   if (!isAdminLoggedIn) {
+    if (authBootstrapping) {
+      return (
+        <div className="admin-login-container">
+          <p className="admin-login-bootstrapping">Restaurando sua sessão…</p>
+        </div>
+      );
+    }
     return (
       <div className="admin-login-container">
         <form onSubmit={handleLogin} className="admin-login-box">
@@ -2127,7 +2217,8 @@ export const Admin: React.FC = () => {
               onClick={() => {
                 localStorage.removeItem(ADMIN_JWT_KEY);
                 localStorage.removeItem('adminToken');
-                window.location.reload();
+                sessionStorage.removeItem(ADMIN_UI_KEY);
+                window.location.href = '/admin';
               }}
             >
               Sair

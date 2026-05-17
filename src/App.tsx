@@ -16,6 +16,19 @@ import './App.css'
 
 type MemberTab = 'home' | 'courses' | 'downloads' | 'validation' | 'ranking' | 'profile'
 
+const MEMBER_TAB_KEY = 'ebookpro_member_tab'
+const MEMBER_TABS: MemberTab[] = ['home', 'courses', 'downloads', 'validation', 'ranking', 'profile']
+
+function isAdminRoute(pathname: string): boolean {
+  const path = pathname.replace(/\/+$/, '') || '/'
+  return path === '/admin'
+}
+
+function readStoredMemberTab(): MemberTab {
+  const raw = sessionStorage.getItem(MEMBER_TAB_KEY)
+  return raw && MEMBER_TABS.includes(raw as MemberTab) ? (raw as MemberTab) : 'home'
+}
+
 function parseShowcaseRoute(pathname: string): { isShowcase: boolean; slug: string | null } {
   const path = pathname.replace(/\/+$/, '')
   const match = path.match(/^\/(vitrine|catalogo|cat[aá]logo)(?:\/([^/]+))?$/i)
@@ -98,7 +111,7 @@ function App() {
     return <PublicBuilderPage slug={directBuilderSlug} />
   }
 
-  if (window.location.pathname === '/admin') {
+  if (isAdminRoute(window.location.pathname)) {
     return <Admin />
   }
 
@@ -109,7 +122,11 @@ function App() {
   const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('ebookpro_userId'))
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('ebookpro_userEmail'))
   const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('ebookpro_userName'))
-  const [activeTab, setActiveTab] = useState<MemberTab>('home')
+  const [activeTab, setActiveTabState] = useState<MemberTab>(readStoredMemberTab)
+  const setActiveTab = (tab: MemberTab) => {
+    setActiveTabState(tab)
+    sessionStorage.setItem(MEMBER_TAB_KEY, tab)
+  }
   const [showShowcase, setShowShowcase] = useState(false)
   const [showcaseSlug, setShowcaseSlug] = useState<string | null>(null)
   const [supportUrl, setSupportUrl] = useState('')

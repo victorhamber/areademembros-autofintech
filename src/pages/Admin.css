@@ -7,6 +7,13 @@
   background-color: var(--bg-main);
   color: var(--text-primary);
 }
+
+.admin-login-bootstrapping {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
 .admin-login-box {
   background: var(--bg-secondary);
   padding: 40px;
