@@ -161,16 +161,11 @@
   color: #9e9e9e;
 }
 
-.validation-license-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  font-size: 0.82rem;
+.validation-license-detail {
+  margin: 0;
+  font-size: 0.84rem;
   color: var(--text-secondary);
-}
-
-.validation-license-id {
-  opacity: 0.85;
+  line-height: 1.4;
 }
 
 .validation-hint {

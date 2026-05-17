@@ -19,12 +19,61 @@ function isLicenseActive(l: LicenseRow): boolean {
   return new Date(l.dataExpiracao).getTime() >= Date.now();
 }
 
-function formatLicenseLabel(l: LicenseRow, tr: ReturnType<typeof t>): string {
+function licenseGroupKey(l: LicenseRow): string {
+  return `${l.productName || ''}|${l.plano || ''}|${l.systemId || ''}`.toLowerCase();
+}
+
+function formatDateShort(iso: string | null | undefined, lang: Lang): string {
+  if (!iso) return '';
+  const locale = lang === 'es' ? 'es-ES' : 'pt-BR';
+  return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function buildLicenseSlotMap(licenses: LicenseRow[]): Map<number, { index: number; total: number }> {
+  const groups = new Map<string, LicenseRow[]>();
+  for (const l of licenses) {
+    const key = licenseGroupKey(l);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(l);
+  }
+  const slots = new Map<number, { index: number; total: number }>();
+  for (const group of groups.values()) {
+    const sorted = [...group].sort((a, b) => a.id - b.id);
+    sorted.forEach((l, index) => slots.set(l.id, { index, total: sorted.length }));
+  }
+  return slots;
+}
+
+function formatLicenseDetail(
+  l: LicenseRow,
+  tr: ReturnType<typeof t>,
+  lang: Lang,
+  slot?: { index: number; total: number }
+): string {
+  const account = String(l.numeroConta || '').trim();
+  if (account) return `${tr.validation_account_mt5}: ${account}`;
+
+  const expiry = formatDateShort(l.dataExpiracao, lang);
+  if (expiry) return `${tr.validation_valid_until} ${expiry}`;
+
+  if (slot && slot.total > 1) {
+    return tr.validation_access_slot
+      .replace('{n}', String(slot.index + 1))
+      .replace('{total}', String(slot.total));
+  }
+
+  return tr.validation_pending_account;
+}
+
+function formatLicenseLabel(
+  l: LicenseRow,
+  tr: ReturnType<typeof t>,
+  lang: Lang,
+  slot?: { index: number; total: number }
+): string {
   const product = l.productName || l.systemId || 'Produto';
   const plan = l.plano ? ` · ${l.plano}` : '';
-  const account = String(l.numeroConta || '').trim();
-  if (account) return `${product}${plan} — ${tr.validation_account_mt5}: ${account}`;
-  return `${product}${plan} — ${tr.validation_license_ref} #${l.id}`;
+  return `${product}${plan} — ${formatLicenseDetail(l, tr, lang, slot)}`;
 }
 
 export function ValidationPanel({
@@ -46,6 +95,9 @@ export function ValidationPanel({
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const selectableLicenses = useMemo(() => licenses.filter(isLicenseActive), [licenses]);
+
+  const licenseSlots = useMemo(() => buildLicenseSlotMap(licenses), [licenses]);
+  const activeLicenseSlots = useMemo(() => buildLicenseSlotMap(selectableLicenses), [selectableLicenses]);
 
   const selectedLicense = useMemo(
     () => selectableLicenses.find((l) => String(l.id) === selectedLicenseId) || null,
@@ -134,8 +186,9 @@ export function ValidationPanel({
             <h2 className="validation-subtitle">{tr.validation_licenses_heading}</h2>
             <ul className="validation-license-list">
               {licenses.map((l) => {
-                const account = String(l.numeroConta || '').trim();
                 const active = isLicenseActive(l);
+                const slot = licenseSlots.get(l.id);
+                const detail = formatLicenseDetail(l, tr, lang, slot);
                 return (
                   <li key={l.id} className="validation-license-item">
                     <div className="validation-license-item-main">
@@ -153,15 +206,7 @@ export function ValidationPanel({
                         {active ? tr.validation_status_active : tr.validation_status_expired}
                       </span>
                     </div>
-                    <div className="validation-license-meta">
-                      <span>
-                        {tr.validation_account_mt5}:{' '}
-                        <strong>{account || tr.validation_no_account}</strong>
-                      </span>
-                      <span className="validation-license-id">
-                        {tr.validation_license_ref} #{l.id}
-                      </span>
-                    </div>
+                    <p className="validation-license-detail">{detail}</p>
                   </li>
                 );
               })}
@@ -186,7 +231,7 @@ export function ValidationPanel({
                 <option value="">{tr.validation_system_placeholder}</option>
                 {selectableLicenses.map((l) => (
                   <option key={l.id} value={String(l.id)}>
-                    {formatLicenseLabel(l, tr)}
+                    {formatLicenseLabel(l, tr, lang, activeLicenseSlots.get(l.id))}
                   </option>
                 ))}
               </select>
