@@ -128,6 +128,16 @@ const translations = {
     validation_loading: 'Validando...',
     validation_no_products:
       'Não encontramos produtos vinculados ao seu e-mail. Se você já comprou, aguarde a liberação ou fale com o suporte.',
+    validation_licenses_heading: 'Suas licenças',
+    validation_account_mt5: 'Conta MT5',
+    validation_license_ref: 'Licença',
+    validation_no_account: 'não vinculada',
+    validation_status_active: 'Ativa',
+    validation_status_expired: 'Expirada',
+    validation_no_active_license: 'Nenhuma licença ativa no momento. Renove ou fale com o suporte.',
+    validation_account_placeholder: 'Ex.: 12345678',
+    validation_account_linked: 'Esta licença já está vinculada a uma conta. Você pode validar ou atualizar o número abaixo.',
+    validation_account_new_hint: 'Informe o número da conta MetaTrader para vincular a esta licença.',
 
     // ── Ranking (top usuários) ──
     ranking_title: 'Ranking',
@@ -361,6 +371,16 @@ const translations = {
     validation_loading: 'Validando...',
     validation_no_products:
       'No encontramos productos vinculados a tu e-mail. Si ya compraste, espera la liberación o contacta soporte.',
+    validation_licenses_heading: 'Tus licencias',
+    validation_account_mt5: 'Cuenta MT5',
+    validation_license_ref: 'Licencia',
+    validation_no_account: 'no vinculada',
+    validation_status_active: 'Activa',
+    validation_status_expired: 'Expirada',
+    validation_no_active_license: 'No hay licencia activa. Renueva o contacta soporte.',
+    validation_account_placeholder: 'Ej.: 12345678',
+    validation_account_linked: 'Esta licencia ya está vinculada a una cuenta.',
+    validation_account_new_hint: 'Indica el número de cuenta MetaTrader para vincular esta licencia.',
 
     // ── Ranking ──
     ranking_title: 'Ranking',

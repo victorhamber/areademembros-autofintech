@@ -44,10 +44,12 @@ export function registerMemberApiRoutes(app: express.Application, prisma: Prisma
     if (!user) return res.status(404).json({ error: 'User not found' });
     const numero_conta = String(req.body?.numero_conta || '').trim();
     const system_id = String(req.body?.system_id || '').trim();
+    const license_id = req.body?.license_id;
     const out = await validateLicenseHandler(prisma, {
       email: user.email,
       numero_conta,
-      system_id
+      system_id,
+      license_id,
     });
     res.status(out.status).json(out.json);
   });

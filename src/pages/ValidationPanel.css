@@ -1,7 +1,10 @@
 .validation-page {
   padding: var(--spacing-md);
-  max-width: 520px;
+  max-width: 560px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .validation-header h1 {
@@ -91,4 +94,88 @@
   color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+.validation-subtitle {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.validation-card--list {
+  gap: 8px;
+}
+
+.validation-license-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.validation-license-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: var(--bg-main);
+}
+
+.validation-license-item-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.validation-license-product {
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.validation-license-plan {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.validation-license-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.validation-license-status--active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.validation-license-status--inactive {
+  background: rgba(158, 158, 158, 0.15);
+  color: #9e9e9e;
+}
+
+.validation-license-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.validation-license-id {
+  opacity: 0.85;
+}
+
+.validation-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
