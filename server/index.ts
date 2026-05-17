@@ -16,7 +16,7 @@ import { registerEadAndTrialRoutes } from './routes/eadAndTrial.js';
 import { registerAdminForexRoutes } from './routes/adminForex.js';
 import { startScheduledJobs } from './jobs/scheduler.js';
 import { userHasMemberAccess } from './lib/userAccess.js';
-import { verifyUserPassword } from './lib/verifyUserPassword.js';
+import { hashMemberPassword, verifyUserPassword } from './lib/verifyUserPassword.js';
 import { adminAuthMiddleware } from './middleware/adminAuth.js';
 import { resolveAdminPassword } from './lib/adminPassword.js';
 import { ensureDevTestAccount } from './lib/ensureDevTestAccount.js';
@@ -429,7 +429,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (user && !user.password) {
       user = await prisma.user.update({
         where: { id: user.id },
-        data: { password }
+        data: { password: hashMemberPassword(String(password || '')) },
       });
       const ok = await userHasMemberAccess(prisma, user.id);
       if (!ok) {
@@ -540,7 +540,10 @@ app.post('/api/auth/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Token inválido ou expirado.' });
     }
 
-    await prisma.user.update({ where: { id: userId }, data: { password: newPassword } });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashMemberPassword(String(newPassword || '')) },
+    });
     await prisma.setting.delete({ where: { key: `reset_token_${userId}` } }).catch(() => {});
 
     res.json({ success: true });
@@ -601,7 +604,10 @@ app.put('/api/profile/password', async (req, res) => {
     if (!user || !verifyUserPassword(String(currentPassword || ''), user.password)) {
       return res.status(400).json({ error: 'Senha atual incorreta.' });
     }
-    await prisma.user.update({ where: { id: userId }, data: { password: newPassword } });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashMemberPassword(String(newPassword || '')) },
+    });
     res.json({ success: true });
   } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });

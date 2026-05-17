@@ -417,12 +417,11 @@ async function applyToPostgres(prisma, data) {
   }
 
   for (const u of userByEmail.values()) {
+    const updateData = { name: u.name || undefined };
+    if (u.password) updateData.password = u.password;
     await prisma.user.upsert({
       where: { email: u.email },
-      update: {
-        name: u.name || undefined,
-        password: u.password ?? undefined,
-      },
+      update: updateData,
       create: {
         email: u.email,
         password: u.password,
