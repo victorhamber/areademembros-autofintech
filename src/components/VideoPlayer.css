@@ -7,13 +7,13 @@
   --plyr-badge-border-radius: 4px;
   border-radius: var(--radius-lg, 12px);
   overflow: hidden;
+  position: relative;
 }
 
 .lesson-video .plyr__poster {
   background-color: #000;
 }
 
-/* Esconde qualquer iframe do YouTube que vaze fora do Plyr */
 .lesson-video .plyr iframe {
   pointer-events: auto;
 }
@@ -28,7 +28,56 @@
   background: rgba(224, 122, 47, 1);
 }
 
-/* Barra de progresso */
 .lesson-video .plyr__progress__buffer {
   color: rgba(255, 255, 255, 0.25);
+}
+
+/* ============================================
+   MÁSCARAS PARA ESCONDER BRANDING DO YOUTUBE
+   ============================================
+   O iframe do YouTube renderiza nome do canal,
+   sugestões e logo. Cobrimos essas regiões com
+   overlays opacos sobre o player.
+*/
+
+/* Camada que cobre o topo do iframe (nome/avatar do canal) */
+.lesson-video .plyr__video-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.6) 70%, transparent 100%);
+  z-index: 2;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Camada que cobre o canto inferior direito (logo YouTube) */
+.lesson-video .plyr__video-wrapper::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 130px;
+  height: 60px;
+  background: #000;
+  z-index: 2;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Quando o vídeo está rodando, esconde as máscaras
+   (o YouTube já remove os elementos durante playback) */
+.lesson-video .plyr--playing .plyr__video-wrapper::before,
+.lesson-video .plyr--playing .plyr__video-wrapper::after {
+  opacity: 0;
+}
+
+/* Os controles do Plyr ficam SEMPRE acima das máscaras */
+.lesson-video .plyr__controls,
+.lesson-video .plyr__control--overlaid,
+.lesson-video .plyr__poster {
+  z-index: 3;
 }
