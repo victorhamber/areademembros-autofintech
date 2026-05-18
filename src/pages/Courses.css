@@ -499,10 +499,11 @@
 }
 
 .lesson-video {
+  position: relative;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-main);
+  background: #000;
 }
 
 .lesson-video iframe {
@@ -510,6 +511,20 @@
   aspect-ratio: 16 / 9;
   border: 0;
   display: block;
+}
+
+/* Oculta o logo do YouTube no canto superior direito */
+.lesson-video::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 160px;
+  height: 42px;
+  background: #000;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 0 var(--radius-lg) 0 0;
 }
 
 .lesson-video--empty {
