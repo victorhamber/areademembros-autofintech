@@ -4,19 +4,19 @@ export type VideoInfo = {
   embedUrl: string;
 };
 
+function yt(id: string): VideoInfo {
+  return { provider: 'youtube', videoId: id, embedUrl: `https://www.youtube-nocookie.com/embed/${id}` };
+}
+function vim(id: string): VideoInfo {
+  return { provider: 'vimeo', videoId: id, embedUrl: `https://player.vimeo.com/video/${id}` };
+}
+
 /**
  * Extrai provider + videoId + embedUrl de qualquer link de vídeo.
  */
 export function parseVideoUrl(raw: string | null | undefined): VideoInfo | null {
   const url = String(raw ?? '').trim();
   if (!url) return null;
-
-  function yt(id: string): VideoInfo {
-    return { provider: 'youtube', videoId: id, embedUrl: `https://www.youtube-nocookie.com/embed/${id}` };
-  }
-  function vim(id: string): VideoInfo {
-    return { provider: 'vimeo', videoId: id, embedUrl: `https://player.vimeo.com/video/${id}` };
-  }
 
   try {
     const parsed = new URL(url, 'https://example.invalid');
@@ -49,7 +49,9 @@ export function parseVideoUrl(raw: string | null | undefined): VideoInfo | null 
       if (id && /^\d+$/.test(id)) return vim(id);
       return { provider: 'vimeo', videoId: '', embedUrl: url };
     }
-  } catch { /* fallback */ }
+  } catch {
+    /* fallback */
+  }
 
   const ytWatch = url.match(/(?:youtube\.com\/watch\?.*[&?]v=|youtu\.be\/)([\w-]{11})/i);
   if (ytWatch) return yt(ytWatch[1]);
@@ -61,6 +63,37 @@ export function parseVideoUrl(raw: string | null | undefined): VideoInfo | null 
   if (vimeo) return vim(vimeo[1]);
 
   return { provider: 'unknown', videoId: '', embedUrl: url };
+}
+
+/** URLs de poster do YouTube (maior → menor resolução) */
+export function youtubePosterCandidates(videoId: string): string[] {
+  return [
+    `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+    `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
+    `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+  ];
+}
+
+/** Carrega a melhor thumbnail disponível (padrão Presto Player) */
+export function loadBestPoster(candidates: string[], minWidth = 121): Promise<string | null> {
+  const tryOne = (src: string) =>
+    new Promise<string>((resolve, reject) => {
+      const img = new Image();
+      const done = () => {
+        img.onload = null;
+        img.onerror = null;
+        if (img.naturalWidth >= minWidth) resolve(src);
+        else reject();
+      };
+      img.onload = done;
+      img.onerror = () => reject();
+      img.src = src;
+    });
+
+  return candidates.reduce<Promise<string | null>>(
+    (chain, src) => chain.catch(() => tryOne(src)),
+    Promise.reject()
+  ).catch(() => null);
 }
 
 /** Atalho legado — retorna só a embedUrl */
