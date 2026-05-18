@@ -36,11 +36,11 @@ async function resolveUserOwnedProductIds(prisma: PrismaClient, userId: string |
       statusLicenca: 'ativa',
       OR: [{ dataExpiracao: null }, { dataExpiracao: { gte: now } }],
     },
-    select: { systemId: true, offerCode: true },
+    select: { systemId: true, offerCode: true, plano: true },
   });
   if (!activeLicenses.length) return owned;
   const allProducts = await prisma.product.findMany({
-    select: { id: true, systemId: true, offerCode: true, plano: true },
+    select: { id: true, systemId: true, offerCode: true, plano: true, productName: true },
   });
   return resolveOwnedProductIds(activeLicenses, allProducts);
 }

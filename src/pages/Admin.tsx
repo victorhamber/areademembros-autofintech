@@ -266,6 +266,7 @@ export const Admin: React.FC = () => {
     statusLicenca: 'ativa',
     dataExpiracao: planExpiryLocalValue('mensal'),
     numeroConta: '',
+    offerCode: '',
   });
   const [editingLicenseId, setEditingLicenseId] = useState<number | null>(null);
   const [licenseModalBusy, setLicenseModalBusy] = useState(false);
@@ -1255,6 +1256,26 @@ export const Admin: React.FC = () => {
     };
   }, [products]);
 
+  const licenseFormSelectedProductId = useMemo(() => {
+    const matched = resolveProductForLicense(
+      products as Array<{ id: number; systemId?: string; productName?: string; offerCode?: string; plano?: string }>,
+      {
+        systemId: licenseForm.systemId,
+        plano: licenseForm.plano,
+        offerCode: licenseForm.offerCode,
+      }
+    );
+    return matched?.id != null ? String(matched.id) : '';
+  }, [products, licenseForm.systemId, licenseForm.plano, licenseForm.offerCode]);
+
+  const licenseFormSelectedProductName = useMemo(() => {
+    if (!licenseFormSelectedProductId) return '';
+    const p = (products as Array<{ id: number; productName?: string }>).find(
+      (x) => String(x.id) === licenseFormSelectedProductId
+    );
+    return p?.productName || '';
+  }, [products, licenseFormSelectedProductId]);
+
   useEffect(() => {
     if (!managingAccessFor?.email) {
       setModalClientLicenses([]);
@@ -1267,6 +1288,7 @@ export const Admin: React.FC = () => {
       statusLicenca: 'ativa',
       dataExpiracao: planExpiryLocalValue('mensal'),
       numeroConta: '',
+      offerCode: '',
     });
     setEditingLicenseId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- email do modal
@@ -1913,6 +1935,7 @@ export const Admin: React.FC = () => {
                                   statusLicenca: String(l.statusLicenca || 'ativa'),
                                   dataExpiracao: isoToDatetimeLocalValue(l.dataExpiracao),
                                   numeroConta: String(l.numeroConta || ''),
+                                  offerCode: String(l.offerCode || ''),
                                 });
                               }}
                             >
@@ -1954,25 +1977,48 @@ export const Admin: React.FC = () => {
                 {editingLicenseId != null ? `Editar licença #${editingLicenseId}` : 'Nova licença'}
               </h3>
               <label className="admin-modal-field-label" htmlFor="license-product-pick">
-                Preencher systemId a partir do produto
+                Produto vinculado
               </label>
               <select
                 id="license-product-pick"
-                value=""
+                value={licenseFormSelectedProductId}
                 disabled={licenseModalBusy}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  e.currentTarget.value = '';
-                  if (v) setLicenseForm((f) => ({ ...f, systemId: v }));
+                  const productId = e.target.value;
+                  if (!productId) return;
+                  const p = (products as Array<{ id: number; systemId?: string; plano?: string }>).find(
+                    (x) => String(x.id) === productId
+                  );
+                  if (!p) return;
+                  setLicenseForm((f) => ({
+                    ...f,
+                    systemId: String(p.systemId || '').trim(),
+                    plano: String(p.plano || f.plano || 'mensal'),
+                  }));
                 }}
               >
                 <option value="">Selecione um produto…</option>
                 {products.map((p: any) => (
-                  <option key={p.id} value={p.systemId}>
+                  <option key={p.id} value={String(p.id)}>
                     {p.productName} — {p.systemId}
                   </option>
                 ))}
               </select>
+              {licenseFormSelectedProductName ? (
+                <p className="admin-modal-field-hint" style={{ marginTop: 6, marginBottom: 0, fontSize: 12 }}>
+                  Detectado: <strong>{licenseFormSelectedProductName}</strong>
+                  {licenseForm.systemId ? (
+                    <>
+                      {' '}
+                      · systemId <code>{licenseForm.systemId}</code>
+                    </>
+                  ) : null}
+                </p>
+              ) : licenseForm.systemId.trim() ? (
+                <p className="admin-modal-field-hint" style={{ marginTop: 6, marginBottom: 0, fontSize: 12, color: '#f59e0b' }}>
+                  Nenhum produto do catálogo corresponde a este systemId/plano. Confira em Produtos.
+                </p>
+              ) : null}
               <label className="admin-modal-field-label" htmlFor="license-system-id">
                 systemId *
               </label>
@@ -2080,6 +2126,7 @@ export const Admin: React.FC = () => {
                               statusLicenca: 'ativa',
                               dataExpiracao: planExpiryLocalValue('mensal'),
                               numeroConta: '',
+                              offerCode: '',
                             });
                           }
                         } finally {
@@ -2101,6 +2148,7 @@ export const Admin: React.FC = () => {
                           statusLicenca: 'ativa',
                           dataExpiracao: planExpiryLocalValue('mensal'),
                           numeroConta: '',
+                          offerCode: '',
                         });
                       }}
                     >
@@ -2137,6 +2185,7 @@ export const Admin: React.FC = () => {
                             statusLicenca: 'ativa',
                             dataExpiracao: planExpiryLocalValue('mensal'),
                             numeroConta: '',
+                            offerCode: '',
                           });
                         }
                       } finally {
