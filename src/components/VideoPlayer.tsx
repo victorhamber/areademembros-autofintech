@@ -47,7 +47,26 @@ const PLYR_OPTS: Plyr.Options = {
   keyboard: { focused: true, global: false },
   tooltips: { controls: false, seek: true },
   ratio: '16:9',
+  muted: false,
+  volume: 1,
 };
+
+type PlyrWithEmbed = Plyr & {
+  embed?: { unMute?: () => void; setVolume?: (n: number) => void };
+};
+
+/** YouTube muta ao dar seek antes do primeiro play; restaura áudio após retomar. */
+function ensurePlayerAudio(player: Plyr) {
+  try {
+    player.muted = false;
+    if (!player.volume || player.volume === 0) player.volume = 1;
+    const embed = (player as PlyrWithEmbed).embed;
+    embed?.unMute?.();
+    embed?.setVolume?.(100);
+  } catch {
+    /* ignore */
+  }
+}
 
 const PROGRESS_SAVE_INTERVAL_MS = 8000;
 const COMPLETE_AT_PERCENT = 92;
@@ -156,7 +175,9 @@ export const VideoPlayer = memo(function VideoPlayer({
     const onPlay = () => {
       hasPlayedRef.current = true;
       setPauseCover(false);
+      ensurePlayerAudio(player);
     };
+    const onPlaying = () => ensurePlayerAudio(player);
     const onTimeUpdate = () => reportProgress(player);
     const onEndedEvent = () => {
       if (endedFiredRef.current) return;
@@ -167,13 +188,35 @@ export const VideoPlayer = memo(function VideoPlayer({
 
     player.on('ready', () => {
       syncPoster();
-      seekToSavedPosition(player);
-      // Já houve clique na facade; iniciar direto evita exigir "segundo play".
+      ensurePlayerAudio(player);
       setPauseCover(false);
-      void player.play();
+
+      const resumePercent = initialResumePercentRef.current;
+      const startPlayback = () => {
+        void Promise.resolve(player.play()).then(() => {
+          ensurePlayerAudio(player);
+          window.setTimeout(() => ensurePlayerAudio(player), 150);
+          window.setTimeout(() => ensurePlayerAudio(player), 600);
+        });
+      };
+
+      if (resumePercent > 2) {
+        // Seek antes do play deixa o YouTube mudo; após iniciar, busca o ponto e desmuta.
+        const onFirstPlaying = () => {
+          player.off('playing', onFirstPlaying);
+          seekToSavedPosition(player);
+          ensurePlayerAudio(player);
+          window.setTimeout(() => ensurePlayerAudio(player), 200);
+        };
+        player.on('playing', onFirstPlaying);
+        startPlayback();
+      } else {
+        startPlayback();
+      }
     });
     player.on('pause', onPause);
     player.on('play', onPlay);
+    player.on('playing', onPlaying);
     player.on('timeupdate', onTimeUpdate);
     player.on('ended', onEndedEvent);
 
@@ -186,6 +229,7 @@ export const VideoPlayer = memo(function VideoPlayer({
       reportProgress(player, true);
       player.off('pause', onPause);
       player.off('play', onPlay);
+      player.off('playing', onPlaying);
       player.off('timeupdate', onTimeUpdate);
       player.off('ended', onEndedEvent);
     };
@@ -206,7 +250,12 @@ export const VideoPlayer = memo(function VideoPlayer({
   const resumeFromCover = (e: React.MouseEvent) => {
     e.stopPropagation();
     setPauseCover(false);
-    void playerRef.current?.play();
+    const player = playerRef.current;
+    if (!player) return;
+    void Promise.resolve(player.play()).then(() => {
+      ensurePlayerAudio(player);
+      window.setTimeout(() => ensurePlayerAudio(player), 150);
+    });
   };
 
   const handleFacadeActivate = () => {

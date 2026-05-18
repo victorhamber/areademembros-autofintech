@@ -1,10 +1,10 @@
 /* ========== BASE ========== */
 .courses-page {
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 900px;
+  gap: 20px;
+  max-width: 1160px;
   margin: 0 auto;
 }
 
@@ -186,8 +186,9 @@
 .course-detail-header {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
-  padding: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
 }
 
 .courses-back {
@@ -210,13 +211,14 @@
 
 .course-detail-title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
+  font-weight: 700;
 }
 
 .course-detail-sub {
-  margin: 6px 0 10px;
+  margin: 8px 0 12px;
   color: var(--text-secondary);
-  font-size: 0.88rem;
+  font-size: 0.93rem;
 }
 
 .course-detail-bar {
@@ -234,20 +236,21 @@
 }
 
 .course-detail-kpis {
-  margin-top: 12px;
+  margin-top: 14px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 }
 
 .course-detail-kpi {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.02);
-  padding: 10px 12px;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(30, 41, 59, 0.55), rgba(2, 6, 23, 0.45));
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .course-detail-kpi span {
@@ -258,7 +261,8 @@
 }
 
 .course-detail-kpi strong {
-  font-size: 1rem;
+  font-size: 1.12rem;
+  color: #eaf2ff;
 }
 
 /* ========== MODULE ACCORDION ========== */
@@ -270,37 +274,39 @@
 
 .course-player-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
 .course-player-sidebar {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
-  padding: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
+  padding: 12px;
   max-height: calc(100dvh - 260px);
   overflow: auto;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .course-player-main {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
   overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .course-module-block {
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   overflow: hidden;
-  background: var(--bg-secondary);
+  background: rgba(255, 255, 255, 0.01);
 }
 
 .course-module-header {
   width: 100%;
-  padding: 12px 14px;
+  padding: 13px 14px;
   border: 0;
   background: transparent;
   color: var(--text-primary);
@@ -309,7 +315,7 @@
   justify-content: space-between;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 600;
   gap: 8px;
 }
@@ -359,7 +365,7 @@
 
 .course-lesson-btn {
   width: 100%;
-  padding: 10px 14px 10px 20px;
+  padding: 11px 14px 11px 18px;
   border: 0;
   background: transparent;
   color: var(--text-primary);
@@ -368,7 +374,7 @@
   gap: 10px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: 0.91rem;
   text-align: left;
 }
 
@@ -381,7 +387,7 @@
 }
 
 .course-lesson-btn--active {
-  background: rgba(59, 130, 246, 0.14);
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.08));
 }
 
 .course-lesson-check {
