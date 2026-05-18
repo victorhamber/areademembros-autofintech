@@ -560,7 +560,7 @@
   padding: 12px 20px;
   border-radius: var(--radius-md);
   background: var(--accent-primary);
-  color: #031018;
+  color: var(--button-text);
   font-weight: 700;
   text-decoration: none;
   font-size: 0.92rem;
@@ -608,7 +608,7 @@
 .lesson-next-btn {
   border: 0;
   background: var(--accent-primary);
-  color: #031018;
+  color: var(--button-text);
   padding: 10px 16px;
   border-radius: var(--radius-md);
   cursor: pointer;

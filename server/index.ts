@@ -32,6 +32,30 @@ function getAppUrl() {
 // Spanish-speaking country ISO codes
 const ES_COUNTRIES = ['AR','BO','CL','CO','CR','CU','DO','EC','SV','GQ','GT','HN','MX','NI','PA','PY','PE','ES','UY','VE'];
 
+const MEMBER_THEME_KEYS = [
+  'member_theme_bg_main',
+  'member_theme_bg_secondary',
+  'member_theme_bg_card',
+  'member_theme_text_primary',
+  'member_theme_text_secondary',
+  'member_theme_accent_primary',
+  'member_theme_accent_primary_hover',
+  'member_theme_border_subtle',
+  'member_theme_button_text',
+] as const;
+
+const MEMBER_THEME_DEFAULTS: Record<(typeof MEMBER_THEME_KEYS)[number], string> = {
+  member_theme_bg_main: '#0e0e0e',
+  member_theme_bg_secondary: '#141414',
+  member_theme_bg_card: '#181818',
+  member_theme_text_primary: '#ffffff',
+  member_theme_text_secondary: '#b3b3b3',
+  member_theme_accent_primary: '#3b82f6',
+  member_theme_accent_primary_hover: '#60a5fa',
+  member_theme_border_subtle: 'rgba(255, 255, 255, 0.12)',
+  member_theme_button_text: '#031018',
+};
+
 // ==========================================
 // EMAIL HELPER (RESEND)
 // ==========================================
@@ -307,6 +331,19 @@ app.get('/api/public/member-hero', async (_req, res) => {
       backgroundUrl = u && u.length > 0 ? u : null;
     }
     res.json({ backgroundUrl: backgroundUrl || null, kicker: kicker || null, supportUrl: supportUrl || null });
+  } catch {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.get('/api/public/member-theme', async (_req, res) => {
+  try {
+    const payload: Record<string, string> = {};
+    for (const key of MEMBER_THEME_KEYS) {
+      const value = (await getSetting(prisma, key))?.trim();
+      payload[key] = value || MEMBER_THEME_DEFAULTS[key];
+    }
+    res.json(payload);
   } catch {
     res.status(500).json({ error: 'Failed' });
   }
@@ -1098,6 +1135,8 @@ app.get('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
 app.post('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
   try {
     const entries = req.body as Record<string, string>;
+    const colorPattern =
+      /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/;
     for (const [key, value] of Object.entries(entries)) {
       // Skip masked values (don't overwrite with masked text)
       if (key === 'resend_api_key' && value.startsWith('••')) continue;
@@ -1112,6 +1151,14 @@ app.post('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
                 'member_hero_background_url: use URL vazia, https://…, http://… ou caminho relativo /uploads/… (não use //).'
             });
           }
+        }
+      }
+      if (MEMBER_THEME_KEYS.includes(key as (typeof MEMBER_THEME_KEYS)[number])) {
+        const v = String(value ?? '').trim();
+        if (!colorPattern.test(v)) {
+          return res.status(400).json({
+            error: `${key}: informe uma cor válida em HEX (#RRGGBB) ou RGBA (rgba(...)).`,
+          });
         }
       }
       await prisma.setting.upsert({

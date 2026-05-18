@@ -262,7 +262,7 @@
 }
 .category-pill.active {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--button-text);
   border-color: var(--accent-primary);
   font-weight: 600;
 }

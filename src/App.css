@@ -390,7 +390,7 @@
   border-radius: var(--radius-sm);
   border: none;
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--button-text);
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;

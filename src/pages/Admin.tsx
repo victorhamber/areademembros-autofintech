@@ -325,7 +325,16 @@ export const Admin: React.FC = () => {
     reset_template_pt: '',
     member_hero_background_url: '',
     member_hero_kicker: '',
-    member_support_url: ''
+    member_support_url: '',
+    member_theme_bg_main: '#0e0e0e',
+    member_theme_bg_secondary: '#141414',
+    member_theme_bg_card: '#181818',
+    member_theme_text_primary: '#ffffff',
+    member_theme_text_secondary: '#b3b3b3',
+    member_theme_accent_primary: '#3b82f6',
+    member_theme_accent_primary_hover: '#60a5fa',
+    member_theme_border_subtle: 'rgba(255, 255, 255, 0.12)',
+    member_theme_button_text: '#031018'
   });
   const [licenses, setLicenses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -349,6 +358,7 @@ export const Admin: React.FC = () => {
   const [forexApiLines, setForexApiLines] = useState('');
   const [emailSaving, setEmailSaving] = useState(false);
   const [bannerSaving, setBannerSaving] = useState(false);
+  const [themeSaving, setThemeSaving] = useState(false);
   const emptyProductForm = () => ({
     productName: '',
     systemId: '',
@@ -969,6 +979,41 @@ export const Admin: React.FC = () => {
       alert('Erro de conexão.');
     } finally {
       setBannerSaving(false);
+    }
+  };
+
+  const saveMemberTheme = async () => {
+    const h = authHeaders();
+    if (!h.Authorization) return;
+    setThemeSaving(true);
+    try {
+      const payload = {
+        member_theme_bg_main: String(emailSettings.member_theme_bg_main || '').trim(),
+        member_theme_bg_secondary: String(emailSettings.member_theme_bg_secondary || '').trim(),
+        member_theme_bg_card: String(emailSettings.member_theme_bg_card || '').trim(),
+        member_theme_text_primary: String(emailSettings.member_theme_text_primary || '').trim(),
+        member_theme_text_secondary: String(emailSettings.member_theme_text_secondary || '').trim(),
+        member_theme_accent_primary: String(emailSettings.member_theme_accent_primary || '').trim(),
+        member_theme_accent_primary_hover: String(emailSettings.member_theme_accent_primary_hover || '').trim(),
+        member_theme_border_subtle: String(emailSettings.member_theme_border_subtle || '').trim(),
+        member_theme_button_text: String(emailSettings.member_theme_button_text || '').trim(),
+      };
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        alert(j.error || 'Erro ao salvar tema.');
+        return;
+      }
+      alert('Tema salvo. Atualize a área de membros para ver tudo aplicado.');
+      void fetchEmailSettings();
+    } catch {
+      alert('Erro de conexão.');
+    } finally {
+      setThemeSaving(false);
     }
   };
 
@@ -2368,6 +2413,60 @@ export const Admin: React.FC = () => {
             <button type="button" className="btn-primary" onClick={() => void saveMemberBanner()} disabled={bannerSaving}>
               {bannerSaving ? 'Salvando…' : 'Salvar banner'}
             </button>
+          </div>
+          <div className="admin-form">
+            <h2>Tema da área de membros</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.55 }}>
+              Personalize as cores globais da área de membros (menu, páginas, cards e botões). Essas cores são aplicadas em toda a experiência do aluno.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 12 }}>
+              <label>
+                Fundo principal
+                <input type="color" value={emailSettings.member_theme_bg_main || '#0e0e0e'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_bg_main: e.target.value }))} />
+              </label>
+              <label>
+                Fundo secundário
+                <input type="color" value={emailSettings.member_theme_bg_secondary || '#141414'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_bg_secondary: e.target.value }))} />
+              </label>
+              <label>
+                Fundo de cards
+                <input type="color" value={emailSettings.member_theme_bg_card || '#181818'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_bg_card: e.target.value }))} />
+              </label>
+              <label>
+                Texto principal
+                <input type="color" value={emailSettings.member_theme_text_primary || '#ffffff'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_text_primary: e.target.value }))} />
+              </label>
+              <label>
+                Texto secundário
+                <input type="color" value={emailSettings.member_theme_text_secondary || '#b3b3b3'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_text_secondary: e.target.value }))} />
+              </label>
+              <label>
+                Cor primária
+                <input type="color" value={emailSettings.member_theme_accent_primary || '#3b82f6'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_accent_primary: e.target.value }))} />
+              </label>
+              <label>
+                Cor primária (hover)
+                <input type="color" value={emailSettings.member_theme_accent_primary_hover || '#60a5fa'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_accent_primary_hover: e.target.value }))} />
+              </label>
+              <label>
+                Cor da letra do botão
+                <input type="color" value={emailSettings.member_theme_button_text || '#031018'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_button_text: e.target.value }))} />
+              </label>
+              <label style={{ gridColumn: '1 / -1' }}>
+                Borda sutil (RGBA)
+                <input
+                  type="text"
+                  placeholder="rgba(255, 255, 255, 0.12)"
+                  value={emailSettings.member_theme_border_subtle || 'rgba(255, 255, 255, 0.12)'}
+                  onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_border_subtle: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="admin-form-actions" style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button type="button" className="btn-primary" onClick={() => void saveMemberTheme()} disabled={themeSaving}>
+                {themeSaving ? 'Salvando…' : 'Salvar tema da área de membros'}
+              </button>
+            </div>
           </div>
         </div>
       )}

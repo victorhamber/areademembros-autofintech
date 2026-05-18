@@ -19,6 +19,45 @@ type MemberTab = 'home' | 'courses' | 'downloads' | 'validation' | 'ranking' | '
 const MEMBER_TAB_KEY = 'ebookpro_member_tab'
 const MEMBER_TABS: MemberTab[] = ['home', 'courses', 'downloads', 'validation', 'ranking', 'profile']
 
+type MemberThemeSettings = {
+  member_theme_bg_main?: string
+  member_theme_bg_secondary?: string
+  member_theme_bg_card?: string
+  member_theme_text_primary?: string
+  member_theme_text_secondary?: string
+  member_theme_accent_primary?: string
+  member_theme_accent_primary_hover?: string
+  member_theme_border_subtle?: string
+  member_theme_button_text?: string
+}
+
+function applyMemberTheme(theme: MemberThemeSettings) {
+  const root = document.documentElement
+  const map: Array<[keyof MemberThemeSettings, string]> = [
+    ['member_theme_bg_main', '--bg-main'],
+    ['member_theme_bg_secondary', '--bg-secondary'],
+    ['member_theme_bg_card', '--bg-card'],
+    ['member_theme_text_primary', '--text-primary'],
+    ['member_theme_text_secondary', '--text-secondary'],
+    ['member_theme_accent_primary', '--accent-primary'],
+    ['member_theme_accent_primary_hover', '--accent-primary-hover'],
+    ['member_theme_border_subtle', '--border-subtle'],
+    ['member_theme_button_text', '--button-text'],
+  ]
+  for (const [settingKey, cssVar] of map) {
+    const value = String(theme?.[settingKey] || '').trim()
+    if (value) root.style.setProperty(cssVar, value)
+  }
+  const accent = String(theme?.member_theme_accent_primary || '').trim()
+  const hex = accent.match(/^#([0-9a-fA-F]{6})$/)?.[1]
+  if (hex) {
+    const r = parseInt(hex.slice(0, 2), 16)
+    const g = parseInt(hex.slice(2, 4), 16)
+    const b = parseInt(hex.slice(4, 6), 16)
+    root.style.setProperty('--accent-soft', `rgba(${r}, ${g}, ${b}, 0.28)`)
+  }
+}
+
 function isAdminRoute(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, '') || '/'
   return path === '/admin'
@@ -205,6 +244,20 @@ function App() {
       .catch(() => {
         if (!cancelled) setSupportUrl('')
       })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/public/member-theme')
+      .then((r) => r.json())
+      .then((data: MemberThemeSettings) => {
+        if (cancelled) return
+        applyMemberTheme(data || {})
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
