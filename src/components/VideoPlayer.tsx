@@ -67,6 +67,8 @@ export const VideoPlayer = memo(function VideoPlayer({
   const hasPlayedRef = useRef(false);
   const endedFiredRef = useRef(false);
   const lastSavedPercentRef = useRef(0);
+  const initialResumePercentRef = useRef(0);
+  const [resumePercentDisplay, setResumePercentDisplay] = useState(0);
   const onProgressRef = useRef(onProgress);
   const onEndedRef = useRef(onEnded);
 
@@ -77,12 +79,14 @@ export const VideoPlayer = memo(function VideoPlayer({
 
   const useFacade = video.provider === 'youtube' || video.provider === 'vimeo';
   const hideYoutubeUi = video.provider === 'youtube';
-  const resumePercent = Math.min(100, Math.max(0, Math.round(initialPercent)));
 
   useEffect(() => {
+    const bounded = Math.min(100, Math.max(0, Math.round(initialPercent)));
+    initialResumePercentRef.current = bounded;
+    setResumePercentDisplay(bounded);
     endedFiredRef.current = false;
-    lastSavedPercentRef.current = resumePercent;
-  }, [video.videoId, video.provider, resumePercent]);
+    lastSavedPercentRef.current = bounded;
+  }, [video.videoId, video.provider, initialPercent]);
 
   useEffect(() => {
     if (video.provider !== 'youtube' || !video.videoId) {
@@ -115,13 +119,14 @@ export const VideoPlayer = memo(function VideoPlayer({
 
   const seekToSavedPosition = useCallback(
     (player: Plyr) => {
+      const resumePercent = initialResumePercentRef.current;
       if (resumePercent <= 2) return;
       const duration = player.duration;
       if (!duration || duration <= 0) return;
       const target = (resumePercent / 100) * duration;
       if (target > 1) player.currentTime = target;
     },
-    [resumePercent]
+    []
   );
 
   const mountPlyr = useCallback(() => {
@@ -163,6 +168,7 @@ export const VideoPlayer = memo(function VideoPlayer({
     player.on('ready', () => {
       syncPoster();
       seekToSavedPosition(player);
+      const resumePercent = initialResumePercentRef.current;
       if (resumePercent > 2) {
         setPauseCover(true);
       } else {
@@ -186,7 +192,7 @@ export const VideoPlayer = memo(function VideoPlayer({
       player.off('timeupdate', onTimeUpdate);
       player.off('ended', onEndedEvent);
     };
-  }, [video.provider, video.videoId, posterUrl, reportProgress, seekToSavedPosition, resumePercent]);
+  }, [video.provider, video.videoId, posterUrl, reportProgress, seekToSavedPosition]);
 
   useEffect(() => {
     if (!activated || !useFacade) return;
@@ -236,8 +242,8 @@ export const VideoPlayer = memo(function VideoPlayer({
         ) : (
           <span className="video-player-facade__placeholder" aria-hidden />
         )}
-        {resumePercent > 2 && (
-          <span className="video-player-facade__resume-hint">Continuar de {resumePercent}%</span>
+        {resumePercentDisplay > 2 && (
+          <span className="video-player-facade__resume-hint">Continuar de {resumePercentDisplay}%</span>
         )}
         <span className="video-player-facade__play">
           <Play size={32} fill="currentColor" strokeWidth={0} />
