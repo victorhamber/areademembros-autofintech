@@ -13,6 +13,9 @@ export function setupSecurity() {
 
   // 2. Bloquear arrastar imagens ou links (Drag & Drop)
   document.addEventListener('dragstart', (e) => {
+    const target = e.target as HTMLElement | null;
+    // Permite drag-and-drop em áreas administrativas explícitas.
+    if (target?.closest('[data-allow-drag="true"]')) return;
     e.preventDefault();
   });
 

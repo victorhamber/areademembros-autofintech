@@ -251,8 +251,8 @@ export const Admin: React.FC = () => {
   const [newLessonActionLabel, setNewLessonActionLabel] = useState('');
   const [newLessonActionUrl, setNewLessonActionUrl] = useState('');
   const [draggedLessonId, setDraggedLessonId] = useState('');
-  const [dragOverLessonId, setDragOverLessonId] = useState('');
   const [dragOverModuleId, setDragOverModuleId] = useState('');
+  const [dragOverInsertIndex, setDragOverInsertIndex] = useState<number | null>(null);
 
   // -- USER FORM STATE --
   const [newUserName, setNewUserName] = useState('');
@@ -1503,7 +1503,7 @@ export const Admin: React.FC = () => {
     }
   };
 
-  const moveLessonToTarget = async (moduleId: string, targetLessonId: string | null) => {
+  const moveLessonToTarget = async (moduleId: string, insertIndex: number) => {
     if (!draggedLessonId) return;
     const module = selectedModules.find((m: any) => m.id === moduleId);
     const lessons = (module?.lessons || []) as any[];
@@ -1513,8 +1513,7 @@ export const Admin: React.FC = () => {
     if (fromIndex < 0) return;
 
     const withoutDragged = lessons.filter((l: any) => l.id !== draggedLessonId);
-    const targetIndex = targetLessonId ? withoutDragged.findIndex((l: any) => l.id === targetLessonId) : withoutDragged.length;
-    if (targetIndex < 0) return;
+    const targetIndex = Math.max(0, Math.min(insertIndex, withoutDragged.length));
 
     const reordered = [...withoutDragged];
     reordered.splice(targetIndex, 0, lessons[fromIndex]);
@@ -1546,8 +1545,8 @@ export const Admin: React.FC = () => {
       alert(err instanceof Error ? err.message : 'Falha ao reordenar aulas.');
       await fetchCourses();
     } finally {
-      setDragOverLessonId('');
       setDragOverModuleId('');
+      setDragOverInsertIndex(null);
       setDraggedLessonId('');
     }
   };
@@ -2437,75 +2436,83 @@ export const Admin: React.FC = () => {
                                     {(m.lessons || []).length === 0 ? (
                                       <li className="admin-lesson-item admin-lesson-item--muted">Nenhuma aula neste módulo.</li>
                                     ) : (
-                                      (m.lessons || []).map((l: any) => {
+                                      (m.lessons || []).map((l: any, idx: number) => {
                                         const activeLesson = selectedLessonId === l.id;
-                                        const dragOver = dragOverModuleId === m.id && dragOverLessonId === l.id;
+                                        const overBefore = dragOverModuleId === m.id && dragOverInsertIndex === idx;
+                                        const overAfter = dragOverModuleId === m.id && dragOverInsertIndex === idx + 1;
                                         return (
-                                          <li
-                                            key={l.id}
-                                            onDragOver={(e) => {
-                                              e.preventDefault();
-                                              e.dataTransfer.dropEffect = 'move';
-                                              if (draggedLessonId && draggedLessonId !== l.id) {
-                                                setDragOverModuleId(m.id);
-                                                setDragOverLessonId(l.id);
-                                              }
-                                            }}
-                                            onDrop={(e) => {
-                                              e.preventDefault();
-                                              void moveLessonToTarget(m.id, l.id);
-                                            }}
-                                          >
-                                            <button
-                                              type="button"
-                                              className={`admin-lesson-item admin-lesson-item--btn ${activeLesson ? 'admin-lesson-item--active' : ''} ${dragOver ? 'admin-lesson-item--dragover' : ''}`}
-                                              draggable
-                                              onDragStart={(e) => {
-                                                e.dataTransfer.effectAllowed = 'move';
-                                                setDraggedLessonId(l.id);
-                                                setDragOverModuleId(m.id);
-                                              }}
-                                              onDragEnd={() => {
-                                                setDraggedLessonId('');
-                                                setDragOverLessonId('');
-                                                setDragOverModuleId('');
-                                              }}
-                                              onClick={() => {
-                                                setSelectedLessonId(activeLesson ? '' : l.id);
-                                                if (!activeLesson) {
-                                                  setEadSectionTab('aula');
-                                                  setEadLessonSubtab('editar');
+                                          <React.Fragment key={l.id}>
+                                            <li
+                                              className={`admin-lesson-dropzone admin-lesson-dropzone--between ${overBefore ? 'admin-lesson-dropzone--active' : ''}`}
+                                              onDragOver={(e) => {
+                                                e.preventDefault();
+                                                e.dataTransfer.dropEffect = 'move';
+                                                if (draggedLessonId) {
+                                                  setDragOverModuleId(m.id);
+                                                  setDragOverInsertIndex(idx);
                                                 }
                                               }}
+                                              onDrop={(e) => {
+                                                e.preventDefault();
+                                                void moveLessonToTarget(m.id, idx);
+                                              }}
                                             >
-                                              <ListChecks size={12} />
-                                              <span>{l.title}</span>
-                                              {l.videoUrl && (
-                                                <span style={{ fontSize: 10, color: 'var(--accent-primary)', marginLeft: 'auto' }}>vídeo</span>
-                                              )}
-                                            </button>
-                                          </li>
+                                              Soltar aqui (posição {idx + 1})
+                                            </li>
+                                            <li>
+                                              <button
+                                                type="button"
+                                                data-allow-drag="true"
+                                                className={`admin-lesson-item admin-lesson-item--btn ${activeLesson ? 'admin-lesson-item--active' : ''}`}
+                                                draggable
+                                                onDragStart={(e) => {
+                                                  e.dataTransfer.effectAllowed = 'move';
+                                                  setDraggedLessonId(l.id);
+                                                  setDragOverModuleId(m.id);
+                                                  setDragOverInsertIndex(idx);
+                                                }}
+                                                onDragEnd={() => {
+                                                  setDraggedLessonId('');
+                                                  setDragOverModuleId('');
+                                                  setDragOverInsertIndex(null);
+                                                }}
+                                                onClick={() => {
+                                                  setSelectedLessonId(activeLesson ? '' : l.id);
+                                                  if (!activeLesson) {
+                                                    setEadSectionTab('aula');
+                                                    setEadLessonSubtab('editar');
+                                                  }
+                                                }}
+                                              >
+                                                <ListChecks size={12} />
+                                                <span>{l.title}</span>
+                                                {l.videoUrl && (
+                                                  <span style={{ fontSize: 10, color: 'var(--accent-primary)', marginLeft: 'auto' }}>vídeo</span>
+                                                )}
+                                              </button>
+                                            </li>
+                                            {idx === (m.lessons || []).length - 1 && (
+                                              <li
+                                                className={`admin-lesson-dropzone admin-lesson-dropzone--between ${overAfter ? 'admin-lesson-dropzone--active' : ''}`}
+                                                onDragOver={(e) => {
+                                                  e.preventDefault();
+                                                  e.dataTransfer.dropEffect = 'move';
+                                                  if (draggedLessonId) {
+                                                    setDragOverModuleId(m.id);
+                                                    setDragOverInsertIndex(idx + 1);
+                                                  }
+                                                }}
+                                                onDrop={(e) => {
+                                                  e.preventDefault();
+                                                  void moveLessonToTarget(m.id, idx + 1);
+                                                }}
+                                              >
+                                                Soltar aqui (posição {idx + 2})
+                                              </li>
+                                            )}
+                                          </React.Fragment>
                                         );
                                       })
-                                    )}
-                                    {(m.lessons || []).length > 0 && (
-                                      <li
-                                        className={`admin-lesson-dropzone ${dragOverModuleId === m.id && !dragOverLessonId ? 'admin-lesson-dropzone--active' : ''}`}
-                                        onDragOver={(e) => {
-                                          e.preventDefault();
-                                          e.dataTransfer.dropEffect = 'move';
-                                          if (draggedLessonId) {
-                                            setDragOverModuleId(m.id);
-                                            setDragOverLessonId('');
-                                          }
-                                        }}
-                                        onDrop={(e) => {
-                                          e.preventDefault();
-                                          void moveLessonToTarget(m.id, null);
-                                        }}
-                                      >
-                                        Solte aqui para mover ao final
-                                      </li>
                                     )}
                                   </ul>
                                 )}
