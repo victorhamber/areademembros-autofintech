@@ -314,7 +314,6 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
     const lessonOrder = new Map<string, number>();
     allCourseLessons.forEach((l, idx) => lessonOrder.set(l.id, idx + 1));
     const suggestedLesson = firstSuggestedLesson(activeCourse, progress);
-    const remaining = Math.max(0, stats.total - stats.done);
     return (
       <div className="courses-page">
         <section className="course-detail-header">
@@ -328,20 +327,6 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
           </p>
           <div className="course-detail-bar">
             <div style={{ width: `${stats.pct}%` }} />
-          </div>
-          <div className="course-detail-kpis">
-            <div className="course-detail-kpi">
-              <span>Progresso</span>
-              <strong>{stats.pct}%</strong>
-            </div>
-            <div className="course-detail-kpi">
-              <span>Concluídas</span>
-              <strong>{stats.done}</strong>
-            </div>
-            <div className="course-detail-kpi">
-              <span>Restantes</span>
-              <strong>{remaining}</strong>
-            </div>
           </div>
         </section>
 
