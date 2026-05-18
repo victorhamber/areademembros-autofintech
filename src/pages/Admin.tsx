@@ -2161,7 +2161,7 @@ export const Admin: React.FC = () => {
       <div className="admin-shell">
         <aside className="admin-sidebar" aria-label="Menu do painel administrativo">
           <div className="admin-sidebar-brand">
-            <img src="/logo.png" alt="Readlyme" className="admin-sidebar-logo" draggable={false} />
+            <img src="/autofintech-logo.png" alt="AutoFinTech" className="admin-sidebar-logo" draggable={false} />
             <span className="admin-sidebar-badge">Painel</span>
           </div>
           <nav className="admin-sidebar-nav">

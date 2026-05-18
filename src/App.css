@@ -170,10 +170,10 @@
 
 .member-sidebar-logo {
   display: block;
-  width: auto;
-  max-width: 100%;
+  width: 100%;
+  max-width: 220px;
   height: auto;
-  max-height: 40px;
+  max-height: 56px;
   object-fit: contain;
   object-position: left center;
 }

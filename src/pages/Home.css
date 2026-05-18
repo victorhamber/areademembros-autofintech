@@ -77,6 +77,25 @@
 }
 
 /* Fade longo para o preto da página — sem “linha” entre banner e conteúdo */
+.hero-fullbleed--netflix::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Zona mais alta = some o corte seco da capa antes do texto */
+  height: min(52%, 420px);
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.35) 42%,
+    rgba(0, 0, 0, 0.72) 72%,
+    var(--bg-main) 100%
+  );
+}
+
 .hero-banner--netflix .hero-overlay {
   position: absolute;
   inset: 0;
@@ -85,10 +104,11 @@
   background: linear-gradient(
     180deg,
     rgba(0, 0, 0, 0.1) 0%,
-    rgba(0, 0, 0, 0.02) 32%,
-    transparent 58%,
-    rgba(0, 0, 0, 0.22) 78%,
-    rgba(0, 0, 0, 0.68) 91%,
+    rgba(0, 0, 0, 0.02) 28%,
+    transparent 52%,
+    rgba(0, 0, 0, 0.2) 66%,
+    rgba(0, 0, 0, 0.52) 80%,
+    rgba(0, 0, 0, 0.82) 90%,
     var(--bg-main) 100%
   );
 }

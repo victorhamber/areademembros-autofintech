@@ -57,7 +57,7 @@ export const Showcase: React.FC<ShowcaseProps> = ({ lang, onBack, slug }) => {
   return (
     <div className="showcase-container">
       <header className="showcase-header">
-        <img src="/logo.png" alt="Readlyme" className="showcase-logo" />
+        <img src="/autofintech-logo.png" alt="AutoFinTech" className="showcase-logo" />
         {!activeSlug && (
           <button className="showcase-back-btn" onClick={onBack}>
             {tr.showcase_back_btn}
