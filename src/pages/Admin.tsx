@@ -2604,7 +2604,7 @@ export const Admin: React.FC = () => {
                           <label>Título *</label>
                           <input placeholder="Ex: Como instalar o robô" value={newLessonTitle} onChange={(e) => setNewLessonTitle(e.target.value)} required />
                           <label>Link do vídeo</label>
-                          <input placeholder="YouTube/Vimeo embed URL" value={newLessonVideoUrl} onChange={(e) => setNewLessonVideoUrl(e.target.value)} />
+                          <input placeholder="Link do YouTube (watch ou youtu.be) ou embed" value={newLessonVideoUrl} onChange={(e) => setNewLessonVideoUrl(e.target.value)} />
                           <label>Texto da aula</label>
                           <textarea
                             rows={4}

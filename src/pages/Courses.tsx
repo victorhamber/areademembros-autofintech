@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ExternalLink, GraduationCap, Lock, Play } from 'lucide-react';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
+import { toVideoEmbedUrl } from '../lib/videoEmbed';
 import './Courses.css';
 
 type Lesson = {
@@ -135,6 +136,11 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
     }
     return null;
   }, [activeCourse, activeLessonId]);
+
+  const activeLessonVideoEmbed = useMemo(
+    () => toVideoEmbedUrl(activeLesson?.videoUrl),
+    [activeLesson?.videoUrl]
+  );
 
   const allCourseLessons = useMemo(() => {
     if (!activeCourse) return [];
@@ -286,13 +292,14 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
             {activeLesson ? (
               <div className="lesson-page">
                 <div className="lesson-content">
-                  {activeLesson.videoUrl ? (
+                  {activeLessonVideoEmbed ? (
                     <div className="lesson-video">
                       <iframe
-                        src={activeLesson.videoUrl}
+                        src={activeLessonVideoEmbed}
                         title={activeLesson.title}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                         allowFullScreen
+                        referrerPolicy="strict-origin-when-cross-origin"
                       />
                     </div>
                   ) : (
