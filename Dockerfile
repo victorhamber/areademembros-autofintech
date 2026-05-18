@@ -16,6 +16,9 @@ RUN npx prisma generate
 # Build the React Frontend into /dist
 RUN npm run build
 
+# Ponto de montagem para uploads persistentes (volume EasyPanel → /app/uploads ou UPLOAD_DIR)
+RUN mkdir -p /app/uploads /data/uploads && chmod 755 /app/uploads /data/uploads
+
 # Expose Express server port
 EXPOSE 3000
 
