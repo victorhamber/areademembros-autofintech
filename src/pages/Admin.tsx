@@ -250,6 +250,9 @@ export const Admin: React.FC = () => {
   const [newLessonBodyText, setNewLessonBodyText] = useState('');
   const [newLessonActionLabel, setNewLessonActionLabel] = useState('');
   const [newLessonActionUrl, setNewLessonActionUrl] = useState('');
+  const [draggedLessonId, setDraggedLessonId] = useState('');
+  const [dragOverLessonId, setDragOverLessonId] = useState('');
+  const [dragOverModuleId, setDragOverModuleId] = useState('');
 
   // -- USER FORM STATE --
   const [newUserName, setNewUserName] = useState('');
@@ -1437,7 +1440,7 @@ export const Admin: React.FC = () => {
       const res = await fetch('/api/admin/course-modules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ courseId: selectedCourseId, title, sortOrder: 0 }),
+        body: JSON.stringify({ courseId: selectedCourseId, title }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -1464,7 +1467,6 @@ export const Admin: React.FC = () => {
         body: JSON.stringify({
           moduleId: selectedModuleId,
           title,
-          sortOrder: 0,
           ebookId: null,
           videoUrl: newLessonVideoUrl.trim() || null,
           bodyText: newLessonBodyText.trim() || null,
@@ -1486,6 +1488,67 @@ export const Admin: React.FC = () => {
       alert('Aula criada.');
     } catch {
       alert('Servidor offline.');
+    }
+  };
+
+  const reorderModuleLessons = async (moduleId: string, lessonIds: string[]) => {
+    const res = await fetch(`/api/admin/course-modules/${moduleId}/reorder-lessons`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ lessonIds }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error((d as { error?: string }).error || 'Falha ao reordenar aulas.');
+    }
+  };
+
+  const moveLessonToTarget = async (moduleId: string, targetLessonId: string | null) => {
+    if (!draggedLessonId) return;
+    const module = selectedModules.find((m: any) => m.id === moduleId);
+    const lessons = (module?.lessons || []) as any[];
+    if (!lessons.length) return;
+
+    const fromIndex = lessons.findIndex((l: any) => l.id === draggedLessonId);
+    if (fromIndex < 0) return;
+
+    const withoutDragged = lessons.filter((l: any) => l.id !== draggedLessonId);
+    const targetIndex = targetLessonId ? withoutDragged.findIndex((l: any) => l.id === targetLessonId) : withoutDragged.length;
+    if (targetIndex < 0) return;
+
+    const reordered = [...withoutDragged];
+    reordered.splice(targetIndex, 0, lessons[fromIndex]);
+    const reorderedIds = reordered.map((l: any) => l.id);
+    const originalIds = lessons.map((l: any) => l.id);
+    if (reorderedIds.join('|') === originalIds.join('|')) return;
+
+    setCourses((prev) =>
+      prev.map((c: any) =>
+        c.id !== selectedCourseId
+          ? c
+          : {
+              ...c,
+              modules: (c.modules || []).map((m: any) =>
+                m.id !== moduleId
+                  ? m
+                  : {
+                      ...m,
+                      lessons: reordered.map((l: any, idx: number) => ({ ...l, sortOrder: idx })),
+                    }
+              ),
+            }
+      )
+    );
+
+    try {
+      await reorderModuleLessons(moduleId, reorderedIds);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Falha ao reordenar aulas.');
+      await fetchCourses();
+    } finally {
+      setDragOverLessonId('');
+      setDragOverModuleId('');
+      setDraggedLessonId('');
     }
   };
 
@@ -2376,11 +2439,37 @@ export const Admin: React.FC = () => {
                                     ) : (
                                       (m.lessons || []).map((l: any) => {
                                         const activeLesson = selectedLessonId === l.id;
+                                        const dragOver = dragOverModuleId === m.id && dragOverLessonId === l.id;
                                         return (
-                                          <li key={l.id}>
+                                          <li
+                                            key={l.id}
+                                            onDragOver={(e) => {
+                                              e.preventDefault();
+                                              e.dataTransfer.dropEffect = 'move';
+                                              if (draggedLessonId && draggedLessonId !== l.id) {
+                                                setDragOverModuleId(m.id);
+                                                setDragOverLessonId(l.id);
+                                              }
+                                            }}
+                                            onDrop={(e) => {
+                                              e.preventDefault();
+                                              void moveLessonToTarget(m.id, l.id);
+                                            }}
+                                          >
                                             <button
                                               type="button"
-                                              className={`admin-lesson-item admin-lesson-item--btn ${activeLesson ? 'admin-lesson-item--active' : ''}`}
+                                              className={`admin-lesson-item admin-lesson-item--btn ${activeLesson ? 'admin-lesson-item--active' : ''} ${dragOver ? 'admin-lesson-item--dragover' : ''}`}
+                                              draggable
+                                              onDragStart={(e) => {
+                                                e.dataTransfer.effectAllowed = 'move';
+                                                setDraggedLessonId(l.id);
+                                                setDragOverModuleId(m.id);
+                                              }}
+                                              onDragEnd={() => {
+                                                setDraggedLessonId('');
+                                                setDragOverLessonId('');
+                                                setDragOverModuleId('');
+                                              }}
                                               onClick={() => {
                                                 setSelectedLessonId(activeLesson ? '' : l.id);
                                                 if (!activeLesson) {
@@ -2398,6 +2487,25 @@ export const Admin: React.FC = () => {
                                           </li>
                                         );
                                       })
+                                    )}
+                                    {(m.lessons || []).length > 0 && (
+                                      <li
+                                        className={`admin-lesson-dropzone ${dragOverModuleId === m.id && !dragOverLessonId ? 'admin-lesson-dropzone--active' : ''}`}
+                                        onDragOver={(e) => {
+                                          e.preventDefault();
+                                          e.dataTransfer.dropEffect = 'move';
+                                          if (draggedLessonId) {
+                                            setDragOverModuleId(m.id);
+                                            setDragOverLessonId('');
+                                          }
+                                        }}
+                                        onDrop={(e) => {
+                                          e.preventDefault();
+                                          void moveLessonToTarget(m.id, null);
+                                        }}
+                                      >
+                                        Solte aqui para mover ao final
+                                      </li>
                                     )}
                                   </ul>
                                 )}

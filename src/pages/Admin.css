@@ -1426,6 +1426,28 @@
   color: #dbeafe;
 }
 
+.admin-lesson-item--dragover {
+  outline: 1px dashed rgba(96, 165, 250, 0.8);
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.admin-lesson-dropzone {
+  list-style: none;
+  margin: 4px 10px 8px 40px;
+  padding: 8px 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: center;
+}
+
+.admin-lesson-dropzone--active {
+  border-color: rgba(96, 165, 250, 0.85);
+  background: rgba(59, 130, 246, 0.12);
+  color: #dbeafe;
+}
+
 .admin-lesson-item--muted {
   list-style: none;
   cursor: default;

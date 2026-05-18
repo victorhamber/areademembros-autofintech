@@ -113,11 +113,11 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
 
     const courses = await prisma.course.findMany({
       where: { published: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       include: {
         modules: {
-          orderBy: { sortOrder: 'asc' },
-          include: { lessons: { orderBy: { sortOrder: 'asc' }, include: { ebook: true } } },
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          include: { lessons: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { ebook: true } } },
         },
       },
     });
@@ -145,10 +145,10 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
       where: { slug: req.params.slug, published: true },
       include: {
         modules: {
-          orderBy: { sortOrder: 'asc' },
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
           include: {
             lessons: {
-              orderBy: { sortOrder: 'asc' },
+              orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
               include: { ebook: { select: { id: true, title: true, coverUrl: true } } },
             },
           },
@@ -302,11 +302,11 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
 
   app.get('/api/admin/courses', admin, async (_req, res) => {
     const courses = await prisma.course.findMany({
-      orderBy: { sortOrder: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       include: {
         modules: {
-          orderBy: { sortOrder: 'asc' },
-          include: { lessons: { orderBy: { sortOrder: 'asc' }, include: { ebook: true } } },
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          include: { lessons: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { ebook: true } } },
         },
       },
     });
@@ -373,8 +373,16 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
   app.post('/api/admin/course-modules', admin, async (req, res) => {
     const { courseId, title, sortOrder } = req.body as { courseId?: string; title?: string; sortOrder?: number };
     if (!courseId || !title) return res.status(400).json({ error: 'courseId and title required' });
+    const maxSort = await prisma.courseModule.aggregate({
+      where: { courseId },
+      _max: { sortOrder: true },
+    });
+    const nextSortOrder =
+      typeof sortOrder === 'number' && Number.isFinite(sortOrder)
+        ? sortOrder
+        : (maxSort._max.sortOrder ?? -1) + 1;
     const m = await prisma.courseModule.create({
-      data: { courseId, title, sortOrder: sortOrder ?? 0 }
+      data: { courseId, title, sortOrder: nextSortOrder }
     });
     res.json(m);
   });
@@ -391,11 +399,19 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
       actionUrl?: string | null;
     };
     if (!moduleId || !title) return res.status(400).json({ error: 'moduleId and title required' });
+    const maxSort = await prisma.courseLesson.aggregate({
+      where: { moduleId },
+      _max: { sortOrder: true },
+    });
+    const nextSortOrder =
+      typeof sortOrder === 'number' && Number.isFinite(sortOrder)
+        ? sortOrder
+        : (maxSort._max.sortOrder ?? -1) + 1;
     const l = await prisma.courseLesson.create({
       data: {
         moduleId,
         title,
-        sortOrder: sortOrder ?? 0,
+        sortOrder: nextSortOrder,
         ebookId: ebookId || null,
         videoUrl: videoUrl || null,
         bodyText: bodyText || null,
@@ -452,6 +468,36 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
       .catch(() => null);
     if (!l) return res.status(404).json({ error: 'Not found' });
     res.json(l);
+  });
+
+  app.put('/api/admin/course-modules/:id/reorder-lessons', admin, async (req, res) => {
+    const moduleId = req.params.id;
+    const { lessonIds } = req.body as { lessonIds?: string[] };
+    if (!Array.isArray(lessonIds)) return res.status(400).json({ error: 'lessonIds required' });
+
+    const module = await prisma.courseModule.findUnique({ where: { id: moduleId }, select: { id: true } });
+    if (!module) return res.status(404).json({ error: 'Module not found' });
+
+    const existing = await prisma.courseLesson.findMany({
+      where: { moduleId },
+      select: { id: true },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    });
+    const existingIds = new Set(existing.map((l) => l.id));
+    const uniqueIncoming = Array.from(new Set(lessonIds.filter((id) => existingIds.has(id))));
+    const missingIds = existing.map((l) => l.id).filter((id) => !uniqueIncoming.includes(id));
+    const finalOrder = [...uniqueIncoming, ...missingIds];
+
+    await prisma.$transaction(
+      finalOrder.map((lessonId, idx) =>
+        prisma.courseLesson.update({
+          where: { id: lessonId },
+          data: { sortOrder: idx },
+        })
+      )
+    );
+
+    res.json({ success: true });
   });
 
   app.delete('/api/admin/course-lessons/:id', admin, async (req, res) => {

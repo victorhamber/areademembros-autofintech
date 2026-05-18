@@ -168,12 +168,9 @@ export const VideoPlayer = memo(function VideoPlayer({
     player.on('ready', () => {
       syncPoster();
       seekToSavedPosition(player);
-      const resumePercent = initialResumePercentRef.current;
-      if (resumePercent > 2) {
-        setPauseCover(true);
-      } else {
-        void player.play();
-      }
+      // Já houve clique na facade; iniciar direto evita exigir "segundo play".
+      setPauseCover(false);
+      void player.play();
     });
     player.on('pause', onPause);
     player.on('play', onPlay);
