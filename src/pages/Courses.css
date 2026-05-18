@@ -276,11 +276,13 @@
 .course-player-layout {
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-areas: "main sidebar";
   gap: 16px;
   align-items: start;
 }
 
 .course-player-sidebar {
+  grid-area: sidebar;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
@@ -291,6 +293,7 @@
 }
 
 .course-player-main {
+  grid-area: main;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01));
@@ -622,6 +625,9 @@
 @media (max-width: 600px) {
   .course-player-layout {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "sidebar"
+      "main";
   }
 
   .course-player-sidebar {
