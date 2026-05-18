@@ -271,6 +271,14 @@
     width: 100%;
   }
 
+  /* Cursos: usa quase toda a largura disponível da coluna principal. */
+  .app-main > .courses-page {
+    max-width: none;
+    width: calc(100% - 12px);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   /* Início: hero e faixa superior ocupam toda a largura da coluna (sem “caixa” 1200px) */
   .app-main > .home-page.home-page--fullbleed {
     max-width: none;
