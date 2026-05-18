@@ -29,11 +29,13 @@ const PLYR_OPTS: Plyr.Options = {
     showinfo: 0,
     iv_load_policy: 3,
     modestbranding: 1,
+    customControls: true,
   },
   vimeo: {
     byline: false,
     portrait: false,
     title: false,
+    customControls: true,
   },
   hideControls: true,
   clickToPlay: true,
@@ -43,16 +45,18 @@ const PLYR_OPTS: Plyr.Options = {
 };
 
 /**
- * Player estilo Presto Player: facade com poster até o clique.
- * O iframe do YouTube só carrega depois — sem nome do canal, sem logo.
+ * Estilo Presto Player: facade → Plyr com customControls + crop do iframe + capa ao pausar.
  */
 export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
   const [activated, setActivated] = useState(false);
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const [pauseCover, setPauseCover] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Plyr | null>(null);
+  const hasPlayedRef = useRef(false);
 
   const useFacade = video.provider === 'youtube' || video.provider === 'vimeo';
+  const hideYoutubeUi = video.provider === 'youtube';
 
   useEffect(() => {
     if (video.provider !== 'youtube' || !video.videoId) {
@@ -82,27 +86,49 @@ export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
     const player = new Plyr(wrapper, PLYR_OPTS);
     playerRef.current = player;
 
-    if (posterUrl) {
-      player.poster = posterUrl;
-    }
+    const syncPoster = () => {
+      if (posterUrl) player.poster = posterUrl;
+    };
+
+    const onPause = () => {
+      if (hasPlayedRef.current) setPauseCover(true);
+    };
+    const onPlay = () => {
+      hasPlayedRef.current = true;
+      setPauseCover(false);
+    };
 
     player.on('ready', () => {
-      if (posterUrl) player.poster = posterUrl;
+      syncPoster();
       void player.play();
     });
+    player.on('pause', onPause);
+    player.on('play', onPlay);
+    player.on('ended', onPause);
+
+    return () => {
+      player.off('pause', onPause);
+      player.off('play', onPlay);
+      player.off('ended', onPause);
+    };
   }, [video.provider, video.videoId, posterUrl]);
 
   useEffect(() => {
     if (!activated || !useFacade) return;
-    mountPlyr();
+    const cleanup = mountPlyr();
     return () => {
+      cleanup?.();
       playerRef.current?.destroy();
       playerRef.current = null;
+      hasPlayedRef.current = false;
+      setPauseCover(false);
     };
   }, [activated, useFacade, mountPlyr]);
 
-  const handleActivate = () => {
-    setActivated(true);
+  const resumeFromCover = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPauseCover(false);
+    void playerRef.current?.play();
   };
 
   if (video.provider === 'unknown') {
@@ -123,7 +149,7 @@ export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
       <button
         type="button"
         className="video-player-facade"
-        onClick={handleActivate}
+        onClick={() => setActivated(true)}
         aria-label={title ? `Reproduzir: ${title}` : 'Reproduzir vídeo'}
       >
         {posterUrl ? (
@@ -138,5 +164,28 @@ export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
     );
   }
 
-  return <div ref={containerRef} className="video-player-plyr-mount" />;
+  return (
+    <div
+      className={`video-player-wrap${hideYoutubeUi ? ' hide-youtube-ui' : ''}`}
+    >
+      <div ref={containerRef} className="video-player-plyr-mount" />
+      {pauseCover && (
+        <button
+          type="button"
+          className="video-player-pause-cover"
+          onClick={resumeFromCover}
+          aria-label="Continuar reprodução"
+        >
+          {posterUrl ? (
+            <img className="video-player-pause-cover__poster" src={posterUrl} alt="" />
+          ) : (
+            <span className="video-player-facade__placeholder" aria-hidden />
+          )}
+          <span className="video-player-facade__play">
+            <Play size={32} fill="currentColor" strokeWidth={0} />
+          </span>
+        </button>
+      )}
+    </div>
+  );
 });

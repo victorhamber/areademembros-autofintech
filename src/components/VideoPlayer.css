@@ -1,4 +1,4 @@
-/* ========== Facade (antes do clique — estilo Presto Player) ========== */
+/* ========== Facade (antes do clique) ========== */
 .video-player-facade {
   position: relative;
   display: block;
@@ -18,7 +18,8 @@
   outline-offset: 2px;
 }
 
-.video-player-facade__poster {
+.video-player-facade__poster,
+.video-player-pause-cover__poster {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -49,6 +50,7 @@
   color: #fff;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   transition: transform 0.2s ease, background 0.2s ease;
+  pointer-events: none;
 }
 
 .video-player-facade:hover .video-player-facade__play {
@@ -56,43 +58,76 @@
   background: #e07a2f;
 }
 
-/* ========== Plyr (após o clique) ========== */
-.video-player-plyr-mount,
-.video-player-plyr-mount .plyr {
+/* ========== Wrapper Plyr ========== */
+.video-player-wrap {
+  position: relative;
   width: 100%;
   border-radius: var(--radius-lg, 12px);
   overflow: hidden;
+  background: #000;
+}
+
+.video-player-plyr-mount,
+.video-player-plyr-mount .plyr {
+  width: 100%;
 }
 
 .lesson-video .plyr {
   --plyr-color-main: #e07a2f;
   --plyr-video-background: #000;
-  --plyr-badge-background: #e07a2f;
-  --plyr-badge-text-color: #fff;
-}
-
-.lesson-video .plyr__poster {
-  background-size: cover;
-  background-position: center;
 }
 
 .lesson-video .plyr__control--overlaid {
   background: rgba(224, 122, 47, 0.92);
   border: 0;
   padding: 18px;
+  z-index: 4;
 }
 
 .lesson-video .plyr__control--overlaid:hover {
   background: #e07a2f;
 }
 
-/* Esconde logo residual do YouTube no canto do iframe */
-.lesson-video .plyr--youtube.plyr--paused .plyr__poster {
-  display: block;
-  opacity: 1;
+/* Esconde o botão play grande do Plyr quando a capa de pause está ativa */
+.video-player-wrap:has(.video-player-pause-cover) .plyr__control--overlaid {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
-.lesson-video .plyr--youtube .plyr__video-embed iframe {
-  top: 0;
+/* ========== Hack Presto: recorta iframe do YouTube ==========
+   Empurra UI nativa (nome, logo, link) para fora da área visível */
+.video-player-wrap.hide-youtube-ui .plyr__video-wrapper {
+  overflow: hidden;
+}
+
+.video-player-wrap.hide-youtube-ui .plyr__video-embed iframe {
+  position: absolute;
+  top: -50%;
   left: 0;
+  width: 100% !important;
+  height: 200% !important;
+  max-width: none;
+}
+
+/* ========== Capa ao pausar (como presto-player__play-cover) ========== */
+.video-player-pause-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 99;
+  margin: 0;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  background: #000;
+  overflow: hidden;
+}
+
+.video-player-pause-cover:focus-visible {
+  outline: 2px solid #e07a2f;
+  outline-offset: -2px;
+}
+
+/* Controles Plyr ficam acima do vídeo mas abaixo da capa de pause */
+.video-player-wrap .plyr__controls {
+  z-index: 10;
 }
