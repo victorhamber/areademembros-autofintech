@@ -1,16 +1,22 @@
-const YT_CLEAN_PARAMS = 'modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&color=white&cc_load_policy=0&disablekb=0&playsinline=1';
-
-function ytEmbed(videoId: string): string {
-  return `https://www.youtube-nocookie.com/embed/${videoId}?${YT_CLEAN_PARAMS}`;
-}
+export type VideoInfo = {
+  provider: 'youtube' | 'vimeo' | 'unknown';
+  videoId: string;
+  embedUrl: string;
+};
 
 /**
- * Converte links comuns (watch, youtu.be, shorts) em URL de embed para iframe.
- * Adiciona parâmetros para minimizar branding do YouTube.
+ * Extrai provider + videoId + embedUrl de qualquer link de vídeo.
  */
-export function toVideoEmbedUrl(raw: string | null | undefined): string | null {
+export function parseVideoUrl(raw: string | null | undefined): VideoInfo | null {
   const url = String(raw ?? '').trim();
   if (!url) return null;
+
+  function yt(id: string): VideoInfo {
+    return { provider: 'youtube', videoId: id, embedUrl: `https://www.youtube-nocookie.com/embed/${id}` };
+  }
+  function vim(id: string): VideoInfo {
+    return { provider: 'vimeo', videoId: id, embedUrl: `https://player.vimeo.com/video/${id}` };
+  }
 
   try {
     const parsed = new URL(url, 'https://example.invalid');
@@ -18,42 +24,47 @@ export function toVideoEmbedUrl(raw: string | null | undefined): string | null {
 
     if (host === 'youtu.be') {
       const id = parsed.pathname.replace(/^\//, '').split('/')[0];
-      if (id) return ytEmbed(id);
+      if (id) return yt(id);
     }
 
     if (host === 'youtube.com' || host === 'youtube-nocookie.com' || host === 'm.youtube.com') {
       if (parsed.pathname.startsWith('/embed/')) {
         const id = parsed.pathname.split('/')[2];
-        if (id) return ytEmbed(id);
+        if (id) return yt(id);
       }
       if (parsed.pathname.startsWith('/shorts/')) {
         const id = parsed.pathname.split('/')[2];
-        if (id) return ytEmbed(id);
+        if (id) return yt(id);
       }
       const v = parsed.searchParams.get('v');
-      if (v) return ytEmbed(v);
+      if (v) return yt(v);
     }
 
     if (host === 'vimeo.com') {
       const id = parsed.pathname.replace(/^\//, '').split('/')[0];
-      if (id && /^\d+$/.test(id)) return `https://player.vimeo.com/video/${id}?title=0&byline=0&portrait=0`;
+      if (id && /^\d+$/.test(id)) return vim(id);
     }
-
-    if (host === 'player.vimeo.com') return url;
-  } catch {
-    /* fallback regex abaixo */
-  }
+    if (host === 'player.vimeo.com') {
+      const id = parsed.pathname.split('/').pop();
+      if (id && /^\d+$/.test(id)) return vim(id);
+      return { provider: 'vimeo', videoId: '', embedUrl: url };
+    }
+  } catch { /* fallback */ }
 
   const ytWatch = url.match(/(?:youtube\.com\/watch\?.*[&?]v=|youtu\.be\/)([\w-]{11})/i);
-  if (ytWatch) return ytEmbed(ytWatch[1]);
+  if (ytWatch) return yt(ytWatch[1]);
 
   const ytShorts = url.match(/youtube\.com\/shorts\/([\w-]{11})/i);
-  if (ytShorts) return ytEmbed(ytShorts[1]);
-
-  if (/\/embed\//i.test(url)) return url;
+  if (ytShorts) return yt(ytShorts[1]);
 
   const vimeo = url.match(/vimeo\.com\/(\d+)/i);
-  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}?title=0&byline=0&portrait=0`;
+  if (vimeo) return vim(vimeo[1]);
 
-  return url;
+  return { provider: 'unknown', videoId: '', embedUrl: url };
+}
+
+/** Atalho legado — retorna só a embedUrl */
+export function toVideoEmbedUrl(raw: string | null | undefined): string | null {
+  const info = parseVideoUrl(raw);
+  return info?.embedUrl ?? null;
 }

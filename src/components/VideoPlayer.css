@@ -1,0 +1,34 @@
+/* Plyr overrides — tema escuro, sem marca */
+.lesson-video .plyr {
+  --plyr-color-main: #e07a2f;
+  --plyr-video-background: #000;
+  --plyr-badge-background: #e07a2f;
+  --plyr-badge-text-color: #fff;
+  --plyr-badge-border-radius: 4px;
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+}
+
+.lesson-video .plyr__poster {
+  background-color: #000;
+}
+
+/* Esconde qualquer iframe do YouTube que vaze fora do Plyr */
+.lesson-video .plyr iframe {
+  pointer-events: auto;
+}
+
+/* Botão play grande centralizado */
+.lesson-video .plyr__control--overlaid {
+  background: rgba(224, 122, 47, 0.9);
+  border-radius: 50%;
+  padding: 18px;
+}
+.lesson-video .plyr__control--overlaid:hover {
+  background: rgba(224, 122, 47, 1);
+}
+
+/* Barra de progresso */
+.lesson-video .plyr__progress__buffer {
+  color: rgba(255, 255, 255, 0.25);
+}

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ExternalLink, GraduationCap, Lock, Play } from 'lucide-react';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
-import { toVideoEmbedUrl } from '../lib/videoEmbed';
+import { parseVideoUrl } from '../lib/videoEmbed';
+import { VideoPlayer } from '../components/VideoPlayer';
+import '../components/VideoPlayer.css';
 import './Courses.css';
 
 type Lesson = {
@@ -137,8 +139,8 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
     return null;
   }, [activeCourse, activeLessonId]);
 
-  const activeLessonVideoEmbed = useMemo(
-    () => toVideoEmbedUrl(activeLesson?.videoUrl),
+  const activeLessonVideo = useMemo(
+    () => parseVideoUrl(activeLesson?.videoUrl),
     [activeLesson?.videoUrl]
   );
 
@@ -292,14 +294,12 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
             {activeLesson ? (
               <div className="lesson-page">
                 <div className="lesson-content">
-                  {activeLessonVideoEmbed ? (
+                  {activeLessonVideo ? (
                     <div className="lesson-video">
-                      <iframe
-                        src={activeLessonVideoEmbed}
+                      <VideoPlayer
+                        key={activeLessonVideo.videoId || activeLessonVideo.embedUrl}
+                        video={activeLessonVideo}
                         title={activeLesson.title}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                        referrerPolicy="strict-origin-when-cross-origin"
                       />
                     </div>
                   ) : (
