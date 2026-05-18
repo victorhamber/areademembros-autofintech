@@ -385,7 +385,7 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
                                 {done ? <Check size={12} /> : <Play size={10} />}
                               </span>
                               <span className="course-lesson-name">{les.title}</span>
-                              {isSuggested && <span className="course-lesson-tag">Próxima</span>}
+                              {isActive && <span className="course-lesson-tag">Assistindo</span>}
                             </button>
                           </li>
                         );
