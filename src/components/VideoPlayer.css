@@ -34,6 +34,21 @@
   background: linear-gradient(145deg, #1a1a1a 0%, #0a0a0a 100%);
 }
 
+.video-player-facade__resume-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
 .video-player-facade__play {
   position: absolute;
   top: 50%;

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ExternalLink, GraduationCap, Lock, Play } from 'lucide-react';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
 import { parseVideoUrl } from '../lib/videoEmbed';
+import { readEadResumeState, writeEadResumeState } from '../lib/lessonProgress';
 import { VideoPlayer } from '../components/VideoPlayer';
 import '../components/VideoPlayer.css';
 import './Courses.css';
@@ -115,15 +116,79 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
       .catch(() => {});
   }, [userId, courses.length]);
 
+  const allCourseLessonsRef = useRef<Lesson[]>([]);
+  const lessonCompleteGuardRef = useRef<Set<string>>(new Set());
+  const lessonResumeAppliedRef = useRef<string | null>(null);
+
+  const saveProgress = useCallback(
+    (lessonId: string, patch: { completed?: boolean; percent?: number }) => {
+      setProgress((prev) => {
+        const cur = prev[lessonId];
+        let nextPercent: number;
+        if (patch.completed === true) {
+          nextPercent = 100;
+        } else if (patch.percent != null) {
+          nextPercent =
+            patch.completed === false
+              ? patch.percent
+              : Math.max(cur?.percent ?? 0, patch.percent);
+        } else {
+          nextPercent = cur?.percent ?? 0;
+        }
+        const nextCompleted = patch.completed ?? cur?.completed ?? false;
+        return {
+          ...prev,
+          [lessonId]: { completed: nextCompleted, percent: nextPercent },
+        };
+      });
+      const h = { ...buildHeaders(), 'Content-Type': 'application/json' };
+      const body: { lessonId: string; completed?: boolean; percent?: number } = { lessonId };
+      if (patch.completed != null) body.completed = patch.completed;
+      if (patch.percent != null) body.percent = patch.percent;
+      if (patch.completed === true) body.percent = 100;
+      void fetch('/api/me/lesson-progress', {
+        method: 'POST',
+        headers: h,
+        body: JSON.stringify(body),
+      });
+    },
+    [userId]
+  );
+
   const markLesson = (lessonId: string, completed: boolean) => {
-    setProgress(prev => ({ ...prev, [lessonId]: { completed, percent: completed ? 100 : 0 } }));
-    const h = { ...buildHeaders(), 'Content-Type': 'application/json' };
-    fetch('/api/me/lesson-progress', {
-      method: 'POST',
-      headers: h,
-      body: JSON.stringify({ lessonId, completed, percent: completed ? 100 : 0 })
-    });
+    if (completed) lessonCompleteGuardRef.current.add(lessonId);
+    else lessonCompleteGuardRef.current.delete(lessonId);
+    saveProgress(lessonId, { completed, percent: completed ? 100 : 0 });
   };
+
+  const advanceToNextLesson = useCallback((lessonId: string) => {
+    const lessons = allCourseLessonsRef.current;
+    const idx = lessons.findIndex((l) => l.id === lessonId);
+    const next = idx >= 0 && idx < lessons.length - 1 ? lessons[idx + 1] : null;
+    if (next) {
+      window.setTimeout(() => {
+        setActiveLessonId(next.id);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 800);
+    }
+  }, []);
+
+  const handleLessonComplete = useCallback(
+    (lessonId: string) => {
+      if (lessonCompleteGuardRef.current.has(lessonId)) return;
+      lessonCompleteGuardRef.current.add(lessonId);
+      saveProgress(lessonId, { completed: true, percent: 100 });
+      advanceToNextLesson(lessonId);
+    },
+    [saveProgress, advanceToNextLesson]
+  );
+
+  const handleVideoProgress = useCallback(
+    (lessonId: string, percent: number) => {
+      saveProgress(lessonId, { percent });
+    },
+    [saveProgress]
+  );
 
   const activeCourse = useMemo(() => {
     if (!activeCourseSlug) return null;
@@ -169,16 +234,56 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   }, [activeCourse?.id]);
 
   const openLesson = (lessonId: string) => {
+    lessonCompleteGuardRef.current.delete(lessonId);
     setActiveLessonId(lessonId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   useEffect(() => {
-    if (!activeCourse) return;
+    allCourseLessonsRef.current = allCourseLessons;
+  }, [allCourseLessons]);
+
+  useEffect(() => {
+    if (!courses.length || initialSlug?.trim()) return;
+    const saved = readEadResumeState();
+    if (!saved?.courseSlug || activeCourseSlug) return;
+    const target = courses.find((c) => c.slug === saved.courseSlug);
+    if (target && target.hasAccess !== false) {
+      setActiveCourseSlug(saved.courseSlug);
+    }
+  }, [courses, initialSlug, activeCourseSlug]);
+
+  useEffect(() => {
+    if (activeCourseSlug && activeLessonId) {
+      writeEadResumeState({ courseSlug: activeCourseSlug, lessonId: activeLessonId });
+    }
+  }, [activeCourseSlug, activeLessonId]);
+
+  useEffect(() => {
+    lessonResumeAppliedRef.current = null;
+    lessonCompleteGuardRef.current.clear();
+  }, [activeCourse?.id]);
+
+  useEffect(() => {
+    if (!activeCourse || !allCourseLessons.length) return;
     if (activeLessonId && allCourseLessons.some((l) => l.id === activeLessonId)) return;
+
+    const saved = readEadResumeState();
+    const resumeKey = saved ? `${activeCourse.slug}:${saved.lessonId}` : '';
+    if (
+      saved?.courseSlug === activeCourse.slug &&
+      saved.lessonId &&
+      allCourseLessons.some((l) => l.id === saved.lessonId) &&
+      lessonResumeAppliedRef.current !== resumeKey
+    ) {
+      lessonResumeAppliedRef.current = resumeKey;
+      setActiveLessonId(saved.lessonId);
+      return;
+    }
+
     const next = firstSuggestedLesson(activeCourse, progress);
     if (next) setActiveLessonId(next.id);
-  }, [activeCourse?.id, allCourseLessons.length, activeLessonId, progress]);
+  }, [activeCourse?.id, activeCourse?.slug, allCourseLessons, activeLessonId, progress]);
 
   // --- LOADING ---
   if (loading) {
@@ -204,6 +309,8 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   if (activeCourse) {
     const stats = courseLessonStats(activeCourse, progress);
     const lessonDone = !!activeLesson && !!progress[activeLesson.id]?.completed;
+    const lessonPercent = activeLesson ? progress[activeLesson.id]?.percent ?? 0 : 0;
+    const videoResumePercent = lessonDone ? 0 : lessonPercent;
     const lessonOrder = new Map<string, number>();
     allCourseLessons.forEach((l, idx) => lessonOrder.set(l.id, idx + 1));
     const suggestedLesson = firstSuggestedLesson(activeCourse, progress);
@@ -297,9 +404,12 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
                   {activeLessonVideo ? (
                     <div className="lesson-video">
                       <VideoPlayer
-                        key={activeLessonVideo.videoId || activeLessonVideo.embedUrl}
+                        key={activeLesson.id}
                         video={activeLessonVideo}
                         title={activeLesson.title}
+                        initialPercent={videoResumePercent}
+                        onProgress={(pct) => handleVideoProgress(activeLesson.id, pct)}
+                        onEnded={() => handleLessonComplete(activeLesson.id)}
                       />
                     </div>
                   ) : (

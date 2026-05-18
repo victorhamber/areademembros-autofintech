@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { t } from '../i18n/translations';
 import type { Lang } from '../i18n/translations';
 import './InstallPrompt.css';
@@ -76,7 +76,7 @@ export const InstallPrompt: React.FC<InstallPromptProps> = ({ lang }) => {
       <div className="install-prompt-banner fade-in">
         <div className="install-prompt-content">
           <div className="install-icon">
-            <Download size={20} />
+            <img src="/icons/icon-192.png" alt="" width={38} height={38} className="install-icon-img" />
           </div>
           <div className="install-text">
             <strong>{tr.install_title}</strong>

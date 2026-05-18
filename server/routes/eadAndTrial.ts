@@ -215,17 +215,25 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     const { lessonId, percent, completed } = req.body as { lessonId?: string; percent?: number; completed?: boolean };
     if (!lessonId) return res.status(400).json({ error: 'lessonId required' });
+    const existing = await prisma.lessonProgress.findUnique({
+      where: { userId_lessonId: { userId, lessonId } }
+    });
+    const nextPercent =
+      percent != null
+        ? Math.min(100, Math.max(existing?.percent ?? 0, Math.max(0, percent)))
+        : (existing?.percent ?? 0);
+    const nextCompleted = completed != null ? Boolean(completed) : (existing?.completed ?? false);
     const p = await prisma.lessonProgress.upsert({
       where: { userId_lessonId: { userId, lessonId } },
       create: {
         userId,
         lessonId,
-        percent: Math.min(100, Math.max(0, percent ?? 0)),
-        completed: Boolean(completed)
+        percent: nextPercent,
+        completed: nextCompleted
       },
       update: {
-        percent: percent != null ? Math.min(100, Math.max(0, percent)) : undefined,
-        completed: completed != null ? Boolean(completed) : undefined
+        percent: percent != null ? nextPercent : undefined,
+        completed: completed != null ? nextCompleted : undefined
       }
     });
     res.json(p);

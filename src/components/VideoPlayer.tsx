@@ -4,10 +4,15 @@ import 'plyr/dist/plyr.css';
 import { Play } from 'lucide-react';
 import type { VideoInfo } from '../lib/videoEmbed';
 import { loadBestPoster, youtubePosterCandidates } from '../lib/videoEmbed';
+import { percentFromTime } from '../lib/lessonProgress';
 
 interface Props {
   video: VideoInfo;
   title?: string;
+  /** Percentual salvo (0–100) para retomar a reprodução */
+  initialPercent?: number;
+  onProgress?: (percent: number) => void;
+  onEnded?: () => void;
 }
 
 const PLYR_OPTS: Plyr.Options = {
@@ -44,19 +49,40 @@ const PLYR_OPTS: Plyr.Options = {
   ratio: '16:9',
 };
 
-/**
- * Estilo Presto Player: facade → Plyr com customControls + crop do iframe + capa ao pausar.
- */
-export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
+const PROGRESS_SAVE_INTERVAL_MS = 8000;
+const COMPLETE_AT_PERCENT = 92;
+
+export const VideoPlayer = memo(function VideoPlayer({
+  video,
+  title,
+  initialPercent = 0,
+  onProgress,
+  onEnded,
+}: Props) {
   const [activated, setActivated] = useState(false);
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
   const [pauseCover, setPauseCover] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Plyr | null>(null);
   const hasPlayedRef = useRef(false);
+  const endedFiredRef = useRef(false);
+  const lastSavedPercentRef = useRef(0);
+  const onProgressRef = useRef(onProgress);
+  const onEndedRef = useRef(onEnded);
+
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+    onEndedRef.current = onEnded;
+  }, [onProgress, onEnded]);
 
   const useFacade = video.provider === 'youtube' || video.provider === 'vimeo';
   const hideYoutubeUi = video.provider === 'youtube';
+  const resumePercent = Math.min(100, Math.max(0, Math.round(initialPercent)));
+
+  useEffect(() => {
+    endedFiredRef.current = false;
+    lastSavedPercentRef.current = resumePercent;
+  }, [video.videoId, video.provider, resumePercent]);
 
   useEffect(() => {
     if (video.provider !== 'youtube' || !video.videoId) {
@@ -71,6 +97,32 @@ export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
       cancelled = true;
     };
   }, [video.provider, video.videoId]);
+
+  const reportProgress = useCallback((player: Plyr, force = false) => {
+    const duration = player.duration;
+    const current = player.currentTime;
+    if (!duration || duration <= 0) return;
+    const pct = percentFromTime(current, duration);
+    if (!force && pct <= lastSavedPercentRef.current && pct < COMPLETE_AT_PERCENT) return;
+    lastSavedPercentRef.current = Math.max(lastSavedPercentRef.current, pct);
+    onProgressRef.current?.(pct);
+
+    if (!endedFiredRef.current && pct >= COMPLETE_AT_PERCENT) {
+      endedFiredRef.current = true;
+      onEndedRef.current?.();
+    }
+  }, []);
+
+  const seekToSavedPosition = useCallback(
+    (player: Plyr) => {
+      if (resumePercent <= 2) return;
+      const duration = player.duration;
+      if (!duration || duration <= 0) return;
+      const target = (resumePercent / 100) * duration;
+      if (target > 1) player.currentTime = target;
+    },
+    [resumePercent]
+  );
 
   const mountPlyr = useCallback(() => {
     const el = containerRef.current;
@@ -91,27 +143,50 @@ export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
     };
 
     const onPause = () => {
-      if (hasPlayedRef.current) setPauseCover(true);
+      if (hasPlayedRef.current) {
+        setPauseCover(true);
+        reportProgress(player, true);
+      }
     };
     const onPlay = () => {
       hasPlayedRef.current = true;
       setPauseCover(false);
     };
+    const onTimeUpdate = () => reportProgress(player);
+    const onEndedEvent = () => {
+      if (endedFiredRef.current) return;
+      endedFiredRef.current = true;
+      onProgressRef.current?.(100);
+      onEndedRef.current?.();
+    };
 
     player.on('ready', () => {
       syncPoster();
-      void player.play();
+      seekToSavedPosition(player);
+      if (resumePercent > 2) {
+        setPauseCover(true);
+      } else {
+        void player.play();
+      }
     });
     player.on('pause', onPause);
     player.on('play', onPlay);
-    player.on('ended', onPause);
+    player.on('timeupdate', onTimeUpdate);
+    player.on('ended', onEndedEvent);
+
+    const progressInterval = window.setInterval(() => {
+      if (player && !player.paused) reportProgress(player, true);
+    }, PROGRESS_SAVE_INTERVAL_MS);
 
     return () => {
+      window.clearInterval(progressInterval);
+      reportProgress(player, true);
       player.off('pause', onPause);
       player.off('play', onPlay);
-      player.off('ended', onPause);
+      player.off('timeupdate', onTimeUpdate);
+      player.off('ended', onEndedEvent);
     };
-  }, [video.provider, video.videoId, posterUrl]);
+  }, [video.provider, video.videoId, posterUrl, reportProgress, seekToSavedPosition, resumePercent]);
 
   useEffect(() => {
     if (!activated || !useFacade) return;
@@ -129,6 +204,10 @@ export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
     e.stopPropagation();
     setPauseCover(false);
     void playerRef.current?.play();
+  };
+
+  const handleFacadeActivate = () => {
+    setActivated(true);
   };
 
   if (video.provider === 'unknown') {
@@ -149,13 +228,16 @@ export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
       <button
         type="button"
         className="video-player-facade"
-        onClick={() => setActivated(true)}
+        onClick={handleFacadeActivate}
         aria-label={title ? `Reproduzir: ${title}` : 'Reproduzir vídeo'}
       >
         {posterUrl ? (
           <img className="video-player-facade__poster" src={posterUrl} alt="" decoding="async" />
         ) : (
           <span className="video-player-facade__placeholder" aria-hidden />
+        )}
+        {resumePercent > 2 && (
+          <span className="video-player-facade__resume-hint">Continuar de {resumePercent}%</span>
         )}
         <span className="video-player-facade__play">
           <Play size={32} fill="currentColor" strokeWidth={0} />
@@ -165,9 +247,7 @@ export const VideoPlayer = memo(function VideoPlayer({ video, title }: Props) {
   }
 
   return (
-    <div
-      className={`video-player-wrap${hideYoutubeUi ? ' hide-youtube-ui' : ''}`}
-    >
+    <div className={`video-player-wrap${hideYoutubeUi ? ' hide-youtube-ui' : ''}`}>
       <div ref={containerRef} className="video-player-plyr-mount" />
       {pauseCover && (
         <button
