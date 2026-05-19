@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, Image as ImageIcon, Film, Music2, File as FileIcon } from 'lucide-react';
 import { resolveProductForLicense } from '@shared/licenseProductMatch';
+import { MEMBER_THEME_DEFAULTS } from '@shared/memberTheme';
 import './Admin.css';
 
 const ADMIN_TABLE_PAGE_SIZE = 12;
@@ -326,15 +327,7 @@ export const Admin: React.FC = () => {
     member_hero_background_url: '',
     member_hero_kicker: '',
     member_support_url: '',
-    member_theme_bg_main: '#0e0e0e',
-    member_theme_bg_secondary: '#141414',
-    member_theme_bg_card: '#181818',
-    member_theme_text_primary: '#ffffff',
-    member_theme_text_secondary: '#b3b3b3',
-    member_theme_accent_primary: '#3b82f6',
-    member_theme_accent_primary_hover: '#60a5fa',
-    member_theme_border_subtle: 'rgba(255, 255, 255, 0.12)',
-    member_theme_button_text: '#031018'
+    ...MEMBER_THEME_DEFAULTS,
   });
   const [licenses, setLicenses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -1009,6 +1002,31 @@ export const Admin: React.FC = () => {
         return;
       }
       alert('Tema salvo. Atualize a área de membros para ver tudo aplicado.');
+      void fetchEmailSettings();
+    } catch {
+      alert('Erro de conexão.');
+    } finally {
+      setThemeSaving(false);
+    }
+  };
+
+  const resetMemberTheme = async () => {
+    const h = authHeaders();
+    if (!h.Authorization) return;
+    setEmailSettings((p) => ({ ...p, ...MEMBER_THEME_DEFAULTS }));
+    setThemeSaving(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify(MEMBER_THEME_DEFAULTS),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        alert(j.error || 'Erro ao restaurar tema.');
+        return;
+      }
+      alert('Cores restauradas para o padrão. Atualize a área de membros para ver o resultado.');
       void fetchEmailSettings();
     } catch {
       alert('Erro de conexão.');
@@ -2465,6 +2483,9 @@ export const Admin: React.FC = () => {
             <div className="admin-form-actions" style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button type="button" className="btn-primary" onClick={() => void saveMemberTheme()} disabled={themeSaving}>
                 {themeSaving ? 'Salvando…' : 'Salvar tema da área de membros'}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => void resetMemberTheme()} disabled={themeSaving}>
+                Restaurar cores padrão
               </button>
             </div>
           </div>

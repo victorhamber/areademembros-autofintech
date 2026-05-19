@@ -7,7 +7,11 @@
 .ranking-hero {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08), rgba(19, 26, 43, 0.82));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-primary) 8%, transparent),
+    color-mix(in srgb, var(--bg-card) 92%, transparent)
+  );
   padding: 16px;
   display: grid;
   grid-template-columns: auto 1fr;
@@ -19,8 +23,8 @@
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.22);
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,7 +76,7 @@
 .ranking-pill.active {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .ranking-state {
@@ -155,17 +159,17 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
   color: var(--accent-primary);
   text-decoration: none;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .ranking-setup-link:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.55);
-  color: #93c5fd;
+  background: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  color: color-mix(in srgb, var(--accent-primary-hover) 78%, var(--text-primary));
 }
 
 .ranking-setup-link:focus-visible {
@@ -195,7 +199,7 @@
   place-items: center;
   font-weight: 800;
   font-size: 14px;
-  color: #031018;
+  color: var(--button-text);
   background: rgba(255, 255, 255, 0.14);
 }
 

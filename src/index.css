@@ -52,7 +52,7 @@ html, body {
 /* Scrollbar moderna (global) */
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(96, 165, 250, 0.62) rgba(255, 255, 255, 0.06);
+  scrollbar-color: color-mix(in srgb, var(--accent-primary-hover) 62%, transparent) rgba(255, 255, 255, 0.06);
 }
 
 /* WebKit (Chrome/Edge/Safari) */
@@ -67,14 +67,22 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.82), rgba(59, 130, 246, 0.72));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-primary-hover) 82%, transparent),
+    color-mix(in srgb, var(--accent-primary) 72%, transparent)
+  );
   border: 2px solid rgba(14, 14, 14, 0.9);
   border-radius: 999px;
   min-height: 40px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(147, 197, 253, 0.95), rgba(96, 165, 250, 0.9));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-primary-hover) 95%, transparent),
+    color-mix(in srgb, var(--accent-primary-hover) 88%, transparent)
+  );
 }
 
 ::-webkit-scrollbar-corner {
