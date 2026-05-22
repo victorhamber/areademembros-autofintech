@@ -1,3 +1,24 @@
+/* Gutter responsivo — evita conteúdo colado nas laterais (mobile e desktop com sidebar) */
+.home-page--fullbleed {
+  --home-gutter: clamp(16px, 4vw, 24px);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: clip;
+}
+
+@media (min-width: 768px) {
+  .home-page--fullbleed {
+    --home-gutter: clamp(20px, 2.5vw, 36px);
+  }
+}
+
+@media (min-width: 1200px) {
+  .home-page--fullbleed {
+    --home-gutter: clamp(24px, 2vw, 40px);
+  }
+}
+
 /* ========== Hero (área alta — arte em largura total; conteúdo desce abaixo) ========== */
 .hero-fullbleed--netflix {
   background-color: var(--bg-main);
@@ -32,8 +53,10 @@
   margin-right: auto;
   margin-bottom: 0;
   /* Mais padding-top = título mais baixo no banner, favorecendo ver a arte acima */
-  padding: calc(env(safe-area-inset-top, 0px) + clamp(56px, 12vh, 140px)) var(--spacing-md)
-    clamp(24px, 5vh, 56px);
+  padding: calc(env(safe-area-inset-top, 0px) + clamp(56px, 12vh, 140px))
+    max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px))
+    clamp(24px, 5vh, 56px)
+    max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   position: relative;
   z-index: 2;
   flex-shrink: 0;
@@ -52,18 +75,18 @@
 
 @media (min-width: 768px) {
   .hero-fullbleed--netflix {
-    width: calc(100% + var(--spacing-md) * 2);
+    width: 100%;
     max-width: none;
-    margin-left: calc(-1 * var(--spacing-md));
-    margin-right: calc(-1 * var(--spacing-md));
+    margin-left: 0;
+    margin-right: 0;
   }
 }
 
 @media (max-width: 767px) {
   .hero-fullbleed--netflix {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
   }
 }
 
@@ -146,13 +169,30 @@
   z-index: 3;
   background: var(--bg-main);
   padding-top: var(--spacing-md);
+  padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+
+.home-content .book-row-container {
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.home-content .empty-search {
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* ========== SEARCH + idioma ========== */
 .search-container.search-container--row {
   position: relative;
-  margin: calc(var(--spacing-lg) + clamp(6px, 1.2vh, 14px)) var(--spacing-md) 0;
-  padding: var(--spacing-sm) 0 0;
+  margin: calc(var(--spacing-lg) + clamp(6px, 1.2vh, 14px)) 0 0;
+  padding: var(--spacing-sm)
+    max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px)) 0
+    max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   margin-bottom: var(--spacing-xl);
   z-index: 4;
   background: var(--bg-main);
@@ -163,6 +203,10 @@
   gap: var(--spacing-md);
   flex-wrap: wrap;
   box-sizing: border-box;
+  width: 100%;
+  max-width: min(1200px, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .search-field-wrap {
@@ -235,7 +279,8 @@
   display: flex;
   overflow-x: auto;
   gap: 12px;
-  padding: 0 var(--spacing-md) var(--spacing-md);
+  padding: 0 max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px)) var(--spacing-md)
+    max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   margin-top: -8px;
   margin-bottom: var(--spacing-md);
   position: relative;
@@ -273,7 +318,7 @@
   font-size: 15px;
   border: 1px dashed #2a2a2a;
   border-radius: 10px;
-  margin: 0 var(--spacing-md);
+  margin: 0;
 }
 
 /* ========== SKELETON LOADING ========== */
@@ -284,7 +329,8 @@
   animation: shimmer 1.5s infinite;
 }
 .skeleton-row {
-  padding: 0 var(--spacing-md);
+  padding: 0 max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px))
+    max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
   margin-bottom: var(--spacing-xl);
 }
 .skeleton-title {
@@ -347,10 +393,17 @@
   .hero-inner {
     padding-top: calc(env(safe-area-inset-top, 0px) + clamp(40px, 10vh, 100px));
     padding-bottom: clamp(28px, 6vh, 52px);
+    padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
   }
 
   .search-container.search-container--row {
     margin-top: calc(var(--spacing-md) + 8px);
+  }
+
+  .search-field-wrap {
+    flex: 1 1 100%;
+    max-width: 100%;
   }
 
   .hero-greeting {
@@ -365,7 +418,11 @@
 
 @media (min-width: 1200px) {
   .search-container.search-container--row {
-    max-width: 1140px;
+    max-width: min(1140px, 100%);
+  }
+
+  .home-content .book-row-container {
+    max-width: min(1140px, 100%);
     margin-left: auto;
     margin-right: auto;
   }

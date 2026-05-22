@@ -285,6 +285,20 @@
     width: 100%;
     margin-left: 0;
     margin-right: 0;
+    box-sizing: border-box;
+  }
+
+  .app-main.app-main--netflix-home {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-main.app-main--netflix-home {
+    padding-left: 0;
+    padding-right: 0;
+    overflow-x: clip;
   }
 }
 
