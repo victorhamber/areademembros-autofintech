@@ -61,7 +61,9 @@ export function registerMemberApiRoutes(app: express.Application, prisma: Prisma
     if (!user) return res.status(404).json({ error: 'User not found' });
     const id = parseInt(req.params.id, 10);
     const numeroConta = String(req.body?.numero_conta || '').trim();
-    if (!numeroConta) return res.status(400).json({ error: 'numero_conta required' });
+    if (!numeroConta || numeroConta.length < 3) {
+      return res.status(400).json({ error: 'Informe um número de conta MetaTrader válido (mínimo 3 dígitos).' });
+    }
     const lic = await prisma.license.findFirst({
       where: { id, email: user.email.toLowerCase() }
     });
