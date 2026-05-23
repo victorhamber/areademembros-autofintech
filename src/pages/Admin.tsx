@@ -34,14 +34,22 @@ function hexForColorInput(value: string | undefined, fallback: string): string {
 const ADMIN_TABLE_PAGE_SIZE = 12;
 const PLAN_OPTIONS = ['teste', 'mensal', 'semestral', 'anual', 'vitalicio'] as const;
 const PAGE_BUILDER_PAGES_SETTING_KEY = 'admin_page_builder_pages_json';
+const PAGE_BUILDER_FOLDERS_SETTING_KEY = 'admin_page_builder_folders_json';
 const PAGE_BUILDER_LEGACY_SETTING_KEY = 'admin_page_builder_html';
 type BuilderPageTarget = 'header' | 'body';
+type BuilderFolder = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+};
 type BuilderPage = {
   slug: string;
   target: BuilderPageTarget;
   html: string;
   updatedAt: string;
   published?: boolean;
+  folderId?: string;
 };
 const DEFAULT_BUILDER_HTML = `<!doctype html>
 <html lang="pt-BR">
@@ -309,6 +317,10 @@ export const Admin: React.FC = () => {
   const [pageProducts, setPageProducts] = useState(1);
   const [pageWebhooks, setPageWebhooks] = useState(1);
   const [builderPages, setBuilderPages] = useState<BuilderPage[]>([]);
+  const [builderFolders, setBuilderFolders] = useState<BuilderFolder[]>([]);
+  const [builderSelectedFolderId, setBuilderSelectedFolderId] = useState<string | null>(null);
+  const [newBuilderFolderName, setNewBuilderFolderName] = useState('');
+  const [builderFolderSaving, setBuilderFolderSaving] = useState(false);
   const [builderLoadedOnce, setBuilderLoadedOnce] = useState(false);
   const [builderSaving, setBuilderSaving] = useState(false);
   const [builderStep, setBuilderStep] = useState<'list' | 'setup' | 'html'>('list');
@@ -457,13 +469,84 @@ export const Admin: React.FC = () => {
           target: x.target === 'header' ? 'header' : 'body',
           updatedAt: x.updatedAt ? String(x.updatedAt) : new Date().toISOString(),
           published: Boolean(x.published),
+          folderId: typeof x.folderId === 'string' ? x.folderId : undefined,
         }));
     } catch {
       return [];
     }
   };
 
+  const parseBuilderFoldersSetting = (raw: string): BuilderFolder[] => {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((x) => x as Partial<BuilderFolder>)
+        .filter((x) => x && typeof x.id === 'string' && typeof x.name === 'string')
+        .map((x) => ({
+          id: String(x.id),
+          name: String(x.name).trim() || 'Pasta',
+          sortOrder: Number(x.sortOrder) || 0,
+          createdAt: x.createdAt ? String(x.createdAt) : new Date().toISOString(),
+        }))
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+    } catch {
+      return [];
+    }
+  };
+
+  const migrateBuilderFoldersAndPages = (
+    pages: BuilderPage[],
+    folders: BuilderFolder[]
+  ): { pages: BuilderPage[]; folders: BuilderFolder[] } => {
+    let nextFolders = [...folders];
+    if (!nextFolders.length) {
+      nextFolders = [{
+        id: crypto.randomUUID(),
+        name: 'Principal',
+        sortOrder: 0,
+        createdAt: new Date().toISOString(),
+      }];
+    }
+    const validIds = new Set(nextFolders.map((f) => f.id));
+    const fallbackId = nextFolders[0].id;
+    const nextPages = pages.map((p) => ({
+      ...p,
+      folderId: p.folderId && validIds.has(p.folderId) ? p.folderId : fallbackId,
+    }));
+    return { pages: nextPages, folders: nextFolders };
+  };
+
   const serializeBuilderPagesSetting = (pages: BuilderPage[]) => JSON.stringify(pages, null, 2);
+  const serializeBuilderFoldersSetting = (folders: BuilderFolder[]) => JSON.stringify(folders, null, 2);
+
+  const builderSelectedFolder = useMemo(
+    () => builderFolders.find((f) => f.id === builderSelectedFolderId) || null,
+    [builderFolders, builderSelectedFolderId]
+  );
+
+  const builderPagesInFolder = useMemo(() => {
+    if (!builderSelectedFolderId) return [];
+    return builderPages.filter((p) => p.folderId === builderSelectedFolderId);
+  }, [builderPages, builderSelectedFolderId]);
+
+  const persistBuilderState = async (pages: BuilderPage[], folders: BuilderFolder[]) => {
+    const h = authHeaders();
+    if (!h.Authorization) return false;
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          [PAGE_BUILDER_PAGES_SETTING_KEY]: serializeBuilderPagesSetting(pages),
+          [PAGE_BUILDER_FOLDERS_SETTING_KEY]: serializeBuilderFoldersSetting(folders),
+        }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
 
   const getBuilderPreviewDocument = () => builderIframeRef.current?.contentDocument || null;
 
@@ -692,12 +775,18 @@ export const Admin: React.FC = () => {
       openBuilderPage(exists.slug);
       return;
     }
+    if (!builderSelectedFolderId) {
+      alert('Selecione ou crie uma pasta antes de criar a página.');
+      setBuilderStep('list');
+      return;
+    }
     const page: BuilderPage = {
       slug,
       target: builderSetupTarget,
       html: injectHtmlExtras(DEFAULT_BUILDER_HTML, builderSetupHeadCode, builderSetupBodyCode),
       updatedAt: new Date().toISOString(),
       published: false,
+      folderId: builderSelectedFolderId,
     };
     const next = [page, ...builderPages];
     setBuilderPages(next);
@@ -739,15 +828,11 @@ export const Admin: React.FC = () => {
           html,
           updatedAt: new Date().toISOString(),
           published: Boolean(opts?.publish),
+          folderId: builderSelectedFolderId || builderFolders[0]?.id,
         });
       }
-      const payload = serializeBuilderPagesSetting(nextPages);
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { ...h, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [PAGE_BUILDER_PAGES_SETTING_KEY]: payload }),
-      });
-      if (!res.ok) {
+      const ok = await persistBuilderState(nextPages, builderFolders);
+      if (!ok) {
         alert('Falha ao salvar página.');
         return;
       }
@@ -762,19 +847,87 @@ export const Admin: React.FC = () => {
     }
   };
 
-  const persistBuilderPagesSetting = async (pages: BuilderPage[]) => {
-    const h = authHeaders();
-    if (!h.Authorization) return false;
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { ...h, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [PAGE_BUILDER_PAGES_SETTING_KEY]: serializeBuilderPagesSetting(pages) }),
-      });
-      return res.ok;
-    } catch {
-      return false;
+  const persistBuilderPagesSetting = async (pages: BuilderPage[]) =>
+    persistBuilderState(pages, builderFolders);
+
+  const createBuilderFolder = async () => {
+    const name = newBuilderFolderName.trim();
+    if (!name) {
+      alert('Informe o nome da pasta.');
+      return;
     }
+    setBuilderFolderSaving(true);
+    try {
+      const folder: BuilderFolder = {
+        id: crypto.randomUUID(),
+        name,
+        sortOrder: builderFolders.length,
+        createdAt: new Date().toISOString(),
+      };
+      const nextFolders = [...builderFolders, folder];
+      const ok = await persistBuilderState(builderPages, nextFolders);
+      if (!ok) {
+        alert('Falha ao criar pasta.');
+        return;
+      }
+      setBuilderFolders(nextFolders);
+      setBuilderSelectedFolderId(folder.id);
+      setNewBuilderFolderName('');
+    } finally {
+      setBuilderFolderSaving(false);
+    }
+  };
+
+  const renameBuilderFolder = async (folder: BuilderFolder) => {
+    const next = window.prompt('Novo nome da pasta:', folder.name);
+    if (next === null) return;
+    const name = next.trim();
+    if (!name) {
+      alert('O nome não pode ficar vazio.');
+      return;
+    }
+    const nextFolders = builderFolders.map((f) => (f.id === folder.id ? { ...f, name } : f));
+    const ok = await persistBuilderState(builderPages, nextFolders);
+    if (!ok) {
+      alert('Falha ao renomear pasta.');
+      return;
+    }
+    setBuilderFolders(nextFolders);
+  };
+
+  const deleteBuilderFolder = async (folder: BuilderFolder) => {
+    const count = builderPages.filter((p) => p.folderId === folder.id).length;
+    if (count > 0) {
+      alert(`Esta pasta contém ${count} página(s). Exclua ou mova as páginas antes de remover a pasta.`);
+      return;
+    }
+    if (builderFolders.length <= 1) {
+      alert('É necessário manter pelo menos uma pasta.');
+      return;
+    }
+    if (!window.confirm(`Excluir a pasta "${folder.name}"?`)) return;
+    const nextFolders = builderFolders.filter((f) => f.id !== folder.id);
+    const ok = await persistBuilderState(builderPages, nextFolders);
+    if (!ok) {
+      alert('Falha ao excluir pasta.');
+      return;
+    }
+    setBuilderFolders(nextFolders);
+    if (builderSelectedFolderId === folder.id) {
+      setBuilderSelectedFolderId(nextFolders[0]?.id ?? null);
+    }
+  };
+
+  const moveBuilderPageFolder = async (slug: string, folderId: string) => {
+    const nextPages = builderPages.map((p) =>
+      p.slug === slug ? { ...p, folderId, updatedAt: new Date().toISOString() } : p
+    );
+    const ok = await persistBuilderState(nextPages, builderFolders);
+    if (!ok) {
+      alert('Falha ao mover página.');
+      return;
+    }
+    setBuilderPages(nextPages);
   };
 
   const openBuilderPreviewNewTab = (mode: 'desktop' | 'mobile') => {
@@ -854,6 +1007,7 @@ export const Admin: React.FC = () => {
         }));
         if (!builderLoadedOnce) {
           const pagesRaw = String(data?.[PAGE_BUILDER_PAGES_SETTING_KEY] || '').trim();
+          const foldersRaw = String(data?.[PAGE_BUILDER_FOLDERS_SETTING_KEY] || '').trim();
           let parsedPages = parseBuilderPagesSetting(pagesRaw);
           if (!parsedPages.length) {
             const legacyHtml = String(data?.[PAGE_BUILDER_LEGACY_SETTING_KEY] || '').trim();
@@ -864,10 +1018,19 @@ export const Admin: React.FC = () => {
               updatedAt: new Date().toISOString(),
             }];
           }
-          setBuilderPages(parsedPages);
-          setBuilderCurrentSlug(parsedPages[0].slug);
-          setBuilderCodeDraft(parsedPages[0].html || DEFAULT_BUILDER_HTML);
-          setBuilderPreviewHtml(parsedPages[0].html || DEFAULT_BUILDER_HTML);
+          const migrated = migrateBuilderFoldersAndPages(
+            parsedPages,
+            parseBuilderFoldersSetting(foldersRaw)
+          );
+          setBuilderPages(migrated.pages);
+          setBuilderFolders(migrated.folders);
+          setBuilderSelectedFolderId(migrated.folders[0]?.id ?? null);
+          const first = migrated.pages[0];
+          if (first) {
+            setBuilderCurrentSlug(first.slug);
+            setBuilderCodeDraft(first.html || DEFAULT_BUILDER_HTML);
+            setBuilderPreviewHtml(first.html || DEFAULT_BUILDER_HTML);
+          }
           setBuilderLoadedOnce(true);
         }
       }
@@ -4292,105 +4455,204 @@ export const Admin: React.FC = () => {
         <div className="admin-content admin-content--stack">
           {builderStep === 'list' && (
             <div className="admin-form">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
+                Organize seus sistemas em pastas. Só aparecem as páginas da pasta selecionada — sem lista geral.
+              </p>
+
+              <div className="admin-media-folders admin-builder-folders">
+                <div className="admin-media-folders__row">
+                  <span className="admin-media-folders__label">Pastas</span>
+                  {builderFolders.map((f) => {
+                    const count = builderPages.filter((p) => p.folderId === f.id).length;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={`admin-media-folder-chip ${builderSelectedFolderId === f.id ? 'active' : ''}`}
+                        onClick={() => setBuilderSelectedFolderId(f.id)}
+                      >
+                        <FolderOpen size={14} />
+                        {f.name} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="admin-media-folders__create">
+                  <input
+                    type="text"
+                    value={newBuilderFolderName}
+                    onChange={(e) => setNewBuilderFolderName(e.target.value)}
+                    placeholder="Nome da pasta (ex.: Sistema X)"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void createBuilderFolder();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary-sm"
+                    disabled={builderFolderSaving || !newBuilderFolderName.trim()}
+                    onClick={() => void createBuilderFolder()}
+                  >
+                    <FolderPlus size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
+                    {builderFolderSaving ? 'Criando...' : 'Nova pasta'}
+                  </button>
+                  {builderSelectedFolder && (
+                    <>
+                      <button type="button" className="btn-secondary-sm" onClick={() => void renameBuilderFolder(builderSelectedFolder)}>
+                        Renomear pasta
+                      </button>
+                      <button type="button" className="btn-danger-sm" onClick={() => void deleteBuilderFolder(builderSelectedFolder)}>
+                        Excluir pasta
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div className="admin-builder-list-head">
-                <h3>Páginas HTML ({builderPages.length})</h3>
-                <button type="button" className="btn-primary" onClick={() => setBuilderStep('setup')}>
+                <h3>
+                  {builderSelectedFolder
+                    ? `Páginas em “${builderSelectedFolder.name}” (${builderPagesInFolder.length})`
+                    : 'Selecione uma pasta'}
+                </h3>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!builderSelectedFolderId}
+                  onClick={() => {
+                    if (!builderSelectedFolderId) {
+                      alert('Selecione ou crie uma pasta primeiro.');
+                      return;
+                    }
+                    setBuilderStep('setup');
+                  }}
+                >
                   Criar nova página
                 </button>
               </div>
-              <div className="admin-table-scroll">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Slug</th>
-                      <th>Status</th>
-                      <th>Atualizada</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {builderPages.length === 0 ? (
+
+              {!builderSelectedFolderId ? (
+                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 24 }}>
+                  Crie uma pasta acima para começar a organizar suas páginas HTML.
+                </p>
+              ) : (
+                <div className="admin-table-scroll">
+                  <table className="admin-table">
+                    <thead>
                       <tr>
-                        <td colSpan={4} style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>
-                          Nenhuma página cadastrada ainda.
-                        </td>
+                        <th>Slug</th>
+                        <th>Status</th>
+                        <th>Atualizada</th>
+                        <th>Pasta</th>
+                        <th />
                       </tr>
-                    ) : (
-                      builderPages.map((p) => (
-                        <tr key={p.slug}>
-                          <td><code>{p.slug}</code></td>
-                          <td>
-                            <span className={`admin-license-status-pill admin-license-status-pill--${p.published ? 'ativa' : 'inativa'}`}>
-                              {p.published ? 'publicada' : 'rascunho'}
-                            </span>
-                          </td>
-                          <td>{new Date(p.updatedAt).toLocaleString('pt-BR')}</td>
-                          <td>
-                            <div className="admin-actions admin-actions--wrap">
-                              <button type="button" className="btn-secondary-sm" onClick={() => openBuilderPage(p.slug)}>Editar</button>
-                              <button
-                                type="button"
-                                className="btn-secondary-sm"
-                                onClick={() => {
-                                  const base = normalizeBuilderSlug(`${p.slug}-copia`);
-                                  let slug = base;
-                                  let i = 2;
-                                  while (builderPages.some((x) => x.slug === slug)) {
-                                    slug = `${base}-${i++}`;
-                                  }
-                                  const copy: BuilderPage = { ...p, slug, published: false, updatedAt: new Date().toISOString() };
-                                  const next = [copy, ...builderPages];
-                                  setBuilderPages(next);
-                                  void persistBuilderPagesSetting(next);
-                                }}
-                              >
-                                Duplicar
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-secondary-sm"
-                                onClick={() => {
-                                  const cleanSlug = normalizeBuilderSlug(p.slug);
-                                  const pageUrl = `${window.location.origin}/${encodeURIComponent(cleanSlug)}`;
-                                  navigator.clipboard.writeText(pageUrl);
-                                  alert('URL da página copiada!');
-                                }}
-                              >
-                                Copiar URL
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-danger-sm"
-                                onClick={() => {
-                                  if (!window.confirm(`Excluir página "${p.slug}"?`)) return;
-                                  setBuilderPages((prev) => {
-                                    const next = prev.filter((x) => x.slug !== p.slug);
-                                    void persistBuilderPagesSetting(next);
-                                    return next;
-                                  });
-                                  if (builderCurrentSlug === p.slug) {
-                                    setBuilderCurrentSlug('');
-                                    setBuilderCodeDraft(DEFAULT_BUILDER_HTML);
-                                  }
-                                }}
-                              >
-                                Excluir
-                              </button>
-                            </div>
+                    </thead>
+                    <tbody>
+                      {builderPagesInFolder.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 20 }}>
+                            Nenhuma página nesta pasta. Clique em &quot;Criar nova página&quot;.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      ) : (
+                        builderPagesInFolder.map((p) => (
+                          <tr key={p.slug}>
+                            <td><code>{p.slug}</code></td>
+                            <td>
+                              <span className={`admin-license-status-pill admin-license-status-pill--${p.published ? 'ativa' : 'inativa'}`}>
+                                {p.published ? 'publicada' : 'rascunho'}
+                              </span>
+                            </td>
+                            <td>{new Date(p.updatedAt).toLocaleString('pt-BR')}</td>
+                            <td style={{ minWidth: 140 }}>
+                              <select
+                                className="admin-media-move-select"
+                                value={p.folderId || ''}
+                                onChange={(e) => void moveBuilderPageFolder(p.slug, e.target.value)}
+                              >
+                                {builderFolders.map((f) => (
+                                  <option key={f.id} value={f.id}>{f.name}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <div className="admin-actions admin-actions--wrap">
+                                <button type="button" className="btn-secondary-sm" onClick={() => openBuilderPage(p.slug)}>Editar</button>
+                                <button
+                                  type="button"
+                                  className="btn-secondary-sm"
+                                  onClick={() => {
+                                    const base = normalizeBuilderSlug(`${p.slug}-copia`);
+                                    let slug = base;
+                                    let i = 2;
+                                    while (builderPages.some((x) => x.slug === slug)) {
+                                      slug = `${base}-${i++}`;
+                                    }
+                                    const copy: BuilderPage = {
+                                      ...p,
+                                      slug,
+                                      published: false,
+                                      updatedAt: new Date().toISOString(),
+                                      folderId: builderSelectedFolderId,
+                                    };
+                                    const next = [copy, ...builderPages];
+                                    setBuilderPages(next);
+                                    void persistBuilderPagesSetting(next);
+                                  }}
+                                >
+                                  Duplicar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-secondary-sm"
+                                  onClick={() => {
+                                    const cleanSlug = normalizeBuilderSlug(p.slug);
+                                    const pageUrl = `${window.location.origin}/${encodeURIComponent(cleanSlug)}`;
+                                    navigator.clipboard.writeText(pageUrl);
+                                    alert('URL da página copiada!');
+                                  }}
+                                >
+                                  Copiar URL
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-danger-sm"
+                                  onClick={() => {
+                                    if (!window.confirm(`Excluir página "${p.slug}"?`)) return;
+                                    setBuilderPages((prev) => {
+                                      const next = prev.filter((x) => x.slug !== p.slug);
+                                      void persistBuilderPagesSetting(next);
+                                      return next;
+                                    });
+                                    if (builderCurrentSlug === p.slug) {
+                                      setBuilderCurrentSlug('');
+                                      setBuilderCodeDraft(DEFAULT_BUILDER_HTML);
+                                    }
+                                  }}
+                                >
+                                  Excluir
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
           {builderStep === 'setup' && (
             <div className="admin-form">
               <h3>Criar nova página</h3>
-              <p className="admin-builder-meta">Etapa 1: configure slug e códigos opcionais de <code>head</code> e <code>body</code>.</p>
+              <p className="admin-builder-meta">
+                Pasta: <strong>{builderSelectedFolder?.name || '—'}</strong> — Etapa 1: configure slug e códigos opcionais de <code>head</code> e <code>body</code>.
+              </p>
               <label>Slug da página</label>
               <input value={builderSetupSlug} onChange={(e) => setBuilderSetupSlug(e.target.value)} placeholder="ex: oferta-principal" />
               <label>Área</label>

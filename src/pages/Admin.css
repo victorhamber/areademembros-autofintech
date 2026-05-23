@@ -1761,6 +1761,10 @@
   margin-bottom: 10px;
 }
 
+.admin-builder-folders {
+  margin-bottom: 18px;
+}
+
 .admin-builder-topbar-row {
   display: grid;
   grid-template-columns: auto minmax(220px, 320px) 1fr;
