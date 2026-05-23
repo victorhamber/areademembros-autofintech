@@ -33,3 +33,18 @@ HTTP **502** significa que o proxy (Traefik/Nginx do EasyPanel) **não recebeu r
 ```bash
 npx prisma migrate deploy
 ```
+
+### Erro P3019 (`migration_lock.toml` vs PostgreSQL)
+
+Se o log mostrar **P3019** no boot, o `migration_lock.toml` estava desalinhado com o `schema.prisma`. Corrija no repositório e faça redeploy.
+
+Se o banco em produção já foi criado com `db push` (sem histórico de migrações), marque as migrações existentes **uma vez** no console do container (schema já aplicado):
+
+```bash
+npx prisma migrate resolve --applied "20260327054346_add_html_url"
+npx prisma migrate resolve --applied "20260513062500_add_product_download_fields"
+npx prisma migrate resolve --applied "20260522120000_add_media_folders"
+npx prisma migrate deploy
+```
+
+Depois disso, `migrate deploy` no boot do Docker deve concluir sem cair no fallback `db push`.
