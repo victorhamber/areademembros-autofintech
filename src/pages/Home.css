@@ -55,7 +55,7 @@
   /* Mais padding-top = título mais baixo no banner, favorecendo ver a arte acima */
   padding: calc(env(safe-area-inset-top, 0px) + clamp(56px, 12vh, 140px))
     max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px))
-    clamp(8px, 1.5vh, 16px)
+    clamp(16px, 3vh, 32px)
     max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   position: relative;
   z-index: 2;
@@ -164,11 +164,11 @@
 }
 
 .home-content {
-  margin-top: calc(-1 * clamp(12px, 2.5vh, 28px));
+  margin-top: clamp(8px, 1.8vh, 18px);
   position: relative;
   z-index: 3;
   background: var(--bg-main);
-  padding-top: 0;
+  padding-top: var(--spacing-sm);
   padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
   box-sizing: border-box;
@@ -177,8 +177,8 @@
 .home-content .search-container.search-container--row {
   padding-left: 0;
   padding-right: 0;
-  margin-top: 0;
-  margin-bottom: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
   padding-top: 0;
 }
 
@@ -398,13 +398,9 @@
 
   .hero-inner {
     padding-top: calc(env(safe-area-inset-top, 0px) + clamp(40px, 10vh, 100px));
-    padding-bottom: clamp(8px, 1.5vh, 14px);
+    padding-bottom: clamp(14px, 2.5vh, 24px);
     padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
     padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
-  }
-
-  .home-content {
-    margin-top: calc(-1 * clamp(16px, 3vh, 32px));
   }
 
   .home-content .search-container.search-container--row {
