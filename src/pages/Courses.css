@@ -192,24 +192,6 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
 }
 
-.courses-back {
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  padding: 4px 0;
-  margin-bottom: 8px;
-  font-size: 0.85rem;
-}
-
-.courses-back:hover {
-  color: var(--text-primary);
-}
-
 .course-detail-title {
   margin: 0;
   font-size: 1.3rem;

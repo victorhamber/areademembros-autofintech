@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, ExternalLink, GraduationCap, Lock, Play } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ExternalLink, GraduationCap, Lock, Play } from 'lucide-react';
 import type { Lang } from '../i18n/translations';
 import { t } from '../i18n/translations';
 import { parseVideoUrl } from '../lib/videoEmbed';
@@ -317,10 +317,6 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
     return (
       <div className="courses-page">
         <section className="course-detail-header">
-          <button type="button" className="courses-back" onClick={() => { setActiveCourseSlug(''); setActiveLessonId(''); }}>
-            <ArrowLeft size={16} />
-            Voltar aos cursos
-          </button>
           <h1 className="course-detail-title">{activeCourse.title}</h1>
           <p className="course-detail-sub">
             {stats.done} de {stats.total} aulas concluídas · {stats.pct}%
