@@ -380,7 +380,7 @@ app.get('/api/public/pages/:slug', async (req, res) => {
       return;
     }
 
-    if (page.published !== true) {
+    if (page.published === false) {
       res.status(403).type('text/plain; charset=utf-8').send('Página em rascunho. Publique para liberar a URL.');
       return;
     }

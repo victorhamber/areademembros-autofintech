@@ -38,40 +38,12 @@ npx prisma migrate deploy
 
 Se o log mostrar **P3019** no boot, o `migration_lock.toml` estava desalinhado com o `schema.prisma`. Corrija no repositório e faça redeploy.
 
-### Erro P3005 (schema já existe, sem histórico de migrações)
+### Sync de schema no boot (`prisma db push`)
 
-Acontece quando o banco foi criado anteriormente com `db push` (ou veio de outra origem), então as tabelas existem mas a tabela `_prisma_migrations` está vazia.
+O `scripts/db-boot.sh` usa `prisma db push --accept-data-loss` em vez de `migrate deploy` porque:
 
-**Resolvido automaticamente no boot** pelo `scripts/db-boot.sh` (chamado pelo `CMD` do `Dockerfile`):
+- O banco em produção foi criado com `db push` (sem histórico em `_prisma_migrations`).
+- `migrate deploy` exige histórico íntegro e gera erros **P3005**, **P3015** ou **P3017** quando o baseline não bate.
+- `db push` é idempotente: se o schema já está em sync (caso atual), não faz nada e termina silencioso.
 
-1. Roda `prisma migrate deploy`.
-2. Se aparecer **P3005**, marca todas as migrações em `prisma/migrations/` como aplicadas (`prisma migrate resolve --applied <nome>`).
-3. Roda `migrate deploy` novamente; em último caso, faz `db push --accept-data-loss` para manter a API no ar.
-
-A partir do próximo deploy o log não deve mais mostrar P3005.
-
-### P3017 / P3015 (baseline parcial)
-
-Se o log mostrar que a migração `20260327054346_add_html_url` não foi encontrada, mas as outras foram marcadas como aplicadas, o histórico ficou inconsistente. O `scripts/db-boot.sh` atual tenta reparar com `rolled-back` e baseline de novo.
-
-**Importante:** faça redeploy **sem cache** no EasyPanel (rebuild completo) para garantir que `migration.sql` da primeira migração entre na imagem.
-
-Se quiser corrigir manualmente no console do container:
-
-```bash
-npx prisma migrate resolve --rolled-back "20260522120000_add_media_folders"
-npx prisma migrate resolve --rolled-back "20260513062500_add_product_download_fields"
-npx prisma migrate resolve --applied "20260327054346_add_html_url"
-npx prisma migrate resolve --applied "20260513062500_add_product_download_fields"
-npx prisma migrate resolve --applied "20260522120000_add_media_folders"
-npx prisma migrate deploy
-```
-
-Se quiser fazer manualmente no console do container (baseline simples):
-
-```bash
-npx prisma migrate resolve --applied "20260327054346_add_html_url"
-npx prisma migrate resolve --applied "20260513062500_add_product_download_fields"
-npx prisma migrate resolve --applied "20260522120000_add_media_folders"
-npx prisma migrate deploy
-```
+**Quando voltar a usar `migrate deploy`:** quando o banco em produção tiver migrações reais aplicadas e versionadas (ex.: depois de fazer baseline manual com `prisma migrate resolve --applied <nome>` para cada migração existente).

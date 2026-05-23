@@ -468,7 +468,7 @@ export const Admin: React.FC = () => {
           html: String(x.html),
           target: x.target === 'header' ? 'header' : 'body',
           updatedAt: x.updatedAt ? String(x.updatedAt) : new Date().toISOString(),
-          published: x.published === true,
+          published: x.published === false ? false : true,
           folderId: typeof x.folderId === 'string' ? x.folderId : undefined,
         }));
     } catch {
@@ -898,7 +898,7 @@ export const Admin: React.FC = () => {
       setBuilderPages((currentPages) => {
         const draft = [...currentPages];
         const idx = draft.findIndex((p) => p.slug === slug);
-        const wasPublished = idx >= 0 ? draft[idx].published === true : false;
+        const wasPublished = idx >= 0 ? draft[idx].published !== false : true;
         const published = opts?.publish === true ? true : wasPublished;
         if (idx >= 0) {
           draft[idx] = {
@@ -1125,7 +1125,7 @@ export const Admin: React.FC = () => {
               target: 'body',
               html: legacyHtml || DEFAULT_BUILDER_HTML,
               updatedAt: new Date().toISOString(),
-              published: false,
+              published: true,
             }];
           }
           const migrated = migrateBuilderFoldersAndPages(

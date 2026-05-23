@@ -9,13 +9,6 @@ RUN npm install
 # Copy application source
 COPY . .
 
-# Falha o build se alguma migration.sql não entrou na imagem (evita P3015 no runtime)
-RUN set -e; \
-  for d in prisma/migrations/*/; do \
-    test -f "${d}migration.sql" || (echo "FATAL: ausente ${d}migration.sql" && exit 1); \
-  done; \
-  echo "OK: todas as migration.sql presentes."
-
 # Generate Prisma Database Client
 RUN apk add --no-cache openssl
 RUN npx prisma generate
