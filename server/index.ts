@@ -43,8 +43,12 @@ import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.
 import {
   findBuilderPageBySlug,
   isBuilderPagePublished,
+  listPageBuilderSnapshots,
   loadBuilderPages,
   normalizeBuilderSlug,
+  PAGE_BUILDER_PAGES_KEY,
+  restorePageBuilderSnapshot,
+  savePagesWithGuard,
 } from './lib/pageBuilder.js';
 
 const DEFAULT_PASSWORD = 'Mudar123@';
@@ -1260,9 +1264,16 @@ app.post('/api/admin/email-settings', adminAuthMiddleware, async (req, res) => {
 
 app.post('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
   try {
-    const entries = req.body as Record<string, string>;
+    const rawBody = (req.body ?? {}) as Record<string, unknown>;
+    const allowShrink = rawBody.__force_page_builder_shrink === true;
+    const entries: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawBody)) {
+      if (k.startsWith('__')) continue;
+      entries[k] = String(v ?? '');
+    }
     const colorPattern =
       /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/;
+    let pageBuilderResult: { saved: number; previous: number; snapshotKey: string | null } | null = null;
     for (const [key, value] of Object.entries(entries)) {
       // Skip masked values (don't overwrite with masked text)
       if (key === 'resend_api_key' && value.startsWith('••')) continue;
@@ -1287,15 +1298,62 @@ app.post('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
           });
         }
       }
+      if (key === PAGE_BUILDER_PAGES_KEY) {
+        const result = await savePagesWithGuard(prisma, String(value ?? ''), { allowShrink });
+        if (!result.ok) {
+          if (result.code === 'shrink_blocked') {
+            return res.status(409).json({
+              error:
+                `Bloqueado: tentativa de gravar ${result.saved} página(s) sobrescrevendo ${result.previous} existente(s). ` +
+                `Recarregue o admin para sincronizar antes de salvar, ou envie __force_page_builder_shrink=true. ` +
+                `Backup automático salvo em ${result.snapshotKey ?? '(nenhum)'}.`,
+              code: 'shrink_blocked',
+              saved: result.saved,
+              previous: result.previous,
+              snapshotKey: result.snapshotKey,
+            });
+          }
+          return res.status(400).json({ error: result.message });
+        }
+        pageBuilderResult = {
+          saved: result.saved,
+          previous: result.previous,
+          snapshotKey: result.snapshotKey,
+        };
+        continue;
+      }
       await prisma.setting.upsert({
         where: { key },
         update: { value },
         create: { key, value }
       });
     }
-    res.json({ success: true });
+    res.json({ success: true, pageBuilder: pageBuilderResult });
   } catch (error) {
+    console.error('[settings save]', error);
     res.status(500).json({ error: 'Failed to save settings' });
+  }
+});
+
+app.get('/api/admin/page-builder/snapshots', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const rows = await listPageBuilderSnapshots(prisma);
+    res.json(rows);
+  } catch (error) {
+    console.error('[snapshots list]', error);
+    res.status(500).json({ error: 'Falha ao listar backups.' });
+  }
+});
+
+app.post('/api/admin/page-builder/snapshots/restore', adminAuthMiddleware, async (req, res) => {
+  try {
+    const key = String(req.body?.key || '');
+    if (!key) return res.status(400).json({ error: 'Informe a chave do backup.' });
+    const pages = await restorePageBuilderSnapshot(prisma, key);
+    res.json({ success: true, restored: pages.length });
+  } catch (error) {
+    console.error('[snapshots restore]', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Falha ao restaurar backup.' });
   }
 });
 

@@ -2,6 +2,8 @@ import type { PrismaClient } from '@prisma/client';
 
 export const PAGE_BUILDER_PAGES_KEY = 'admin_page_builder_pages_json';
 export const PAGE_BUILDER_LEGACY_KEY = 'admin_page_builder_html';
+export const PAGE_BUILDER_SNAPSHOT_PREFIX = 'admin_page_builder_snapshot_';
+const PAGE_BUILDER_SNAPSHOT_MAX = 20;
 
 export type BuilderPageRecord = {
   slug: string;
@@ -95,4 +97,114 @@ export function findBuilderPageBySlug(
 
 export function serializeBuilderPagesSetting(pages: BuilderPageRecord[]): string {
   return JSON.stringify(pages, null, 2);
+}
+
+export type PageBuilderSaveResult =
+  | { ok: true; saved: number; previous: number; snapshotKey: string | null }
+  | { ok: false; code: 'shrink_blocked'; saved: number; previous: number; snapshotKey: string | null }
+  | { ok: false; code: 'invalid_payload'; message: string };
+
+async function pruneSnapshots(prisma: PrismaClient) {
+  const all = await prisma.setting.findMany({
+    where: { key: { startsWith: PAGE_BUILDER_SNAPSHOT_PREFIX } },
+  });
+  if (all.length <= PAGE_BUILDER_SNAPSHOT_MAX) return;
+  const sorted = [...all].sort((a, b) => (a.key < b.key ? -1 : 1));
+  const toRemove = sorted.slice(0, sorted.length - PAGE_BUILDER_SNAPSHOT_MAX);
+  for (const row of toRemove) {
+    await prisma.setting.delete({ where: { key: row.key } }).catch(() => null);
+  }
+}
+
+async function writeSnapshot(prisma: PrismaClient, payload: string): Promise<string | null> {
+  const trimmed = String(payload || '').trim();
+  if (!trimmed) return null;
+  const ts = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
+  const key = `${PAGE_BUILDER_SNAPSHOT_PREFIX}${ts}_${Math.random().toString(36).slice(2, 8)}`;
+  await prisma.setting.upsert({
+    where: { key },
+    update: { value: trimmed },
+    create: { key, value: trimmed },
+  });
+  await pruneSnapshots(prisma);
+  return key;
+}
+
+/**
+ * Persiste a lista de páginas do construtor com proteções:
+ *  - rejeita payload inválido (não-JSON ou não-array);
+ *  - bloqueia shrink sem allowShrink (evita perda acidental);
+ *  - sempre grava um snapshot com o valor anterior antes de sobrescrever.
+ */
+export async function savePagesWithGuard(
+  prisma: PrismaClient,
+  newRawJson: string,
+  opts?: { allowShrink?: boolean }
+): Promise<PageBuilderSaveResult> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(newRawJson);
+  } catch {
+    return { ok: false, code: 'invalid_payload', message: 'JSON inválido em admin_page_builder_pages_json.' };
+  }
+  if (!Array.isArray(parsed)) {
+    return { ok: false, code: 'invalid_payload', message: 'admin_page_builder_pages_json precisa ser um array.' };
+  }
+  const incomingPages = parseBuilderPagesJson(newRawJson);
+
+  const current = await prisma.setting.findUnique({ where: { key: PAGE_BUILDER_PAGES_KEY } });
+  const currentRaw = String(current?.value || '');
+  const currentPages = parseBuilderPagesJson(currentRaw);
+
+  const snapshotKey = currentRaw.trim() ? await writeSnapshot(prisma, currentRaw) : null;
+
+  if (currentPages.length > 0 && incomingPages.length < currentPages.length && !opts?.allowShrink) {
+    return {
+      ok: false,
+      code: 'shrink_blocked',
+      saved: incomingPages.length,
+      previous: currentPages.length,
+      snapshotKey,
+    };
+  }
+
+  await prisma.setting.upsert({
+    where: { key: PAGE_BUILDER_PAGES_KEY },
+    update: { value: newRawJson },
+    create: { key: PAGE_BUILDER_PAGES_KEY, value: newRawJson },
+  });
+
+  return {
+    ok: true,
+    saved: incomingPages.length,
+    previous: currentPages.length,
+    snapshotKey,
+  };
+}
+
+export async function listPageBuilderSnapshots(prisma: PrismaClient) {
+  const rows = await prisma.setting.findMany({
+    where: { key: { startsWith: PAGE_BUILDER_SNAPSHOT_PREFIX } },
+  });
+  return rows
+    .map((r) => {
+      const pages = parseBuilderPagesJson(String(r.value || ''));
+      return { key: r.key, pages: pages.length };
+    })
+    .sort((a, b) => (a.key < b.key ? 1 : -1));
+}
+
+export async function restorePageBuilderSnapshot(prisma: PrismaClient, snapshotKey: string) {
+  if (!snapshotKey.startsWith(PAGE_BUILDER_SNAPSHOT_PREFIX)) {
+    throw new Error('Chave de snapshot inválida.');
+  }
+  const snap = await prisma.setting.findUnique({ where: { key: snapshotKey } });
+  if (!snap) throw new Error('Snapshot não encontrado.');
+  await writeSnapshot(prisma, String(snap.value || ''));
+  await prisma.setting.upsert({
+    where: { key: PAGE_BUILDER_PAGES_KEY },
+    update: { value: snap.value },
+    create: { key: PAGE_BUILDER_PAGES_KEY, value: snap.value },
+  });
+  return parseBuilderPagesJson(String(snap.value || ''));
 }

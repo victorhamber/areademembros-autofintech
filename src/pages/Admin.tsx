@@ -538,7 +538,7 @@ export const Admin: React.FC = () => {
   const persistBuilderState = async (
     pages: BuilderPage[],
     folders: BuilderFolder[],
-    opts?: { skipLoadGuard?: boolean }
+    opts?: { skipLoadGuard?: boolean; allowShrink?: boolean }
   ) => {
     const h = authHeaders();
     if (!h.Authorization) return false;
@@ -547,16 +547,37 @@ export const Admin: React.FC = () => {
       return false;
     }
     try {
+      const body: Record<string, unknown> = {
+        [PAGE_BUILDER_PAGES_SETTING_KEY]: serializeBuilderPagesSetting(pages),
+        [PAGE_BUILDER_FOLDERS_SETTING_KEY]: serializeBuilderFoldersSetting(folders),
+      };
+      if (opts?.allowShrink) body.__force_page_builder_shrink = true;
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: { ...h, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          [PAGE_BUILDER_PAGES_SETTING_KEY]: serializeBuilderPagesSetting(pages),
-          [PAGE_BUILDER_FOLDERS_SETTING_KEY]: serializeBuilderFoldersSetting(folders),
-        }),
+        body: JSON.stringify(body),
       });
-      return res.ok;
-    } catch {
+      if (res.ok) return true;
+      if (res.status === 409) {
+        const j = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          saved?: number;
+          previous?: number;
+          snapshotKey?: string | null;
+        };
+        const msg =
+          `Bloqueado pelo servidor: tentativa de sobrescrever ${j.previous} página(s) com apenas ${j.saved}.` +
+          `\nBackup criado: ${j.snapshotKey || '(nenhum)'}.` +
+          `\nRecarregue o admin e tente de novo. Para forçar mesmo assim, confirme abaixo.`;
+        const force = window.confirm(`${msg}\n\nForçar gravação?`);
+        if (!force) return false;
+        return persistBuilderState(pages, folders, { ...opts, allowShrink: true });
+      }
+      const text = await res.text().catch(() => '');
+      console.error('[builder] save falhou', res.status, text);
+      return false;
+    } catch (err) {
+      console.error('[builder] save erro', err);
       return false;
     }
   };
@@ -900,6 +921,10 @@ export const Admin: React.FC = () => {
     if (!h.Authorization) return;
     if (!builderCurrentSlug) {
       alert('Crie ou selecione uma página antes de salvar.');
+      return;
+    }
+    if (!builderLoadedOnce) {
+      alert('Aguarde o carregamento das páginas antes de salvar (evita sobrescrever páginas existentes).');
       return;
     }
     setBuilderSaving(true);
@@ -4612,11 +4637,65 @@ export const Admin: React.FC = () => {
           {builderLoadedOnce && builderPages.length === 0 && (
             <div className="admin-form" style={{ marginBottom: 12, borderColor: 'var(--accent-primary)' }}>
               <p style={{ fontSize: 13, margin: 0, color: 'var(--text-secondary)' }}>
-                Nenhuma página salva no banco. Se você tinha páginas antes (ex.: <code>codigo-secreto-depoimento</code>),
-                elas podem ter sido apagadas ao criar uma pasta antes do carregamento. Recrie cada página ou restaure um backup do PostgreSQL.
+                Nenhuma página salva no banco. Use <strong>Backups do construtor</strong> abaixo para restaurar a última versão automática, ou recrie a página.
               </p>
             </div>
           )}
+          <div className="admin-form" style={{ marginBottom: 12 }}>
+            <h4 style={{ margin: '0 0 8px' }}>Backups automáticos do construtor</h4>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+              Toda vez que uma página é salva, o sistema guarda um snapshot do estado anterior (até 20). Use isso para restaurar se algo for sobrescrito.
+            </p>
+            <div className="admin-actions admin-actions--wrap">
+              <button
+                type="button"
+                className="btn-secondary-sm"
+                onClick={async () => {
+                  const h = authHeaders();
+                  if (!h.Authorization) return;
+                  try {
+                    const res = await fetch('/api/admin/page-builder/snapshots', { headers: h });
+                    if (!res.ok) {
+                      alert('Falha ao listar backups.');
+                      return;
+                    }
+                    const rows = (await res.json()) as Array<{ key: string; pages: number }>;
+                    if (!rows.length) {
+                      alert('Nenhum backup encontrado.');
+                      return;
+                    }
+                    const list = rows.map((r, i) => `${i + 1}) ${r.key} — ${r.pages} página(s)`).join('\n');
+                    const pick = window.prompt(
+                      `Backups disponíveis (mais recente primeiro):\n\n${list}\n\nDigite o número do backup que deseja RESTAURAR (irá sobrescrever o atual):`
+                    );
+                    if (!pick) return;
+                    const idx = parseInt(pick, 10) - 1;
+                    if (Number.isNaN(idx) || idx < 0 || idx >= rows.length) {
+                      alert('Opção inválida.');
+                      return;
+                    }
+                    if (!window.confirm(`Restaurar backup ${rows[idx].key} (${rows[idx].pages} página(s))?`)) return;
+                    const r = await fetch('/api/admin/page-builder/snapshots/restore', {
+                      method: 'POST',
+                      headers: { ...h, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ key: rows[idx].key }),
+                    });
+                    if (!r.ok) {
+                      const j = (await r.json().catch(() => ({}))) as { error?: string };
+                      alert(j.error || 'Falha ao restaurar backup.');
+                      return;
+                    }
+                    alert('Backup restaurado. Recarregando…');
+                    window.location.reload();
+                  } catch {
+                    alert('Erro de conexão ao listar backups.');
+                  }
+                }}
+              >
+                Ver / restaurar backups
+              </button>
+            </div>
+          </div>
           {builderStep === 'list' && (
             <div className="admin-form">
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 14px' }}>
