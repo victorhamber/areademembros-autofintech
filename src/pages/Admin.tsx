@@ -530,9 +530,17 @@ export const Admin: React.FC = () => {
     return builderPages.filter((p) => p.folderId === builderSelectedFolderId);
   }, [builderPages, builderSelectedFolderId]);
 
-  const persistBuilderState = async (pages: BuilderPage[], folders: BuilderFolder[]) => {
+  const persistBuilderState = async (
+    pages: BuilderPage[],
+    folders: BuilderFolder[],
+    opts?: { skipLoadGuard?: boolean }
+  ) => {
     const h = authHeaders();
     if (!h.Authorization) return false;
+    if (!opts?.skipLoadGuard && !builderLoadedOnce) {
+      console.warn('[builder] Ignorando save: páginas ainda não carregaram do servidor.');
+      return false;
+    }
     try {
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
@@ -960,6 +968,10 @@ export const Admin: React.FC = () => {
     persistBuilderState(pages, builderFolders);
 
   const createBuilderFolder = async () => {
+    if (!builderLoadedOnce) {
+      alert('Aguarde o carregamento das páginas antes de criar uma pasta.');
+      return;
+    }
     const name = newBuilderFolderName.trim();
     if (!name) {
       alert('Informe o nome da pasta.');
@@ -1117,16 +1129,20 @@ export const Admin: React.FC = () => {
         if (!builderLoadedOnce) {
           const pagesRaw = String(data?.[PAGE_BUILDER_PAGES_SETTING_KEY] || '').trim();
           const foldersRaw = String(data?.[PAGE_BUILDER_FOLDERS_SETTING_KEY] || '').trim();
+          const dbHadPagesJson = pagesRaw.length > 0;
           let parsedPages = parseBuilderPagesSetting(pagesRaw);
-          if (!parsedPages.length) {
+          const restoredFromLegacy = !parsedPages.length;
+          if (restoredFromLegacy) {
             const legacyHtml = String(data?.[PAGE_BUILDER_LEGACY_SETTING_KEY] || '').trim();
-            parsedPages = [{
-              slug: 'pagina-principal',
-              target: 'body',
-              html: legacyHtml || DEFAULT_BUILDER_HTML,
-              updatedAt: new Date().toISOString(),
-              published: true,
-            }];
+            if (legacyHtml) {
+              parsedPages = [{
+                slug: 'pagina-principal',
+                target: 'body',
+                html: legacyHtml,
+                updatedAt: new Date().toISOString(),
+                published: true,
+              }];
+            }
           }
           const migrated = migrateBuilderFoldersAndPages(
             parsedPages,
@@ -1142,6 +1158,9 @@ export const Admin: React.FC = () => {
             setBuilderPreviewHtml(first.html || DEFAULT_BUILDER_HTML);
           }
           setBuilderLoadedOnce(true);
+          if (restoredFromLegacy && migrated.pages.length > 0 && (!dbHadPagesJson || pagesRaw === '[]')) {
+            void persistBuilderState(migrated.pages, migrated.folders, { skipLoadGuard: true });
+          }
         }
       }
     } catch (err) {
@@ -4567,6 +4586,19 @@ export const Admin: React.FC = () => {
 
       {activeTab === 'builder' && (
         <div className="admin-content admin-content--stack">
+          {!builderLoadedOnce && (
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', padding: 12 }}>
+              Carregando páginas do construtor…
+            </p>
+          )}
+          {builderLoadedOnce && builderPages.length === 0 && (
+            <div className="admin-form" style={{ marginBottom: 12, borderColor: 'var(--accent-primary)' }}>
+              <p style={{ fontSize: 13, margin: 0, color: 'var(--text-secondary)' }}>
+                Nenhuma página salva no banco. Se você tinha páginas antes (ex.: <code>codigo-secreto-depoimento</code>),
+                elas podem ter sido apagadas ao criar uma pasta antes do carregamento. Recrie cada página ou restaure um backup do PostgreSQL.
+              </p>
+            </div>
+          )}
           {builderStep === 'list' && (
             <div className="admin-form">
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 14px' }}>

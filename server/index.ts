@@ -40,6 +40,12 @@ import {
   type EmailLang,
 } from '../shared/emailTemplates.js';
 import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.js';
+import {
+  findBuilderPageBySlug,
+  isBuilderPagePublished,
+  loadBuilderPages,
+  normalizeBuilderSlug,
+} from './lib/pageBuilder.js';
 
 const DEFAULT_PASSWORD = 'Mudar123@';
 
@@ -343,49 +349,26 @@ app.get('/api/public/member-theme', async (_req, res) => {
 });
 
 app.get('/api/public/pages/:slug', async (req, res) => {
-  const normalizeSlug = (raw: string) =>
-    String(raw || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9-_/]+/g, '-')
-      .replace(/\/+/g, '/')
-      .replace(/(^[-/]+|[-/]+$)/g, '');
-
   try {
-    const row = await prisma.setting.findUnique({ where: { key: 'admin_page_builder_pages_json' } });
-    const desired = normalizeSlug(String(req.params.slug || ''));
+    const desired = normalizeBuilderSlug(String(req.params.slug || ''));
     if (!desired) {
       res.status(400).type('text/plain; charset=utf-8').send('Slug inválida.');
       return;
     }
 
-    const raw = String(row?.value || '').trim();
-    if (!raw) {
+    const pages = await loadBuilderPages(prisma);
+    const page = findBuilderPageBySlug(pages, desired);
+    if (!page?.html?.trim()) {
       res.status(404).type('text/plain; charset=utf-8').send('Página não encontrada.');
       return;
     }
 
-    let pages: Array<{ slug?: string; html?: string; published?: boolean }> = [];
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (Array.isArray(parsed)) pages = parsed as typeof pages;
-    } catch {
-      pages = [];
-    }
-
-    const page = pages.find((p) => normalizeSlug(String(p?.slug || '')) === desired);
-    if (!page?.html) {
-      res.status(404).type('text/plain; charset=utf-8').send('Página não encontrada.');
-      return;
-    }
-
-    if (page.published === false) {
+    if (!isBuilderPagePublished(page)) {
       res.status(403).type('text/plain; charset=utf-8').send('Página em rascunho. Publique para liberar a URL.');
       return;
     }
 
-    res.status(200).type('text/html; charset=utf-8').send(String(page.html));
+    res.status(200).type('text/html; charset=utf-8').send(page.html);
   } catch {
     res.status(500).type('text/plain; charset=utf-8').send('Erro ao carregar página.');
   }
@@ -1539,35 +1522,46 @@ if (fs.existsSync(distPath)) {
     }
 
     const link = await prisma.shortLink.findUnique({ where: { slug } }).catch(() => null);
-    if (!link || !link.isActive) return next();
+    if (link?.isActive) {
+      const countryCode = getCountryCodeFromHeaders(req);
+      const regionCode = getRegionCodeFromHeaders(req);
+      const deviceType = detectDeviceType(req.headers['user-agent']);
+      const ipAddress = getClientIp(req);
+      const referrer = String(req.headers.referer || '').trim().slice(0, 255);
 
-    const countryCode = getCountryCodeFromHeaders(req);
-    const regionCode = getRegionCodeFromHeaders(req);
-    const deviceType = detectDeviceType(req.headers['user-agent']);
-    const ipAddress = getClientIp(req);
-    const referrer = String(req.headers.referer || '').trim().slice(0, 255);
+      let target = String(link.targetUrl || '').trim();
+      if (!target) return next();
 
-    let target = String(link.targetUrl || '').trim();
-    if (!target) return next();
+      target = applySmartRouting(target, link.smartRules, countryCode, regionCode, deviceType);
+      target = appendTrackingParams(target, link.utmParams);
 
-    target = applySmartRouting(target, link.smartRules, countryCode, regionCode, deviceType);
-    target = appendTrackingParams(target, link.utmParams);
+      await prisma.shortLinkClick
+        .create({
+          data: {
+            linkId: link.id,
+            ipAddress,
+            countryCode,
+            regionCode,
+            deviceType,
+            referrer
+          }
+        })
+        .catch(() => {});
 
-    await prisma.shortLinkClick
-      .create({
-        data: {
-          linkId: link.id,
-          ipAddress,
-          countryCode,
-          regionCode,
-          deviceType,
-          referrer
-        }
-      })
-      .catch(() => {});
+      const status = [301, 302, 307, 308].includes(link.redirectType) ? link.redirectType : 302;
+      return res.redirect(status, target);
+    }
 
-    const status = [301, 302, 307, 308].includes(link.redirectType) ? link.redirectType : 302;
-    return res.redirect(status, target);
+    const builderSlug = normalizeBuilderSlug(slug);
+    if (builderSlug) {
+      const pages = await loadBuilderPages(prisma);
+      const page = findBuilderPageBySlug(pages, builderSlug);
+      if (page?.html?.trim() && isBuilderPagePublished(page)) {
+        return res.status(200).type('text/html; charset=utf-8').send(page.html);
+      }
+    }
+
+    return next();
   });
 
   // /uploads sem arquivo no disco: 404 em texto (não devolver index.html = home)
