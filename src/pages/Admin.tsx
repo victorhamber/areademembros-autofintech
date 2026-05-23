@@ -374,7 +374,7 @@ export const Admin: React.FC = () => {
   const [shortLinks, setShortLinks] = useState<any[]>([]);
   const [mediaAssets, setMediaAssets] = useState<any[]>([]);
   const [mediaFolders, setMediaFolders] = useState<any[]>([]);
-  const [mediaFolderFilter, setMediaFolderFilter] = useState<'all' | 'none' | string>('all');
+  const [mediaFolderFilter, setMediaFolderFilter] = useState<'none' | string>('none');
   const [mediaUploadFolderId, setMediaUploadFolderId] = useState('');
   const [newMediaFolderName, setNewMediaFolderName] = useState('');
   const [mediaFolderSaving, setMediaFolderSaving] = useState(false);
@@ -468,7 +468,7 @@ export const Admin: React.FC = () => {
           html: String(x.html),
           target: x.target === 'header' ? 'header' : 'body',
           updatedAt: x.updatedAt ? String(x.updatedAt) : new Date().toISOString(),
-          published: Boolean(x.published),
+          published: x.published === true,
           folderId: typeof x.folderId === 'string' ? x.folderId : undefined,
         }));
     } catch {
@@ -867,6 +867,21 @@ export const Admin: React.FC = () => {
     setBuilderStep('html');
   };
 
+  const resolveBuilderHtmlForSave = () => {
+    let headCode = builderHeadCodeDraft;
+    let bodyCode = builderBodyCodeDraft;
+    let baseHtml = builderCodeDraft || DEFAULT_BUILDER_HTML;
+    if (builderVisualOpen) {
+      const serialized = serializeBuilderDocument();
+      if (serialized) {
+        headCode = getBuilderAreaCode(serialized, 'header');
+        bodyCode = getBuilderAreaCode(serialized, 'body');
+        baseHtml = serialized;
+      }
+    }
+    return buildFinalBuilderHtml(headCode, bodyCode, baseHtml);
+  };
+
   const saveBuilderPages = async (opts?: { publish?: boolean; conclude?: boolean }) => {
     const h = authHeaders();
     if (!h.Authorization) return;
@@ -876,46 +891,69 @@ export const Admin: React.FC = () => {
     }
     setBuilderSaving(true);
     try {
-      const html = buildFinalBuilderHtml(
-        builderHeadCodeDraft,
-        builderBodyCodeDraft,
-        builderCodeDraft || DEFAULT_BUILDER_HTML
-      );
-      const nextPages = [...builderPages];
-      const idx = nextPages.findIndex((p) => p.slug === builderCurrentSlug);
-      if (idx >= 0) {
-        nextPages[idx] = {
-          ...nextPages[idx],
-          html,
-          updatedAt: new Date().toISOString(),
-          published: opts?.publish ? true : nextPages[idx].published,
-        };
-      } else {
-        nextPages.unshift({
-          slug: builderCurrentSlug,
-          target: 'body',
-          html,
-          updatedAt: new Date().toISOString(),
-          published: Boolean(opts?.publish),
-          folderId: builderSelectedFolderId || builderFolders[0]?.id,
-        });
-      }
+      const html = resolveBuilderHtmlForSave();
+      const slug = builderCurrentSlug;
+      const folderId = builderSelectedFolderId || builderFolders[0]?.id;
+      let nextPages: BuilderPage[] = [];
+      setBuilderPages((currentPages) => {
+        const draft = [...currentPages];
+        const idx = draft.findIndex((p) => p.slug === slug);
+        const wasPublished = idx >= 0 ? draft[idx].published === true : false;
+        const published = opts?.publish === true ? true : wasPublished;
+        if (idx >= 0) {
+          draft[idx] = {
+            ...draft[idx],
+            html,
+            updatedAt: new Date().toISOString(),
+            published,
+          };
+        } else {
+          draft.unshift({
+            slug,
+            target: builderCurrentPage?.target || 'body',
+            html,
+            updatedAt: new Date().toISOString(),
+            published,
+            folderId,
+          });
+        }
+        nextPages = draft;
+        return draft;
+      });
       const ok = await persistBuilderState(nextPages, builderFolders);
       if (!ok) {
         alert('Falha ao salvar página.');
         return;
       }
-      setBuilderPages(nextPages);
       setBuilderCodeDraft(html);
       setBuilderHeadCodeDraft(getBuilderAreaCode(html, 'header'));
       setBuilderBodyCodeDraft(getBuilderAreaCode(html, 'body'));
+      setBuilderPreviewHtml(toBuilderVisualPreviewHtml(html));
       if (opts?.conclude) setBuilderStep('list');
-      alert(opts?.publish ? 'Página salva e publicada! Scripts do HEAD rodam na URL pública.' : 'Página salva com sucesso!');
+      alert(opts?.publish ? 'Página salva e publicada! Scripts do HEAD rodam na URL pública.' : 'Rascunho salvo com sucesso.');
     } catch {
       alert('Erro de conexão ao salvar.');
     } finally {
       setBuilderSaving(false);
     }
+  };
+
+  const toggleBuilderPagePublished = async (slug: string, publish: boolean) => {
+    const h = authHeaders();
+    if (!h.Authorization) return;
+    let nextPages: BuilderPage[] = [];
+    setBuilderPages((current) => {
+      nextPages = current.map((p) =>
+        p.slug === slug ? { ...p, published: publish, updatedAt: new Date().toISOString() } : p
+      );
+      return nextPages;
+    });
+    const ok = await persistBuilderState(nextPages, builderFolders);
+    if (!ok) {
+      alert('Falha ao atualizar status da página.');
+      return;
+    }
+    alert(publish ? 'Página publicada.' : 'Página movida para rascunho.');
   };
 
   const persistBuilderPagesSetting = async (pages: BuilderPage[]) =>
@@ -1087,6 +1125,7 @@ export const Admin: React.FC = () => {
               target: 'body',
               html: legacyHtml || DEFAULT_BUILDER_HTML,
               updatedAt: new Date().toISOString(),
+              published: false,
             }];
           }
           const migrated = migrateBuilderFoldersAndPages(
@@ -1176,7 +1215,15 @@ export const Admin: React.FC = () => {
     if (!h.Authorization) return;
     try {
       const res = await fetch('/api/admin/media-folders', { headers: h });
-      if (res.ok) setMediaFolders(await res.json());
+      if (res.ok) {
+        const rows = await res.json();
+        setMediaFolders(rows);
+        setMediaFolderFilter((prev) => {
+          if (prev === 'none') return prev;
+          if (typeof prev === 'string' && rows.some((f: { id: string }) => f.id === prev)) return prev;
+          return rows[0]?.id ?? 'none';
+        });
+      }
     } catch {
       console.error('fetchMediaFolders');
     }
@@ -1256,7 +1303,10 @@ export const Admin: React.FC = () => {
       alert(j.error || 'Falha ao excluir pasta.');
       return;
     }
-    if (mediaFolderFilter === folder.id) setMediaFolderFilter('all');
+    if (mediaFolderFilter === folder.id) {
+      const remaining = mediaFolders.filter((f: any) => f.id !== folder.id);
+      setMediaFolderFilter(remaining[0]?.id ?? 'none');
+    }
     if (mediaUploadFolderId === folder.id) setMediaUploadFolderId('');
     void fetchMediaFolders();
     void fetchMediaAssets();
@@ -2378,7 +2428,7 @@ export const Admin: React.FC = () => {
     let list = mediaAssets;
     if (mediaFolderFilter === 'none') {
       list = list.filter((m: any) => !m.folderId);
-    } else if (mediaFolderFilter !== 'all') {
+    } else {
       list = list.filter((m: any) => m.folderId === mediaFolderFilter);
     }
     const q = mediaSearch.trim().toLowerCase();
@@ -3813,13 +3863,6 @@ export const Admin: React.FC = () => {
                 <span className="admin-media-folders__label">Pastas</span>
                 <button
                   type="button"
-                  className={`admin-media-folder-chip ${mediaFolderFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setMediaFolderFilter('all')}
-                >
-                  Todas ({mediaAssets.length})
-                </button>
-                <button
-                  type="button"
                   className={`admin-media-folder-chip ${mediaFolderFilter === 'none' ? 'active' : ''}`}
                   onClick={() => setMediaFolderFilter('none')}
                 >
@@ -3860,7 +3903,7 @@ export const Admin: React.FC = () => {
                   <FolderPlus size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
                   {mediaFolderSaving ? 'Criando...' : 'Nova pasta'}
                 </button>
-                {mediaFolderFilter !== 'all' && mediaFolderFilter !== 'none' && (
+                {mediaFolderFilter !== 'none' && (
                   <>
                     <button
                       type="button"
@@ -4652,6 +4695,24 @@ export const Admin: React.FC = () => {
                             <td>
                               <div className="admin-actions admin-actions--wrap">
                                 <button type="button" className="btn-secondary-sm" onClick={() => openBuilderPage(p.slug)}>Editar</button>
+                                {p.published ? (
+                                  <button
+                                    type="button"
+                                    className="btn-secondary-sm"
+                                    onClick={() => void toggleBuilderPagePublished(p.slug, false)}
+                                  >
+                                    Despublicar
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="btn-primary"
+                                    style={{ padding: '6px 12px', fontSize: 12 }}
+                                    onClick={() => void toggleBuilderPagePublished(p.slug, true)}
+                                  >
+                                    Publicar
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   className="btn-secondary-sm"
@@ -4750,7 +4811,7 @@ export const Admin: React.FC = () => {
               </div>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
                 Etapa 2: cole ou edite o HTML. Scripts de rastreamento (pixel, Trajettu, GTM) vão no campo <strong>HEAD</strong>.
-                Use <strong>Salvar e publicar</strong> no editor visual para liberar a URL — o código roda na página real (não só no preview).
+                Use <strong>Salvar e publicar</strong> para liberar a URL pública — o código do HEAD roda na página real (não só no preview).
               </p>
               <label>Área da página (head/body)</label>
               <select
