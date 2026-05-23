@@ -55,7 +55,7 @@
   /* Mais padding-top = título mais baixo no banner, favorecendo ver a arte acima */
   padding: calc(env(safe-area-inset-top, 0px) + clamp(56px, 12vh, 140px))
     max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px))
-    clamp(24px, 5vh, 56px)
+    clamp(8px, 1.5vh, 16px)
     max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   position: relative;
   z-index: 2;
@@ -164,11 +164,11 @@
 }
 
 .home-content {
-  margin-top: clamp(24px, 3.8vh, 40px);
+  margin-top: calc(-1 * clamp(12px, 2.5vh, 28px));
   position: relative;
   z-index: 3;
   background: var(--bg-main);
-  padding-top: var(--spacing-md);
+  padding-top: 0;
   padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
   box-sizing: border-box;
@@ -177,6 +177,9 @@
 .home-content .search-container.search-container--row {
   padding-left: 0;
   padding-right: 0;
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+  padding-top: 0;
 }
 
 .home-content .book-row-container {
@@ -194,7 +197,7 @@
 /* ========== SEARCH + idioma ========== */
 .search-container.search-container--row {
   position: relative;
-  margin: calc(var(--spacing-lg) + clamp(6px, 1.2vh, 14px)) 0 0;
+  margin: 0;
   padding: var(--spacing-sm)
     max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px)) 0
     max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
@@ -395,13 +398,16 @@
 
   .hero-inner {
     padding-top: calc(env(safe-area-inset-top, 0px) + clamp(40px, 10vh, 100px));
-    padding-bottom: clamp(28px, 6vh, 52px);
+    padding-bottom: clamp(8px, 1.5vh, 14px);
     padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
     padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
   }
 
-  .search-container.search-container--row {
-    margin-top: calc(var(--spacing-md) + 8px);
+  .home-content {
+    margin-top: calc(-1 * clamp(16px, 3vh, 32px));
+  }
+
+  .home-content .search-container.search-container--row {
     flex-wrap: wrap;
   }
 
