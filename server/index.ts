@@ -21,7 +21,9 @@ import { adminAuthMiddleware } from './middleware/adminAuth.js';
 import { validateAdminCredentials } from './lib/adminPassword.js';
 import { ensureDevTestAccount } from './lib/ensureDevTestAccount.js';
 import {
+  decodeUploadOriginalName,
   detectMediaKind,
+  formatMediaUploadError,
   resolveStoredMediaMime,
   resolveUploadMime,
   safeUploadFilename,
@@ -233,7 +235,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const safeName = safeUploadFilename(file.originalname || 'arquivo');
+    const safeName = safeUploadFilename(file.originalname || 'arquivo', file.mimetype);
     cb(null, `${uniqueSuffix}-${safeName}`);
   },
 });
@@ -1017,30 +1019,53 @@ app.post('/api/admin/media', adminAuthMiddleware, (req, res, next) => {
 }, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
-    const folderId = await resolveMediaFolderId(req.body?.folderId);
+
+    let folderId = await resolveMediaFolderId(req.body?.folderId);
     if (folderId === 'invalid') return res.status(400).json({ error: 'Pasta inválida.' });
-    const originalName = String(req.file.originalname || req.file.filename);
+
+    const originalName = decodeUploadOriginalName(req.file.originalname || req.file.filename);
     const mimeType = resolveUploadMime(req.file.mimetype, originalName);
-    const created = await prisma.mediaAsset.create({
-      data: {
-        originalName,
-        storedName: String(req.file.filename),
-        url: `/uploads/${req.file.filename}`,
-        mimeType,
-        kind: detectMediaKind(req.file.mimetype, originalName),
-        sizeBytes: Number(req.file.size || 0),
-        folderId,
-      },
-    });
-    const publicUrl = mediaAssetPublicFileUrl(created.id);
-    const saved = await prisma.mediaAsset.update({
-      where: { id: created.id },
-      data: { url: publicUrl },
-      include: { folder: { select: { id: true, name: true } } },
-    });
+    const kind = detectMediaKind(req.file.mimetype, originalName);
+    const assetId = crypto.randomUUID();
+    const publicUrl = mediaAssetPublicFileUrl(assetId);
+
+    const createData = {
+      id: assetId,
+      originalName,
+      storedName: String(req.file.filename),
+      url: publicUrl,
+      mimeType,
+      kind,
+      sizeBytes: Number(req.file.size || 0),
+      folderId,
+    };
+
+    let saved;
+    try {
+      saved = await prisma.mediaAsset.create({
+        data: createData,
+        include: { folder: { select: { id: true, name: true } } },
+      });
+    } catch (firstErr) {
+      const code = (firstErr as { code?: string })?.code;
+      if (code === 'P2003' && folderId) {
+        saved = await prisma.mediaAsset.create({
+          data: { ...createData, folderId: null },
+          include: { folder: { select: { id: true, name: true } } },
+        });
+      } else {
+        throw firstErr;
+      }
+    }
+
     res.json(saved);
-  } catch {
-    res.status(500).json({ error: 'Falha ao salvar mídia.' });
+  } catch (err) {
+    console.error('[Media upload]', err);
+    if (req.file?.filename) {
+      const orphan = path.join(uploadDir, path.basename(req.file.filename));
+      fs.unlink(orphan, () => {});
+    }
+    res.status(500).json({ error: formatMediaUploadError(err) });
   }
 });
 

@@ -27,10 +27,29 @@ const IMAGE_EXTENSIONS = new Set(
     .map(([ext]) => ext)
 );
 
+/** Extensão conhecida (prioriza .webp, .tar.gz, etc.). */
+export function getFileExtension(filename: string): string {
+  const lower = String(filename || '').toLowerCase();
+  const known = Object.keys(UPLOAD_EXTENSION_MIME).sort((a, b) => b.length - a.length);
+  for (const ext of known) {
+    if (lower.endsWith(ext)) return ext;
+  }
+  return path.extname(lower).toLowerCase();
+}
+
 export function mimeFromFilename(filename: string): string | null {
-  const ext = path.extname(String(filename || '')).toLowerCase();
+  const ext = getFileExtension(filename);
   return UPLOAD_EXTENSION_MIME[ext] ?? null;
 }
+
+const MIME_TO_EXT: Record<string, string> = {
+  'image/webp': '.webp',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'image/svg+xml': '.svg',
+  'image/avif': '.avif',
+};
 
 /** Normaliza MIME do multer (inclui .webp quando o SO envia octet-stream). */
 export function resolveUploadMime(
@@ -44,7 +63,7 @@ export function resolveUploadMime(
     if (!reported || reported === 'application/octet-stream') return fromExt;
     if (reported === 'image/webp' || reported === fromExt) return reported;
     // Navegador reportou outro tipo — prioriza extensão para .webp/.avif etc.
-    if (IMAGE_EXTENSIONS.has(path.extname(originalname).toLowerCase())) return fromExt;
+    if (IMAGE_EXTENSIONS.has(getFileExtension(originalname))) return fromExt;
   }
 
   if (reported && reported !== 'application/octet-stream') return reported;
@@ -63,15 +82,52 @@ export function detectMediaKind(
 }
 
 /** Nome seguro no disco preservando extensão (.webp, etc.). */
-export function safeUploadFilename(originalname: string): string {
-  const ext = path.extname(String(originalname || '')).toLowerCase();
-  const base = path.basename(String(originalname || 'arquivo'), ext)
+export function safeUploadFilename(originalname: string, mimetype?: string): string {
+  const decoded = decodeUploadOriginalName(originalname);
+  let ext = getFileExtension(decoded);
+  if (!ext || !UPLOAD_EXTENSION_MIME[ext]) {
+    const fromMime = MIME_TO_EXT[String(mimetype || '').toLowerCase()];
+    if (fromMime) ext = fromMime;
+  }
+  const base = (ext ? path.basename(decoded, ext) : decoded)
     .replace(/[^a-zA-Z0-9.\-_]/g, '')
     .slice(0, 100);
   const safeBase = base || 'arquivo';
   if (ext && UPLOAD_EXTENSION_MIME[ext]) return `${safeBase}${ext}`;
   if (ext && /^\.[a-z0-9]{1,8}$/i.test(ext)) return `${safeBase}${ext}`;
   return safeBase;
+}
+
+/** Multer costuma enviar UTF-8 no campo originalname como latin1. */
+export function decodeUploadOriginalName(name: string): string {
+  const raw = String(name || '').trim() || 'arquivo';
+  try {
+    const decoded = Buffer.from(raw, 'latin1').toString('utf8');
+    if (decoded.includes('\uFFFD')) return raw;
+    return decoded;
+  } catch {
+    return raw;
+  }
+}
+
+export function formatMediaUploadError(err: unknown): string {
+  const code = (err as { code?: string })?.code;
+  if (code === 'P2003') {
+    return 'Pasta inválida ou removida. Selecione outra pasta ou envie sem pasta.';
+  }
+  if (code === 'P2021' || code === 'P2022') {
+    return 'Banco desatualizado: execute a migração (prisma migrate deploy) no servidor.';
+  }
+  if (err instanceof Error && err.message.includes('ENOENT')) {
+    return 'Pasta de uploads inexistente ou sem permissão no servidor (UPLOAD_DIR).';
+  }
+  if (err instanceof Error && err.message.includes('EACCES')) {
+    return 'Sem permissão para gravar arquivos no servidor (UPLOAD_DIR).';
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return `Falha ao salvar mídia: ${err.message}`;
+  }
+  return 'Falha ao salvar mídia. Verifique os logs do servidor.';
 }
 
 export function resolveStoredMediaMime(mimeType: string | null | undefined, storedName: string): string {

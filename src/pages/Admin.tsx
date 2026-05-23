@@ -3535,7 +3535,13 @@ export const Admin: React.FC = () => {
                       });
                       if (!res.ok) {
                         const j = await res.json().catch(() => ({} as { error?: string }));
-                        alert(j.error || 'Falha ao enviar mídia.');
+                        const fallback =
+                          res.status === 413
+                            ? 'Arquivo muito grande.'
+                            : res.status === 401
+                              ? 'Sessão expirada. Faça login novamente.'
+                              : `Falha ao enviar mídia (HTTP ${res.status}).`;
+                        alert(j.error || fallback);
                         return;
                       }
                       alert('Mídia enviada com sucesso!');
