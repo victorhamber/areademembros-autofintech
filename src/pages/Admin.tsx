@@ -344,6 +344,11 @@ export const Admin: React.FC = () => {
   const [builderOffsetX, setBuilderOffsetX] = useState(0);
   const [builderOffsetY, setBuilderOffsetY] = useState(0);
   const builderIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const builderPagesRef = useRef<BuilderPage[]>([]);
+
+  useEffect(() => {
+    builderPagesRef.current = builderPages;
+  }, [builderPages]);
 
   /** Abas internas do editor EAD (painel direito). */
   const [eadSectionTab, setEadSectionTabState] = useState<'curso' | 'modulo' | 'aula'>(
@@ -902,37 +907,34 @@ export const Admin: React.FC = () => {
       const html = resolveBuilderHtmlForSave();
       const slug = builderCurrentSlug;
       const folderId = builderSelectedFolderId || builderFolders[0]?.id;
-      let nextPages: BuilderPage[] = [];
-      setBuilderPages((currentPages) => {
-        const draft = [...currentPages];
-        const idx = draft.findIndex((p) => p.slug === slug);
-        const wasPublished = idx >= 0 ? draft[idx].published !== false : true;
-        const published = opts?.publish === true ? true : wasPublished;
-        if (idx >= 0) {
-          draft[idx] = {
-            ...draft[idx],
-            html,
-            updatedAt: new Date().toISOString(),
-            published,
-          };
-        } else {
-          draft.unshift({
-            slug,
-            target: builderCurrentPage?.target || 'body',
-            html,
-            updatedAt: new Date().toISOString(),
-            published,
-            folderId,
-          });
-        }
-        nextPages = draft;
-        return draft;
-      });
+      const currentPages = [...builderPagesRef.current];
+      const nextPages = [...currentPages];
+      const idx = nextPages.findIndex((p) => p.slug === slug);
+      const wasPublished = idx >= 0 ? nextPages[idx].published !== false : true;
+      const published = opts?.publish === true ? true : wasPublished;
+      if (idx >= 0) {
+        nextPages[idx] = {
+          ...nextPages[idx],
+          html,
+          updatedAt: new Date().toISOString(),
+          published,
+        };
+      } else {
+        nextPages.unshift({
+          slug,
+          target: builderCurrentPage?.target || 'body',
+          html,
+          updatedAt: new Date().toISOString(),
+          published,
+          folderId,
+        });
+      }
       const ok = await persistBuilderState(nextPages, builderFolders);
       if (!ok) {
         alert('Falha ao salvar página.');
         return;
       }
+      setBuilderPages(nextPages);
       setBuilderCodeDraft(html);
       setBuilderHeadCodeDraft(getBuilderAreaCode(html, 'header'));
       setBuilderBodyCodeDraft(getBuilderAreaCode(html, 'body'));
@@ -949,18 +951,15 @@ export const Admin: React.FC = () => {
   const toggleBuilderPagePublished = async (slug: string, publish: boolean) => {
     const h = authHeaders();
     if (!h.Authorization) return;
-    let nextPages: BuilderPage[] = [];
-    setBuilderPages((current) => {
-      nextPages = current.map((p) =>
-        p.slug === slug ? { ...p, published: publish, updatedAt: new Date().toISOString() } : p
-      );
-      return nextPages;
-    });
+    const nextPages = builderPagesRef.current.map((p) =>
+      p.slug === slug ? { ...p, published: publish, updatedAt: new Date().toISOString() } : p
+    );
     const ok = await persistBuilderState(nextPages, builderFolders);
     if (!ok) {
       alert('Falha ao atualizar status da página.');
       return;
     }
+    setBuilderPages(nextPages);
     alert(publish ? 'Página publicada.' : 'Página movida para rascunho.');
   };
 
