@@ -1,8 +1,30 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, Image as ImageIcon, Film, Music2, File as FileIcon } from 'lucide-react';
 import { resolveProductForLicense } from '@shared/licenseProductMatch';
-import { MEMBER_THEME_DEFAULTS } from '@shared/memberTheme';
+import { MEMBER_THEME_DEFAULTS, type MemberThemeKey } from '@shared/memberTheme';
 import './Admin.css';
+
+const MEMBER_THEME_COLOR_FIELDS: { key: MemberThemeKey; label: string }[] = [
+  { key: 'member_theme_bg_main', label: 'Fundo principal' },
+  { key: 'member_theme_bg_secondary', label: 'Fundo secundário' },
+  { key: 'member_theme_bg_card', label: 'Fundo de cards' },
+  { key: 'member_theme_text_primary', label: 'Texto principal' },
+  { key: 'member_theme_text_secondary', label: 'Texto secundário' },
+  { key: 'member_theme_accent_primary', label: 'Cor primária' },
+  { key: 'member_theme_accent_primary_hover', label: 'Cor primária (hover)' },
+  { key: 'member_theme_button_text', label: 'Cor da letra do botão' },
+  { key: 'member_theme_video_accent', label: 'Cor do player de vídeo' },
+];
+
+function hexForColorInput(value: string | undefined, fallback: string): string {
+  const v = String(value ?? '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(v)) {
+    const [r, g, b] = v.slice(1);
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return fallback;
+}
 
 const ADMIN_TABLE_PAGE_SIZE = 12;
 const PLAN_OPTIONS = ['teste', 'mensal', 'semestral', 'anual', 'vitalicio'] as const;
@@ -2456,45 +2478,36 @@ export const Admin: React.FC = () => {
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.55 }}>
               Personalize as cores globais da área de membros (menu, páginas, cards, botões e player de vídeo nas aulas). Essas cores são aplicadas em toda a experiência do aluno.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 12 }}>
-              <label>
-                Fundo principal
-                <input type="color" value={emailSettings.member_theme_bg_main || '#0e0e0e'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_bg_main: e.target.value }))} />
-              </label>
-              <label>
-                Fundo secundário
-                <input type="color" value={emailSettings.member_theme_bg_secondary || '#141414'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_bg_secondary: e.target.value }))} />
-              </label>
-              <label>
-                Fundo de cards
-                <input type="color" value={emailSettings.member_theme_bg_card || '#181818'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_bg_card: e.target.value }))} />
-              </label>
-              <label>
-                Texto principal
-                <input type="color" value={emailSettings.member_theme_text_primary || '#ffffff'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_text_primary: e.target.value }))} />
-              </label>
-              <label>
-                Texto secundário
-                <input type="color" value={emailSettings.member_theme_text_secondary || '#b3b3b3'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_text_secondary: e.target.value }))} />
-              </label>
-              <label>
-                Cor primária
-                <input type="color" value={emailSettings.member_theme_accent_primary || '#3b82f6'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_accent_primary: e.target.value }))} />
-              </label>
-              <label>
-                Cor primária (hover)
-                <input type="color" value={emailSettings.member_theme_accent_primary_hover || '#60a5fa'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_accent_primary_hover: e.target.value }))} />
-              </label>
-              <label>
-                Cor da letra do botão
-                <input type="color" value={emailSettings.member_theme_button_text || '#031018'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_button_text: e.target.value }))} />
-              </label>
-              <label>
-                Cor do player de vídeo
-                <input type="color" value={emailSettings.member_theme_video_accent || '#e07a2f'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_video_accent: e.target.value }))} />
-              </label>
-              <label style={{ gridColumn: '1 / -1' }}>
-                Borda sutil (RGBA)
+            <div className="admin-theme-colors-grid">
+              {MEMBER_THEME_COLOR_FIELDS.map(({ key, label }) => {
+                const fallback = MEMBER_THEME_DEFAULTS[key];
+                const color = hexForColorInput(emailSettings[key], fallback);
+                return (
+                  <label key={key} className="admin-theme-color-field">
+                    {label}
+                    <div className="admin-theme-color-row">
+                      <span
+                        className="admin-theme-color-swatch"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                        aria-hidden
+                      />
+                      <input
+                        type="color"
+                        className="admin-theme-color-input"
+                        value={color}
+                        onChange={(e) => setEmailSettings((p) => ({ ...p, [key]: e.target.value }))}
+                        aria-label={label}
+                      />
+                      <code className="admin-theme-color-hex">{color}</code>
+                    </div>
+                  </label>
+                );
+              })}
+              <label className="admin-theme-color-field" style={{ gridColumn: '1 / -1', textTransform: 'none' }}>
+                <span style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600, fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Borda sutil (RGBA)
+                </span>
                 <input
                   type="text"
                   placeholder="rgba(255, 255, 255, 0.12)"

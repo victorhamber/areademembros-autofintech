@@ -28,7 +28,8 @@
 }
 .admin-login-box h2 { text-align: center; }
 .admin-login-box p { text-align: center; color: var(--text-secondary); font-size: 14px; margin-top: -8px; }
-.admin-login-box input, .admin-form input {
+.admin-login-box input:not([type='color']),
+.admin-form input:not([type='color']) {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   background: var(--bg-main);
@@ -44,9 +45,80 @@
   background: rgba(255,255,255,0.03);
   cursor: pointer;
 }
-.admin-login-box input:focus, .admin-form input:focus {
+.admin-login-box input:not([type='color']):focus,
+.admin-form input:not([type='color']):focus {
   border-color: var(--accent-primary);
   outline: none;
+}
+
+/* Tema da área de membros — preview da cor selecionada */
+.admin-theme-colors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.admin-theme-color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-theme-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-transform: none;
+  font-weight: 400;
+}
+
+.admin-theme-color-swatch {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.admin-theme-color-input {
+  width: 52px;
+  height: 44px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-sm);
+  background: var(--bg-main);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.admin-theme-color-input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.admin-theme-color-input::-webkit-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.admin-theme-color-input::-moz-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.admin-theme-color-hex {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
 }
 .admin-form textarea {
   width: 100%;
