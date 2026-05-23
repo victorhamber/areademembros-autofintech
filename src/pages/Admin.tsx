@@ -4637,64 +4637,52 @@ export const Admin: React.FC = () => {
           {builderLoadedOnce && builderPages.length === 0 && (
             <div className="admin-form" style={{ marginBottom: 12, borderColor: 'var(--accent-primary)' }}>
               <p style={{ fontSize: 13, margin: 0, color: 'var(--text-secondary)' }}>
-                Nenhuma página salva no banco. Use <strong>Backups do construtor</strong> abaixo para restaurar a última versão automática, ou recrie a página.
+                Nenhuma página salva no banco. Crie a primeira clicando em <strong>Nova página</strong>.
               </p>
             </div>
           )}
           <div className="admin-form" style={{ marginBottom: 12 }}>
-            <h4 style={{ margin: '0 0 8px' }}>Backups automáticos do construtor</h4>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
-              Toda vez que uma página é salva, o sistema guarda um snapshot do estado anterior (até 20). Use isso para restaurar se algo for sobrescrito.
-            </p>
-            <div className="admin-actions admin-actions--wrap">
+            <details>
+              <summary style={{ fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                Manutenção do construtor (avançado)
+              </summary>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '8px 0' }}>
+                Apaga todas as páginas, pastas e backups internos do construtor. Não toca em nenhum outro dado do app, nem no WordPress. Use só para começar do zero.
+              </p>
               <button
                 type="button"
-                className="btn-secondary-sm"
+                className="btn-danger-sm"
                 onClick={async () => {
                   const h = authHeaders();
                   if (!h.Authorization) return;
+                  const ok1 = window.confirm('Apagar TODAS as páginas e pastas do construtor? Esta ação não pode ser desfeita.');
+                  if (!ok1) return;
+                  const typed = window.prompt('Confirme digitando: APAGAR TUDO');
+                  if (typed !== 'APAGAR TUDO') {
+                    alert('Confirmação cancelada.');
+                    return;
+                  }
                   try {
-                    const res = await fetch('/api/admin/page-builder/snapshots', { headers: h });
-                    if (!res.ok) {
-                      alert('Falha ao listar backups.');
-                      return;
-                    }
-                    const rows = (await res.json()) as Array<{ key: string; pages: number }>;
-                    if (!rows.length) {
-                      alert('Nenhum backup encontrado.');
-                      return;
-                    }
-                    const list = rows.map((r, i) => `${i + 1}) ${r.key} — ${r.pages} página(s)`).join('\n');
-                    const pick = window.prompt(
-                      `Backups disponíveis (mais recente primeiro):\n\n${list}\n\nDigite o número do backup que deseja RESTAURAR (irá sobrescrever o atual):`
-                    );
-                    if (!pick) return;
-                    const idx = parseInt(pick, 10) - 1;
-                    if (Number.isNaN(idx) || idx < 0 || idx >= rows.length) {
-                      alert('Opção inválida.');
-                      return;
-                    }
-                    if (!window.confirm(`Restaurar backup ${rows[idx].key} (${rows[idx].pages} página(s))?`)) return;
-                    const r = await fetch('/api/admin/page-builder/snapshots/restore', {
+                    const r = await fetch('/api/admin/page-builder/reset', {
                       method: 'POST',
                       headers: { ...h, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ key: rows[idx].key }),
+                      body: JSON.stringify({ confirm: 'APAGAR TUDO' }),
                     });
                     if (!r.ok) {
                       const j = (await r.json().catch(() => ({}))) as { error?: string };
-                      alert(j.error || 'Falha ao restaurar backup.');
+                      alert(j.error || 'Falha ao apagar.');
                       return;
                     }
-                    alert('Backup restaurado. Recarregando…');
+                    alert('Construtor zerado. Recarregando…');
                     window.location.reload();
                   } catch {
-                    alert('Erro de conexão ao listar backups.');
+                    alert('Erro de conexão ao apagar.');
                   }
                 }}
               >
-                Ver / restaurar backups
+                Apagar tudo e começar do zero
               </button>
-            </div>
+            </details>
           </div>
           {builderStep === 'list' && (
             <div className="admin-form">

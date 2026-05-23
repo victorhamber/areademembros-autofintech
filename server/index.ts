@@ -43,11 +43,10 @@ import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.
 import {
   findBuilderPageBySlug,
   isBuilderPagePublished,
-  listPageBuilderSnapshots,
   loadBuilderPages,
   normalizeBuilderSlug,
   PAGE_BUILDER_PAGES_KEY,
-  restorePageBuilderSnapshot,
+  resetPageBuilder,
   savePagesWithGuard,
 } from './lib/pageBuilder.js';
 
@@ -1335,25 +1334,19 @@ app.post('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/admin/page-builder/snapshots', adminAuthMiddleware, async (_req, res) => {
+app.post('/api/admin/page-builder/reset', adminAuthMiddleware, async (req, res) => {
   try {
-    const rows = await listPageBuilderSnapshots(prisma);
-    res.json(rows);
+    const confirm = String(req.body?.confirm || '');
+    if (confirm !== 'APAGAR TUDO') {
+      return res.status(400).json({
+        error: 'Confirmação ausente. Envie {"confirm":"APAGAR TUDO"} para confirmar.',
+      });
+    }
+    const result = await resetPageBuilder(prisma);
+    res.json({ success: true, removed: result.removed });
   } catch (error) {
-    console.error('[snapshots list]', error);
-    res.status(500).json({ error: 'Falha ao listar backups.' });
-  }
-});
-
-app.post('/api/admin/page-builder/snapshots/restore', adminAuthMiddleware, async (req, res) => {
-  try {
-    const key = String(req.body?.key || '');
-    if (!key) return res.status(400).json({ error: 'Informe a chave do backup.' });
-    const pages = await restorePageBuilderSnapshot(prisma, key);
-    res.json({ success: true, restored: pages.length });
-  } catch (error) {
-    console.error('[snapshots restore]', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Falha ao restaurar backup.' });
+    console.error('[page-builder reset]', error);
+    res.status(500).json({ error: 'Falha ao apagar páginas do construtor.' });
   }
 });
 

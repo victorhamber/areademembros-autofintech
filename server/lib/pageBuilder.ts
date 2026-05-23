@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
 export const PAGE_BUILDER_PAGES_KEY = 'admin_page_builder_pages_json';
+export const PAGE_BUILDER_FOLDERS_KEY = 'admin_page_builder_folders_json';
 export const PAGE_BUILDER_LEGACY_KEY = 'admin_page_builder_html';
 export const PAGE_BUILDER_SNAPSHOT_PREFIX = 'admin_page_builder_snapshot_';
 const PAGE_BUILDER_SNAPSHOT_MAX = 20;
@@ -207,4 +208,28 @@ export async function restorePageBuilderSnapshot(prisma: PrismaClient, snapshotK
     create: { key: PAGE_BUILDER_PAGES_KEY, value: snap.value },
   });
   return parseBuilderPagesJson(String(snap.value || ''));
+}
+
+/**
+ * Apaga TODAS as páginas, pastas, legado e snapshots do construtor.
+ * Antes de apagar, salva um snapshot final do estado atual de páginas como
+ * rede de segurança interna (não exposta na UI). Idempotente.
+ */
+export async function resetPageBuilder(prisma: PrismaClient) {
+  const current = await prisma.setting.findUnique({ where: { key: PAGE_BUILDER_PAGES_KEY } });
+  const currentRaw = String(current?.value || '').trim();
+  if (currentRaw) {
+    await writeSnapshot(prisma, currentRaw);
+  }
+  const result = await prisma.setting.deleteMany({
+    where: {
+      OR: [
+        { key: PAGE_BUILDER_PAGES_KEY },
+        { key: PAGE_BUILDER_FOLDERS_KEY },
+        { key: PAGE_BUILDER_LEGACY_KEY },
+        { key: { startsWith: PAGE_BUILDER_SNAPSHOT_PREFIX } },
+      ],
+    },
+  });
+  return { removed: result.count };
 }
