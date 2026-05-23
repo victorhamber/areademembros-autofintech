@@ -211,42 +211,42 @@ export const Home: React.FC<HomeProps> = ({
 
       </div>
 
-      <div className="search-container search-container--row">
-        <div className="search-field-wrap">
-          <Search size={18} className="search-icon" />
-          <input
-            type="text"
-            placeholder={tr.search_placeholder}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
-        </div>
-        {SHOW_LANGUAGE_SWITCHER && (
-          <div className="lang-switcher lang-switcher--toolbar" aria-label="Idioma">
-            <button
-              type="button"
-              className={`lang-btn ${lang === 'pt' ? 'active' : ''}`}
-              onClick={() => setLang('pt')}
-              title="Português"
-              aria-label="Português"
-            >
-              🇧🇷
-            </button>
-            <button
-              type="button"
-              className={`lang-btn ${lang === 'es' ? 'active' : ''}`}
-              onClick={() => setLang('es')}
-              title="Español"
-              aria-label="Español"
-            >
-              🇪🇸
-            </button>
-          </div>
-        )}
-      </div>
-
       <div className="home-content">
+        <div className="search-container search-container--row">
+          <div className="search-field-wrap">
+            <Search size={18} className="search-icon" />
+            <input
+              type="text"
+              placeholder={tr.search_placeholder}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
+          {SHOW_LANGUAGE_SWITCHER && (
+            <div className="lang-switcher lang-switcher--toolbar" aria-label="Idioma">
+              <button
+                type="button"
+                className={`lang-btn ${lang === 'pt' ? 'active' : ''}`}
+                onClick={() => setLang('pt')}
+                title="Português"
+                aria-label="Português"
+              >
+                🇧🇷
+              </button>
+              <button
+                type="button"
+                className={`lang-btn ${lang === 'es' ? 'active' : ''}`}
+                onClick={() => setLang('es')}
+                title="Español"
+                aria-label="Español"
+              >
+                🇪🇸
+              </button>
+            </div>
+          )}
+        </div>
+
         {searchResults !== null ? (
           searchResults.length > 0 ? (
             <BookRow
