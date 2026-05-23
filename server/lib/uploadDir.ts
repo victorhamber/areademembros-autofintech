@@ -1,11 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 
-const DEFAULT_CANDIDATES = ['/data/uploads', '/app/uploads'];
+/** Ordem padrão: /app/uploads primeiro (volume típico no EasyPanel/Coolify). */
+const DEFAULT_CANDIDATES = ['/app/uploads', '/data/uploads'];
 
 /**
  * Resolve pasta gravável para uploads (volume Docker / EasyPanel).
- * Ordem: UPLOAD_DIR → /data/uploads → /app/uploads → ./uploads
+ * Ordem: UPLOAD_DIR → /app/uploads → /data/uploads → ./uploads
  */
 export function resolveUploadDirectory(fallbackRelativeToDirname: string): string {
   const fromEnv = process.env.UPLOAD_DIR?.trim();

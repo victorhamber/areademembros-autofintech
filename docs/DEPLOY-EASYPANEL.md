@@ -7,17 +7,17 @@ HTTP **502** significa que o proxy (Traefik/Nginx do EasyPanel) **não recebeu r
 ### Checklist
 
 1. **Variável de ambiente**
-   - `UPLOAD_DIR=/data/uploads`
+   - `UPLOAD_DIR=/app/uploads` (mesmo caminho do volume)
 
 2. **Volume persistente**
-   - Monte um volume no serviço: caminho no container **`/data/uploads`**
+   - Um volume basta: destino no container **`/app/uploads`** (como no EasyPanel)
 
 3. **Deploy**
    - Após cada deploy, aguarde ~30s (migração Prisma no boot) antes de testar upload.
 
 4. **Health**
    - Abra: `https://app.autofintech.com.br/api/health`
-   - Deve retornar `"uploadsWritable": true` e `"uploadDir": "/data/uploads"` (ou o path configurado).
+   - Deve retornar `"uploadsWritable": true` e `"uploadDir": "/app/uploads"`.
 
 5. **Proxy**
    - Todo tráfego `https://app…/` deve ir para a **porta 3000** do container (um único serviço Node serve API + frontend).
