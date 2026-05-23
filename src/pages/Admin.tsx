@@ -1064,6 +1064,25 @@ export const Admin: React.FC = () => {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
+  const openBuilderPublicUrl = () => {
+    const slug = normalizeBuilderSlug(builderCurrentSlug);
+    if (!slug) {
+      alert('Salve a página antes de abrir a URL pública.');
+      return;
+    }
+    const page = builderPagesRef.current.find((p) => p.slug === slug);
+    if (!page) {
+      alert('Página ainda não foi salva no banco.');
+      return;
+    }
+    if (page.published === false) {
+      alert('Página em rascunho. Clique em "Salvar e publicar" antes de abrir a URL pública.');
+      return;
+    }
+    const publicUrl = `${window.location.origin}/${encodeURIComponent(slug)}`;
+    window.open(publicUrl, '_blank', 'noopener,noreferrer');
+  };
+
   // -- FETCHERS (JWT Bearer — não usa mais header x-admin-password na UI) --
   const validateAdminJwt = async (opts?: { silent?: boolean }, jwt?: string) => {
     const h = authHeaders(jwt);
@@ -4915,7 +4934,10 @@ export const Admin: React.FC = () => {
                       Mobile
                     </button>
                     <button type="button" className="btn-secondary-sm" onClick={() => openBuilderPreviewNewTab(builderPreviewMode)}>
-                      Visualizar
+                      Preview local
+                    </button>
+                    <button type="button" className="btn-secondary-sm" onClick={openBuilderPublicUrl}>
+                      Abrir URL pública
                     </button>
                     <button type="button" className="btn-primary" disabled={builderSaving} onClick={() => void saveBuilderPages({ publish: true })}>
                       {builderSaving ? 'Salvando…' : 'Salvar e publicar'}
