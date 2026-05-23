@@ -250,6 +250,7 @@ const upload = multer({
 });
 
 function respondMediaUploadError(err: unknown, res: express.Response): boolean {
+  if (!err) return false;
   const code = (err as { code?: string }).code;
   if (code === 'LIMIT_FILE_SIZE') {
     res.status(413).json({ error: 'Arquivo muito grande (máx. 80 MB).' });
