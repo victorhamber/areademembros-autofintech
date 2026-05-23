@@ -50,7 +50,24 @@ Acontece quando o banco foi criado anteriormente com `db push` (ou veio de outra
 
 A partir do próximo deploy o log não deve mais mostrar P3005.
 
-Se quiser fazer manualmente no console do container:
+### P3017 / P3015 (baseline parcial)
+
+Se o log mostrar que a migração `20260327054346_add_html_url` não foi encontrada, mas as outras foram marcadas como aplicadas, o histórico ficou inconsistente. O `scripts/db-boot.sh` atual tenta reparar com `rolled-back` e baseline de novo.
+
+**Importante:** faça redeploy **sem cache** no EasyPanel (rebuild completo) para garantir que `migration.sql` da primeira migração entre na imagem.
+
+Se quiser corrigir manualmente no console do container:
+
+```bash
+npx prisma migrate resolve --rolled-back "20260522120000_add_media_folders"
+npx prisma migrate resolve --rolled-back "20260513062500_add_product_download_fields"
+npx prisma migrate resolve --applied "20260327054346_add_html_url"
+npx prisma migrate resolve --applied "20260513062500_add_product_download_fields"
+npx prisma migrate resolve --applied "20260522120000_add_media_folders"
+npx prisma migrate deploy
+```
+
+Se quiser fazer manualmente no console do container (baseline simples):
 
 ```bash
 npx prisma migrate resolve --applied "20260327054346_add_html_url"

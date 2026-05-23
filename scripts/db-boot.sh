@@ -1,9 +1,8 @@
 #!/bin/sh
 # Boot do banco em produção (Docker / EasyPanel).
-# 1) Tenta `prisma migrate deploy` normal.
-# 2) Se falhar com P3005 (banco já populado, sem histórico), faz baseline
-#    marcando todas as migrações existentes como aplicadas e tenta de novo.
-# 3) Último recurso: `prisma db push --accept-data-loss` para manter a API no ar.
+# - Exige migration.sql em cada pasta antes de usar migrate.
+# - Baseline (P3005): marca migrações em ordem; se uma falhar, não continua.
+# - Corrige baseline parcial (ex.: migrações 2/3 aplicadas sem a 1).
 
 set -u
 
@@ -11,47 +10,97 @@ log() {
   echo "[db-boot] $*"
 }
 
-run_migrate_deploy() {
-  npx prisma migrate deploy 2>&1
+list_migrations() {
+  for d in prisma/migrations/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d")
+    [ -f "${d}migration.sql" ] || continue
+    echo "$name"
+  done | sort
 }
 
-log "Tentando prisma migrate deploy..."
-OUTPUT="$(run_migrate_deploy)"
-STATUS=$?
-echo "$OUTPUT"
+verify_migration_files() {
+  missing=""
+  for d in prisma/migrations/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d")
+    if [ ! -f "${d}migration.sql" ]; then
+      missing="$missing $name"
+    fi
+  done
+  if [ -n "$missing" ]; then
+    log "ERRO: migration.sql ausente em:$missing"
+    log "Usando apenas prisma db push (sem migrate deploy)."
+    return 1
+  fi
+  return 0
+}
 
-if [ $STATUS -eq 0 ]; then
+baseline_all_migrations() {
+  log "Baseline: marcando migrações como já aplicadas..."
+  for name in $(list_migrations); do
+    log "  resolve --applied $name"
+    if ! npx prisma migrate resolve --applied "$name"; then
+      log "Falha ao marcar $name como aplicada."
+      return 1
+    fi
+  done
+  return 0
+}
+
+# Remove registros de migrações posteriores quando a primeira não foi aplicada (estado quebrado).
+repair_partial_baseline() {
+  log "Tentando reparar baseline parcial..."
+  reversed=$(list_migrations | sort -r)
+  for name in $reversed; do
+    npx prisma migrate resolve --rolled-back "$name" 2>/dev/null && log "  rolled-back $name"
+  done
+}
+
+run_db_push() {
+  npx prisma db push --accept-data-loss
+}
+
+log "Verificando arquivos de migração..."
+if ! verify_migration_files; then
+  run_db_push || true
+  exit 0
+fi
+
+COUNT=$(list_migrations | wc -l | tr -d ' ')
+log "Encontradas $COUNT migração(ões) com migration.sql."
+
+log "Tentando prisma migrate deploy..."
+if OUTPUT=$(npx prisma migrate deploy 2>&1); then
+  echo "$OUTPUT"
   log "migrate deploy concluído com sucesso."
   exit 0
 fi
 
+echo "$OUTPUT"
+
 if echo "$OUTPUT" | grep -q "P3005"; then
-  log "Detectado P3005 (schema já existe, sem histórico). Fazendo baseline..."
-
-  MIGRATIONS=$(ls -1 prisma/migrations 2>/dev/null | grep -v '^migration_lock.toml$' | sort)
-
-  if [ -z "$MIGRATIONS" ]; then
-    log "Nenhuma migração encontrada para baseline. Fallback para db push."
-    npx prisma db push --accept-data-loss || true
+  log "Detectado P3005 (banco já populado, sem histórico)."
+  if baseline_all_migrations && npx prisma migrate deploy; then
+    log "Baseline OK."
     exit 0
   fi
-
-  for m in $MIGRATIONS; do
-    log "  resolve --applied $m"
-    npx prisma migrate resolve --applied "$m" || true
-  done
-
-  log "Re-executando migrate deploy após baseline..."
-  if npx prisma migrate deploy; then
-    log "Baseline OK, migrate deploy concluído."
+  repair_partial_baseline
+  if baseline_all_migrations && npx prisma migrate deploy; then
+    log "Baseline OK após reparo."
     exit 0
   fi
-
-  log "migrate deploy falhou após baseline. Fallback para db push."
-  npx prisma db push --accept-data-loss || true
-  exit 0
 fi
 
-log "migrate deploy falhou por outro motivo. Fallback para db push."
-npx prisma db push --accept-data-loss || true
+if echo "$OUTPUT" | grep -qE "P3015|P3017"; then
+  log "Detectado estado inconsistente de migrações (P3015/P3017)."
+  repair_partial_baseline
+  if baseline_all_migrations && npx prisma migrate deploy; then
+    log "migrate deploy OK após reparo."
+    exit 0
+  fi
+fi
+
+log "Fallback: prisma db push."
+run_db_push || true
 exit 0
