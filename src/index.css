@@ -12,7 +12,9 @@
   --accent-soft: rgba(59, 130, 246, 0.28);
   --border-subtle: rgba(255, 255, 255, 0.12);
   --button-text: #031018;
-  
+  --video-accent: #e07a2f;
+  --video-accent-soft: rgba(224, 122, 47, 0.95);
+
   --font-main: 'Poppins', 'Inter', sans-serif;
   
   --spacing-sm: 8px;

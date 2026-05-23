@@ -9,6 +9,7 @@ export const MEMBER_THEME_KEYS = [
   'member_theme_accent_primary_hover',
   'member_theme_border_subtle',
   'member_theme_button_text',
+  'member_theme_video_accent',
 ] as const;
 
 export type MemberThemeKey = (typeof MEMBER_THEME_KEYS)[number];
@@ -24,4 +25,5 @@ export const MEMBER_THEME_DEFAULTS: Record<MemberThemeKey, string> = {
   member_theme_accent_primary_hover: '#60a5fa',
   member_theme_border_subtle: 'rgba(255, 255, 255, 0.12)',
   member_theme_button_text: '#031018',
+  member_theme_video_accent: '#e07a2f',
 };

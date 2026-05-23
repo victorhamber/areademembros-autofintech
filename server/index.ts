@@ -18,7 +18,7 @@ import { startScheduledJobs } from './jobs/scheduler.js';
 import { userHasMemberAccess } from './lib/userAccess.js';
 import { hashMemberPassword, verifyUserPassword } from './lib/verifyUserPassword.js';
 import { adminAuthMiddleware } from './middleware/adminAuth.js';
-import { resolveAdminPassword } from './lib/adminPassword.js';
+import { validateAdminCredentials } from './lib/adminPassword.js';
 import { ensureDevTestAccount } from './lib/ensureDevTestAccount.js';
 import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.js';
 
@@ -927,9 +927,13 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
 // ==========================================
 app.post('/api/admin/login', (req, res) => {
   try {
+    const email = String(req.body?.email ?? '');
     const password = String(req.body?.password ?? '');
-    if (password !== resolveAdminPassword()) {
-      return res.status(401).json({ error: 'Senha incorreta.' });
+    if (!email.trim() || !password) {
+      return res.status(400).json({ error: 'Informe e-mail e senha.' });
+    }
+    if (!validateAdminCredentials(email, password)) {
+      return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
     }
     res.json({ token: signAdminJwt() });
   } catch {

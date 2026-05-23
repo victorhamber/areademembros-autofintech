@@ -14,7 +14,7 @@
 }
 
 .video-player-facade:focus-visible {
-  outline: 2px solid #e07a2f;
+  outline: 2px solid var(--video-accent, #e07a2f);
   outline-offset: 2px;
 }
 
@@ -61,7 +61,7 @@
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: rgba(224, 122, 47, 0.95);
+  background: var(--video-accent-soft, rgba(224, 122, 47, 0.95));
   color: #fff;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   transition: transform 0.2s ease, background 0.2s ease;
@@ -70,7 +70,7 @@
 
 .video-player-facade:hover .video-player-facade__play {
   transform: translate(-50%, -50%) scale(1.06);
-  background: #e07a2f;
+  background: var(--video-accent, #e07a2f);
 }
 
 /* ========== Wrapper Plyr ========== */
@@ -88,19 +88,19 @@
 }
 
 .lesson-video .plyr {
-  --plyr-color-main: #e07a2f;
+  --plyr-color-main: var(--video-accent, #e07a2f);
   --plyr-video-background: #000;
 }
 
 .lesson-video .plyr__control--overlaid {
-  background: rgba(224, 122, 47, 0.92);
+  background: var(--video-accent-soft, rgba(224, 122, 47, 0.92));
   border: 0;
   padding: 18px;
   z-index: 4;
 }
 
 .lesson-video .plyr__control--overlaid:hover {
-  background: #e07a2f;
+  background: var(--video-accent, #e07a2f);
 }
 
 /* Esconde o botão play grande do Plyr quando a capa de pause está ativa */
@@ -138,7 +138,7 @@
 }
 
 .video-player-pause-cover:focus-visible {
-  outline: 2px solid #e07a2f;
+  outline: 2px solid var(--video-accent, #e07a2f);
   outline-offset: -2px;
 }
 

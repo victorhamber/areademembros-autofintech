@@ -14,6 +14,29 @@ let warnedMissingAdminPassword = false;
 let warnedSystemAdminPassword = false;
 
 const DEV_FALLBACK = 'AdminTeste@local';
+const DEV_FALLBACK_EMAIL = 'admin@local.dev';
+
+export function normalizeAdminEmail(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .toLowerCase();
+}
+
+export function resolveAdminEmail(): string {
+  const raw = process.env.ADMIN_EMAIL;
+  if (raw !== undefined && String(raw).trim() !== '') {
+    return normalizeAdminEmail(String(raw));
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return 'admin@autofintech.com.br';
+  }
+  return DEV_FALLBACK_EMAIL;
+}
+
+export function validateAdminCredentials(email: string, password: string): boolean {
+  if (normalizeAdminEmail(email) !== resolveAdminEmail()) return false;
+  return String(password ?? '') === resolveAdminPassword();
+}
 
 /** Remove BOM, espaços e aspas comuns do .env (ex.: ADMIN_PASSWORD="minhasenha"). */
 function normalizePasswordFromEnv(raw: string): string {

@@ -206,6 +206,7 @@ export const Admin: React.FC = () => {
   const savedUi = useMemo(() => loadAdminUi(), []);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => !!localStorage.getItem(ADMIN_JWT_KEY));
   const [authBootstrapping, setAuthBootstrapping] = useState(() => !!localStorage.getItem(ADMIN_JWT_KEY));
+  const [adminEmail, setAdminEmail] = useState('');
   const [masterPassword, setMasterPassword] = useState('');
   const [adminJwt, setAdminJwt] = useState(() => localStorage.getItem(ADMIN_JWT_KEY) || '');
 
@@ -990,6 +991,7 @@ export const Admin: React.FC = () => {
         member_theme_accent_primary_hover: String(emailSettings.member_theme_accent_primary_hover || '').trim(),
         member_theme_border_subtle: String(emailSettings.member_theme_border_subtle || '').trim(),
         member_theme_button_text: String(emailSettings.member_theme_button_text || '').trim(),
+        member_theme_video_accent: String(emailSettings.member_theme_video_accent || '').trim(),
       };
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
@@ -1746,7 +1748,7 @@ export const Admin: React.FC = () => {
           const res = await fetch('/api/admin/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: legacyPwd }),
+            body: JSON.stringify({ email: '', password: legacyPwd }),
           });
           const data = await res.json().catch(() => ({} as { token?: string }));
           if (res.ok && data.token) {
@@ -1770,16 +1772,17 @@ export const Admin: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!masterPassword) return;
+    const email = adminEmail.trim();
+    if (!email || !masterPassword) return;
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: masterPassword }),
+        body: JSON.stringify({ email, password: masterPassword }),
       });
       const data = await res.json().catch(() => ({} as { error?: string; token?: string }));
       if (!res.ok) {
-        alert(data.error || 'Senha incorreta.');
+        alert(data.error || 'E-mail ou senha incorretos.');
         return;
       }
       if (!data.token) {
@@ -1789,6 +1792,7 @@ export const Admin: React.FC = () => {
       setAdminJwt(data.token);
       localStorage.setItem(ADMIN_JWT_KEY, data.token);
       localStorage.removeItem('adminToken');
+      setAdminEmail('');
       setMasterPassword('');
       await loadDashboard(data.token);
     } catch {
@@ -1899,10 +1903,25 @@ export const Admin: React.FC = () => {
         <form onSubmit={handleLogin} className="admin-login-box">
           <h2>Centro de Comando</h2>
           <p>Exclusivo ao Criador</p>
-          <input type="password" placeholder="Senha Master" value={masterPassword} onChange={e => setMasterPassword(e.target.value)} required />
+          <input
+            type="email"
+            autoComplete="username"
+            placeholder="E-mail do administrador"
+            value={adminEmail}
+            onChange={(e) => setAdminEmail(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            autoComplete="current-password"
+            placeholder="Senha"
+            value={masterPassword}
+            onChange={(e) => setMasterPassword(e.target.value)}
+            required
+          />
           {import.meta.env.DEV && (
             <p className="admin-login-dev-hint" style={{ fontSize: '13px', color: '#8ab4b0', marginTop: '8px', lineHeight: 1.4 }}>
-              A senha é a do arquivo <code style={{ color: '#93c5fd' }}>.env</code> (<code style={{ color: '#93c5fd' }}>ADMIN_PASSWORD</code>), padrão <strong style={{ color: 'var(--accent-primary)' }}>AdminTeste@local</strong>. O login agora usa token JWT (não depende de header estranho no navegador).
+              Use <code style={{ color: '#93c5fd' }}>ADMIN_EMAIL</code> e <code style={{ color: '#93c5fd' }}>ADMIN_PASSWORD</code> do <code style={{ color: '#93c5fd' }}>.env</code> (dev: <strong style={{ color: 'var(--accent-primary)' }}>admin@local.dev</strong> / <strong style={{ color: 'var(--accent-primary)' }}>AdminTeste@local</strong>).
             </p>
           )}
           <button type="submit">Autenticar Sistema</button>
@@ -2435,7 +2454,7 @@ export const Admin: React.FC = () => {
           <div className="admin-form">
             <h2>Tema da área de membros</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.55 }}>
-              Personalize as cores globais da área de membros (menu, páginas, cards e botões). Essas cores são aplicadas em toda a experiência do aluno.
+              Personalize as cores globais da área de membros (menu, páginas, cards, botões e player de vídeo nas aulas). Essas cores são aplicadas em toda a experiência do aluno.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 12 }}>
               <label>
@@ -2469,6 +2488,10 @@ export const Admin: React.FC = () => {
               <label>
                 Cor da letra do botão
                 <input type="color" value={emailSettings.member_theme_button_text || '#031018'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_button_text: e.target.value }))} />
+              </label>
+              <label>
+                Cor do player de vídeo
+                <input type="color" value={emailSettings.member_theme_video_accent || '#e07a2f'} onChange={(e) => setEmailSettings((p) => ({ ...p, member_theme_video_accent: e.target.value }))} />
               </label>
               <label style={{ gridColumn: '1 / -1' }}>
                 Borda sutil (RGBA)

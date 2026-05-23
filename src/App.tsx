@@ -29,6 +29,7 @@ type MemberThemeSettings = {
   member_theme_accent_primary_hover?: string
   member_theme_border_subtle?: string
   member_theme_button_text?: string
+  member_theme_video_accent?: string
 }
 
 function applyMemberTheme(theme: MemberThemeSettings) {
@@ -43,19 +44,22 @@ function applyMemberTheme(theme: MemberThemeSettings) {
     ['member_theme_accent_primary_hover', '--accent-primary-hover'],
     ['member_theme_border_subtle', '--border-subtle'],
     ['member_theme_button_text', '--button-text'],
+    ['member_theme_video_accent', '--video-accent'],
   ]
   for (const [settingKey, cssVar] of map) {
     const value = String(theme?.[settingKey] || '').trim()
     if (value) root.style.setProperty(cssVar, value)
   }
-  const accent = String(theme?.member_theme_accent_primary || '').trim()
-  const hex = accent.match(/^#([0-9a-fA-F]{6})$/)?.[1]
-  if (hex) {
+  const setAccentSoft = (hexColor: string, cssVar: string, alpha: number) => {
+    const hex = hexColor.match(/^#([0-9a-fA-F]{6})$/)?.[1]
+    if (!hex) return
     const r = parseInt(hex.slice(0, 2), 16)
     const g = parseInt(hex.slice(2, 4), 16)
     const b = parseInt(hex.slice(4, 6), 16)
-    root.style.setProperty('--accent-soft', `rgba(${r}, ${g}, ${b}, 0.28)`)
+    root.style.setProperty(cssVar, `rgba(${r}, ${g}, ${b}, ${alpha})`)
   }
+  setAccentSoft(String(theme?.member_theme_accent_primary || '').trim(), '--accent-soft', 0.28)
+  setAccentSoft(String(theme?.member_theme_video_accent || '').trim(), '--video-accent-soft', 0.95)
 }
 
 function isAdminRoute(pathname: string): boolean {
