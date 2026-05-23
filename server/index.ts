@@ -4,6 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import http from 'http';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 import { Resend } from 'resend';
@@ -28,6 +29,7 @@ import {
   resolveUploadMime,
   safeUploadFilename,
 } from './lib/uploadMime.js';
+import { assertUploadDirectoryWritable, resolveUploadDirectory } from './lib/uploadDir.js';
 import {
   applyEmailPlaceholders,
   buildResetEmailHtml,
@@ -209,10 +211,11 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
 
+app.set('trust proxy', 1);
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 registerForexRoutes(app, prisma);
 registerMemberApiRoutes(app, prisma);
@@ -222,11 +225,13 @@ startScheduledJobs(prisma);
 // ==========================================
 // FILE UPLOADS (MULTER)
 // ==========================================
-const uploadDir = path.resolve(
-  process.env.UPLOAD_DIR?.trim() || path.join(__dirname, '../uploads')
-);
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+let uploadDir: string;
+try {
+  uploadDir = resolveUploadDirectory(path.join(__dirname, '../uploads'));
+  console.log(`[Uploads] Diretório: ${uploadDir}`);
+} catch (e) {
+  console.error('[Uploads] Falha ao preparar pasta:', e);
+  throw e;
 }
 
 const storage = multer.diskStorage({
@@ -279,7 +284,14 @@ app.use('/uploads', express.static(uploadDir));
 // PUBLIC API ROUTES
 // ==========================================
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Platform API is active', time: new Date() });
+  const uploads = assertUploadDirectoryWritable(uploadDir);
+  res.json({
+    status: 'Platform API is active',
+    time: new Date(),
+    uploadDir,
+    uploadsWritable: uploads.ok,
+    uploadError: uploads.ok ? null : uploads.error,
+  });
 });
 
 app.get('/api/public/ebooks', async (req, res) => {
@@ -1604,9 +1616,19 @@ async function startServer() {
       console.error('[Dev] ensureDevTestAccount:', e);
     }
   }
-  app.listen(PORT, () => {
-    console.log(`[EbookPro API] Server running centrally on port ${PORT}`);
+  const server = http.createServer(app);
+  server.requestTimeout = 120_000;
+  server.headersTimeout = 125_000;
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[EbookPro API] Server running on 0.0.0.0:${PORT}`);
   });
 }
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
 
 void startServer();

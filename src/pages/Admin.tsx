@@ -3536,11 +3536,13 @@ export const Admin: React.FC = () => {
                       if (!res.ok) {
                         const j = await res.json().catch(() => ({} as { error?: string }));
                         const fallback =
-                          res.status === 413
-                            ? 'Arquivo muito grande.'
-                            : res.status === 401
-                              ? 'Sessão expirada. Faça login novamente.'
-                              : `Falha ao enviar mídia (HTTP ${res.status}).`;
+                          res.status === 502 || res.status === 504
+                            ? 'Servidor indisponível (502/504). O app pode estar reiniciando após deploy, ou o proxy precisa encaminhar POST /api ao Node. Aguarde 1 minuto e tente de novo. No EasyPanel: volume em /data/uploads e UPLOAD_DIR=/data/uploads.'
+                            : res.status === 413
+                              ? 'Arquivo muito grande.'
+                              : res.status === 401
+                                ? 'Sessão expirada. Faça login novamente.'
+                                : `Falha ao enviar mídia (HTTP ${res.status}).`;
                         alert(j.error || fallback);
                         return;
                       }

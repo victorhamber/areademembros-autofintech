@@ -27,7 +27,8 @@
     "dev:api": "tsx server/index.ts",
     "dev:full": "concurrently -n api,web -c cyan,magenta \"npm run dev:api\" \"npm run dev\"",
     "server": "npx prisma db push --accept-data-loss && tsx server/index.ts",
-    "start": "npx prisma db push --accept-data-loss && tsx server/index.ts"
+    "start": "tsx server/index.ts",
+    "start:docker": "npx prisma migrate deploy && tsx server/index.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
