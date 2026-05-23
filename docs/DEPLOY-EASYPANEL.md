@@ -38,7 +38,19 @@ npx prisma migrate deploy
 
 Se o log mostrar **P3019** no boot, o `migration_lock.toml` estava desalinhado com o `schema.prisma`. Corrija no repositório e faça redeploy.
 
-Se o banco em produção já foi criado com `db push` (sem histórico de migrações), marque as migrações existentes **uma vez** no console do container (schema já aplicado):
+### Erro P3005 (schema já existe, sem histórico de migrações)
+
+Acontece quando o banco foi criado anteriormente com `db push` (ou veio de outra origem), então as tabelas existem mas a tabela `_prisma_migrations` está vazia.
+
+**Resolvido automaticamente no boot** pelo `scripts/db-boot.sh` (chamado pelo `CMD` do `Dockerfile`):
+
+1. Roda `prisma migrate deploy`.
+2. Se aparecer **P3005**, marca todas as migrações em `prisma/migrations/` como aplicadas (`prisma migrate resolve --applied <nome>`).
+3. Roda `migrate deploy` novamente; em último caso, faz `db push --accept-data-loss` para manter a API no ar.
+
+A partir do próximo deploy o log não deve mais mostrar P3005.
+
+Se quiser fazer manualmente no console do container:
 
 ```bash
 npx prisma migrate resolve --applied "20260327054346_add_html_url"
@@ -46,5 +58,3 @@ npx prisma migrate resolve --applied "20260513062500_add_product_download_fields
 npx prisma migrate resolve --applied "20260522120000_add_media_folders"
 npx prisma migrate deploy
 ```
-
-Depois disso, `migrate deploy` no boot do Docker deve concluir sem cair no fallback `db push`.

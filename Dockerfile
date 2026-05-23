@@ -22,5 +22,5 @@ RUN mkdir -p /app/uploads /data/uploads && chmod 755 /app/uploads /data/uploads
 # Expose Express server port
 EXPOSE 3000
 
-# Migração rápida no boot; depois sobe a API sem bloquear com db push pesado
-CMD ["sh", "-c", "npx prisma migrate deploy || npx prisma db push --accept-data-loss; exec npm run start"]
+# Migração no boot via script: trata P3005 (baseline automático) antes do fallback db push.
+CMD ["sh", "-c", "sh scripts/db-boot.sh; exec npm run start"]
