@@ -130,6 +130,15 @@ function PublicBuilderPage({ slug }: { slug: string }) {
     return () => { active = false }
   }, [slug])
 
+  // Substitui o documento inteiro — scripts no <head> (pixel, Trajettu, GTM) rodam no contexto real.
+  // Antes usava iframe/srcDoc e ferramentas como Meta Pixel Helper não detectavam nada.
+  useEffect(() => {
+    if (loading || error || !html || redirecting) return
+    document.open()
+    document.write(html)
+    document.close()
+  }, [html, loading, error, redirecting])
+
   if (redirecting) {
     return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#111' }}>Redirecionando…</div>
   }
@@ -139,12 +148,11 @@ function PublicBuilderPage({ slug }: { slug: string }) {
   if (error || !html) {
     return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#111', padding: 20, textAlign: 'center' }}>{error || 'Página não encontrada.'}</div>
   }
+
   return (
-    <iframe
-      title={`Página pública ${slug}`}
-      srcDoc={html}
-      style={{ width: '100vw', height: '100vh', border: 'none', display: 'block', background: '#fff' }}
-    />
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', color: '#111' }}>
+      Carregando página…
+    </div>
   )
 }
 

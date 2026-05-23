@@ -664,6 +664,24 @@ export const Admin: React.FC = () => {
     if (builderSelectedPath) selectBuilderElement(builderSelectedPath);
   };
 
+  const BUILDER_HEAD_INJECT_ATTR = 'data-af-head-inject';
+
+  const normalizeFullHtmlPaste = (code: string): { body: string; headAppend: string } => {
+    const trimmed = code.trim();
+    if (!/<!doctype|<html[\s>]/i.test(trimmed)) {
+      return { body: trimmed, headAppend: '' };
+    }
+    try {
+      const doc = new DOMParser().parseFromString(trimmed, 'text/html');
+      return {
+        body: doc.body.innerHTML.trim(),
+        headAppend: doc.head.innerHTML.trim(),
+      };
+    } catch {
+      return { body: trimmed, headAppend: '' };
+    }
+  };
+
   const injectHtmlExtras = (html: string, headCode: string, bodyCode: string) => {
     let out = html || DEFAULT_BUILDER_HTML;
     const h = headCode.trim();
@@ -673,14 +691,44 @@ export const Admin: React.FC = () => {
     return out;
   };
 
+  const mergeHeadAppendFromPaste = (html: string, headAppend: string) => {
+    if (!headAppend.trim()) return html;
+    try {
+      const doc = new DOMParser().parseFromString(html || DEFAULT_BUILDER_HTML, 'text/html');
+      const tpl = doc.createElement('template');
+      tpl.innerHTML = headAppend;
+      Array.from(tpl.content.children).forEach((el) => {
+        if (el.tagName === 'SCRIPT' && el.hasAttribute(BUILDER_HEAD_INJECT_ATTR)) return;
+        doc.head.appendChild(el.cloneNode(true));
+      });
+      return `<!doctype html>\n${doc.documentElement.outerHTML}`;
+    } catch {
+      return html;
+    }
+  };
+
+  const buildFinalBuilderHtml = (headCode: string, bodyCode: string, baseHtml?: string) => {
+    const bodyNorm = normalizeFullHtmlPaste(bodyCode);
+    let html = setBuilderHtmlSections(baseHtml || DEFAULT_BUILDER_HTML, { body: bodyNorm.body });
+    if (bodyNorm.headAppend) {
+      html = mergeHeadAppendFromPaste(html, bodyNorm.headAppend);
+    }
+    html = setBuilderHtmlSections(html, { head: headCode });
+    return html.trim() || DEFAULT_BUILDER_HTML;
+  };
+
   const getBuilderAreaCode = (html: string, target: BuilderPageTarget) => {
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html || DEFAULT_BUILDER_HTML, 'text/html');
       if (target === 'body') return doc.body.innerHTML.trim();
 
-      // Exibe no campo de HEAD apenas o código "extra" (pixel, GTM, scripts),
-      // removendo a estrutura base gerada automaticamente.
+      const injected = Array.from(doc.head.querySelectorAll(`[${BUILDER_HEAD_INJECT_ATTR}]`));
+      if (injected.length) {
+        return injected.map((el) => el.outerHTML).join('\n');
+      }
+
+      // Legado: scripts/links extras sem marcador
       const headClone = doc.head.cloneNode(true) as HTMLElement;
       headClone.querySelectorAll('meta[charset], meta[name="viewport"], title').forEach((el) => el.remove());
       headClone.querySelectorAll('style').forEach((styleEl) => {
@@ -705,13 +753,30 @@ export const Admin: React.FC = () => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html || DEFAULT_BUILDER_HTML, 'text/html');
       if (target === 'header') {
-        doc.head.innerHTML = `
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          ${code}
-        `.trim();
+        if (!doc.querySelector('meta[charset]')) {
+          const metaCharset = doc.createElement('meta');
+          metaCharset.setAttribute('charset', 'UTF-8');
+          doc.head.prepend(metaCharset);
+        }
+        if (!doc.querySelector('meta[name="viewport"]')) {
+          const metaViewport = doc.createElement('meta');
+          metaViewport.setAttribute('name', 'viewport');
+          metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
+          doc.head.appendChild(metaViewport);
+        }
+        doc.head.querySelectorAll(`[${BUILDER_HEAD_INJECT_ATTR}]`).forEach((el) => el.remove());
+        const trimmed = code.trim();
+        if (trimmed) {
+          const tpl = doc.createElement('template');
+          tpl.innerHTML = trimmed;
+          Array.from(tpl.content.children).forEach((el) => {
+            el.setAttribute(BUILDER_HEAD_INJECT_ATTR, '1');
+            doc.head.appendChild(el);
+          });
+        }
       } else {
-        doc.body.innerHTML = code;
+        const bodyNorm = normalizeFullHtmlPaste(code);
+        doc.body.innerHTML = bodyNorm.body;
       }
       return `<!doctype html>\n${doc.documentElement.outerHTML}`;
     } catch {
@@ -811,7 +876,11 @@ export const Admin: React.FC = () => {
     }
     setBuilderSaving(true);
     try {
-      const html = (builderCodeDraft || DEFAULT_BUILDER_HTML).trim();
+      const html = buildFinalBuilderHtml(
+        builderHeadCodeDraft,
+        builderBodyCodeDraft,
+        builderCodeDraft || DEFAULT_BUILDER_HTML
+      );
       const nextPages = [...builderPages];
       const idx = nextPages.findIndex((p) => p.slug === builderCurrentSlug);
       if (idx >= 0) {
@@ -838,8 +907,10 @@ export const Admin: React.FC = () => {
       }
       setBuilderPages(nextPages);
       setBuilderCodeDraft(html);
+      setBuilderHeadCodeDraft(getBuilderAreaCode(html, 'header'));
+      setBuilderBodyCodeDraft(getBuilderAreaCode(html, 'body'));
       if (opts?.conclude) setBuilderStep('list');
-      alert('Página salva com sucesso!');
+      alert(opts?.publish ? 'Página salva e publicada! Scripts do HEAD rodam na URL pública.' : 'Página salva com sucesso!');
     } catch {
       alert('Erro de conexão ao salvar.');
     } finally {
@@ -4678,7 +4749,8 @@ export const Admin: React.FC = () => {
                 <button type="button" className="btn-secondary-sm" onClick={() => setBuilderStep('list')}>Voltar à lista</button>
               </div>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
-                Etapa 2: cole ou edite o HTML, depois salve e conclua ou abra o editor visual.
+                Etapa 2: cole ou edite o HTML. Scripts de rastreamento (pixel, Trajettu, GTM) vão no campo <strong>HEAD</strong>.
+                Use <strong>Salvar e publicar</strong> no editor visual para liberar a URL — o código roda na página real (não só no preview).
               </p>
               <label>Área da página (head/body)</label>
               <select
@@ -4728,8 +4800,11 @@ export const Admin: React.FC = () => {
                 >
                   Editor visual
                 </button>
-                <button type="button" className="btn-primary" disabled={builderSaving} onClick={() => void saveBuilderPages({ conclude: true })}>
-                  {builderSaving ? 'Salvando…' : 'Salvar e concluir'}
+                <button type="button" className="btn-secondary-sm" disabled={builderSaving} onClick={() => void saveBuilderPages({ conclude: true })}>
+                  {builderSaving ? 'Salvando…' : 'Salvar rascunho'}
+                </button>
+                <button type="button" className="btn-primary" disabled={builderSaving} onClick={() => void saveBuilderPages({ publish: true, conclude: true })}>
+                  {builderSaving ? 'Salvando…' : 'Salvar e publicar'}
                 </button>
               </div>
             </div>
