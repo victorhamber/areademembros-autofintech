@@ -269,7 +269,17 @@ function detectMediaKind(mimeTypeRaw: string | undefined): 'imagem' | 'video' | 
   return 'arquivo';
 }
 
-// Serve uploaded files publicly
+function mediaAssetPublicFileUrl(id: string): string {
+  return `/api/public/media/${id}/file`;
+}
+
+function resolveMediaAssetFilePath(storedName: string): string | null {
+  const filePath = path.join(uploadDir, path.basename(String(storedName || '')));
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  return filePath;
+}
+
+// Serve uploaded files publicly (quando o proxy encaminha /uploads ao Node)
 app.use('/uploads', express.static(uploadDir));
 
 // ==========================================
@@ -415,6 +425,26 @@ app.get('/api/public/links/resolve', async (req, res) => {
   }
 });
 
+/** Exibe o arquivo no navegador (imagem/vídeo/áudio) — rota /api evita cair no SPA da home. */
+app.get('/api/public/media/:id/file', async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    const media = await prisma.mediaAsset.findUnique({ where: { id } });
+    if (!media) return res.status(404).json({ error: 'Arquivo não encontrado.' });
+
+    const filePath = resolveMediaAssetFilePath(media.storedName);
+    if (!filePath) return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
+
+    const mimeType = String(media.mimeType || '').trim();
+    if (mimeType) res.type(mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.sendFile(filePath);
+  } catch {
+    return res.status(500).json({ error: 'Falha ao abrir arquivo.' });
+  }
+});
+
 app.get('/api/public/media/:id/download', async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
@@ -422,8 +452,8 @@ app.get('/api/public/media/:id/download', async (req, res) => {
     const media = await prisma.mediaAsset.findUnique({ where: { id } });
     if (!media) return res.status(404).json({ error: 'Arquivo não encontrado.' });
 
-    const filePath = path.join(uploadDir, path.basename(media.storedName));
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
+    const filePath = resolveMediaAssetFilePath(media.storedName);
+    if (!filePath) return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
 
     const mimeType = String(media.mimeType || '').trim();
     if (mimeType) res.type(mimeType);
@@ -949,18 +979,22 @@ app.get('/api/admin/media', adminAuthMiddleware, async (_req, res) => {
 app.post('/api/admin/media', adminAuthMiddleware, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
-    const fileUrl = `/uploads/${req.file.filename}`;
     const created = await prisma.mediaAsset.create({
       data: {
         originalName: String(req.file.originalname || req.file.filename),
         storedName: String(req.file.filename),
-        url: fileUrl,
+        url: `/uploads/${req.file.filename}`,
         mimeType: req.file.mimetype || null,
         kind: detectMediaKind(req.file.mimetype),
         sizeBytes: Number(req.file.size || 0)
       }
     });
-    res.json(created);
+    const publicUrl = mediaAssetPublicFileUrl(created.id);
+    const saved = await prisma.mediaAsset.update({
+      where: { id: created.id },
+      data: { url: publicUrl },
+    });
+    res.json(saved);
   } catch {
     res.status(500).json({ error: 'Falha ao salvar mídia.' });
   }
@@ -1125,7 +1159,7 @@ app.post('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
           if (!ok) {
             return res.status(400).json({
               error:
-                'member_hero_background_url: use URL vazia, https://…, http://… ou caminho relativo /uploads/… (não use //).'
+                'member_hero_background_url: use URL vazia, https://…, http://… ou caminho relativo (/api/public/media/…/file ou /uploads/…).'
             });
           }
         }
@@ -1404,10 +1438,34 @@ if (fs.existsSync(distPath)) {
     return res.redirect(status, target);
   });
 
+  // /uploads sem arquivo no disco: 404 em texto (não devolver index.html = home)
+  app.use('/uploads', (req, res) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.status(405).end();
+      return;
+    }
+    const raw = String(req.path || '').replace(/^\/uploads\/?/, '');
+    const filename = path.basename(decodeURIComponent(raw));
+    if (!filename) {
+      res.status(404).type('text/plain; charset=utf-8').send('Arquivo não encontrado.');
+      return;
+    }
+    const filePath = path.join(uploadDir, filename);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).type('text/plain; charset=utf-8').send('Arquivo não encontrado.');
+      return;
+    }
+    res.sendFile(filePath);
+  });
+
   app.use(express.static(distPath));
-  
+
   // Client side routing fallback
   app.use((req, res) => {
+    if (req.path.startsWith('/uploads/')) {
+      res.status(404).type('text/plain; charset=utf-8').send('Arquivo não encontrado.');
+      return;
+    }
     res.sendFile(path.join(distPath, 'index.html'));
   });
 } else {

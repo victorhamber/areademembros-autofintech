@@ -2415,7 +2415,7 @@ export const Admin: React.FC = () => {
             <label style={{ display: 'block', marginTop: '14px', marginBottom: '6px', fontWeight: 600 }}>URL da imagem de fundo (opcional)</label>
             <input
               type="url"
-              placeholder="https://… ou /uploads/arquivo.webp"
+              placeholder="https://… ou /api/public/media/…/file"
               value={emailSettings.member_hero_background_url || ''}
               onChange={(e) => setEmailSettings((p) => ({ ...p, member_hero_background_url: e.target.value }))}
               style={{ width: '100%', padding: '10px', marginBottom: '14px' }}
@@ -3359,7 +3359,7 @@ export const Admin: React.FC = () => {
             <div className="admin-form">
               <h3>Como usar os links</h3>
               <ul style={{ paddingLeft: 18, color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: 13 }}>
-                <li><strong>Link direto:</strong> use em páginas, botões, banners ou embeds.</li>
+                <li><strong>Link direto:</strong> abre o arquivo via API (<code>/api/public/media/…/file</code>) — funciona mesmo quando <code>/uploads/</code> cai na home do app.</li>
                 <li><strong>Link download:</strong> força download para arquivos.</li>
                 <li>Os arquivos ficam armazenados no servidor e listados nesta biblioteca.</li>
                 <li>Você pode copiar URL com um clique e reutilizar em qualquer campanha.</li>
@@ -3405,7 +3405,7 @@ export const Admin: React.FC = () => {
                         kind === 'video' ? <Film size={15} /> :
                         kind === 'audio' ? <Music2 size={15} /> :
                         <FileIcon size={15} />;
-                      const fullUrl = `${window.location.origin}${String(m.url || '')}`;
+                      const fileUrl = `${window.location.origin}/api/public/media/${m.id}/file`;
                       const downloadUrl = `${window.location.origin}/api/public/media/${m.id}/download`;
                       return (
                         <tr key={m.id}>
@@ -3417,19 +3417,19 @@ export const Admin: React.FC = () => {
                           </td>
                           <td style={{ maxWidth: 400 }}>
                             <div style={{ fontWeight: 600, marginBottom: 3 }}>{m.originalName}</div>
-                            <code>{m.url}</code>
+                            <code>{fileUrl.replace(window.location.origin, '')}</code>
                           </td>
                           <td>{Math.max(1, Math.round(Number(m.sizeBytes || 0) / 1024))} KB</td>
                           <td>{new Date(m.createdAt).toLocaleString('pt-BR')}</td>
                           <td>
                             <div className="admin-actions admin-actions--wrap">
-                              <button type="button" className="btn-secondary-sm" onClick={() => { navigator.clipboard.writeText(fullUrl); alert('Link direto copiado!'); }}>
+                              <button type="button" className="btn-secondary-sm" onClick={() => { navigator.clipboard.writeText(fileUrl); alert('Link direto copiado!'); }}>
                                 Copiar URL
                               </button>
                               <button type="button" className="btn-secondary-sm" onClick={() => { navigator.clipboard.writeText(downloadUrl); alert('Link de download copiado!'); }}>
                                 Copiar download
                               </button>
-                              <button type="button" className="btn-secondary-sm" onClick={() => window.open(fullUrl, '_blank', 'noopener,noreferrer')}>
+                              <button type="button" className="btn-secondary-sm" onClick={() => window.open(fileUrl, '_blank', 'noopener,noreferrer')}>
                                 Abrir
                               </button>
                               <button
