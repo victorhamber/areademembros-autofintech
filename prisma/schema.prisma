@@ -299,13 +299,27 @@ model ShortLinkClick {
   @@index([clickedAt])
 }
 
+model MediaFolder {
+  id        String       @id @default(uuid())
+  name      String
+  sortOrder Int          @default(0)
+  assets    MediaAsset[]
+  createdAt DateTime     @default(now())
+
+  @@index([sortOrder])
+}
+
 model MediaAsset {
-  id           String   @id @default(uuid())
+  id           String       @id @default(uuid())
   originalName String
   storedName   String
   url          String
   mimeType     String?
-  kind         String   @default("arquivo")
-  sizeBytes    Int      @default(0)
-  createdAt    DateTime @default(now())
+  kind         String       @default("arquivo")
+  sizeBytes    Int          @default(0)
+  folderId     String?
+  folder       MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdAt    DateTime     @default(now())
+
+  @@index([folderId])
 }

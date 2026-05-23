@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, Image as ImageIcon, Film, Music2, File as FileIcon } from 'lucide-react';
+import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, FolderPlus, Image as ImageIcon, Film, Music2, File as FileIcon } from 'lucide-react';
 import { resolveProductForLicense } from '@shared/licenseProductMatch';
+import { DEFAULT_RESET_TEMPLATE_PT } from '@shared/emailTemplates';
 import { MEMBER_THEME_DEFAULTS, type MemberThemeKey } from '@shared/memberTheme';
 import './Admin.css';
 
@@ -346,7 +347,7 @@ export const Admin: React.FC = () => {
   const [emailSettings, setEmailSettings] = useState<Record<string, string>>({
     resend_api_key: '', sender_name: '', sender_email: '',
     welcome_template_pt: '',
-    reset_template_pt: '',
+    reset_template_pt: DEFAULT_RESET_TEMPLATE_PT,
     member_hero_background_url: '',
     member_hero_kicker: '',
     member_support_url: '',
@@ -356,6 +357,11 @@ export const Admin: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [shortLinks, setShortLinks] = useState<any[]>([]);
   const [mediaAssets, setMediaAssets] = useState<any[]>([]);
+  const [mediaFolders, setMediaFolders] = useState<any[]>([]);
+  const [mediaFolderFilter, setMediaFolderFilter] = useState<'all' | 'none' | string>('all');
+  const [mediaUploadFolderId, setMediaUploadFolderId] = useState('');
+  const [newMediaFolderName, setNewMediaFolderName] = useState('');
+  const [mediaFolderSaving, setMediaFolderSaving] = useState(false);
   const [mediaSearch, setMediaSearch] = useState('');
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -836,7 +842,12 @@ export const Admin: React.FC = () => {
       const res = await fetch('/api/admin/settings', { headers: h });
       if (res.ok) {
         const data = await res.json();
-        setEmailSettings((prev) => ({ ...prev, ...data }));
+        const resetPt = String(data.reset_template_pt || '').trim();
+        setEmailSettings((prev) => ({
+          ...prev,
+          ...data,
+          reset_template_pt: resetPt || DEFAULT_RESET_TEMPLATE_PT,
+        }));
         if (!builderLoadedOnce) {
           const pagesRaw = String(data?.[PAGE_BUILDER_PAGES_SETTING_KEY] || '').trim();
           let parsedPages = parseBuilderPagesSetting(pagesRaw);
@@ -922,6 +933,17 @@ export const Admin: React.FC = () => {
     }
   };
 
+  const fetchMediaFolders = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    try {
+      const res = await fetch('/api/admin/media-folders', { headers: h });
+      if (res.ok) setMediaFolders(await res.json());
+    } catch {
+      console.error('fetchMediaFolders');
+    }
+  };
+
   const fetchMediaAssets = async (jwt?: string) => {
     const h = authHeaders(jwt);
     if (!h.Authorization) return;
@@ -931,6 +953,90 @@ export const Admin: React.FC = () => {
     } catch {
       console.error('fetchMediaAssets');
     }
+  };
+
+  const createMediaFolder = async () => {
+    const name = newMediaFolderName.trim();
+    if (!name) {
+      alert('Informe o nome da pasta.');
+      return;
+    }
+    setMediaFolderSaving(true);
+    try {
+      const res = await fetch('/api/admin/media-folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({} as { error?: string }));
+        alert(j.error || 'Falha ao criar pasta.');
+        return;
+      }
+      const created = await res.json();
+      setNewMediaFolderName('');
+      await fetchMediaFolders();
+      setMediaFolderFilter(created.id);
+      setMediaUploadFolderId(created.id);
+    } catch {
+      alert('Erro de conexão ao criar pasta.');
+    } finally {
+      setMediaFolderSaving(false);
+    }
+  };
+
+  const renameMediaFolder = async (folder: { id: string; name: string }) => {
+    const next = window.prompt('Novo nome da pasta:', folder.name);
+    if (next === null) return;
+    const name = next.trim();
+    if (!name) {
+      alert('O nome não pode ficar vazio.');
+      return;
+    }
+    const res = await fetch(`/api/admin/media-folders/${folder.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({} as { error?: string }));
+      alert(j.error || 'Falha ao renomear pasta.');
+      return;
+    }
+    void fetchMediaFolders();
+    void fetchMediaAssets();
+  };
+
+  const deleteMediaFolder = async (folder: { id: string; name: string }) => {
+    if (!window.confirm(`Excluir a pasta "${folder.name}"? Os arquivos permanecem na biblioteca (sem pasta).`)) return;
+    const res = await fetch(`/api/admin/media-folders/${folder.id}`, {
+      method: 'DELETE',
+      headers: { ...authHeaders() },
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({} as { error?: string }));
+      alert(j.error || 'Falha ao excluir pasta.');
+      return;
+    }
+    if (mediaFolderFilter === folder.id) setMediaFolderFilter('all');
+    if (mediaUploadFolderId === folder.id) setMediaUploadFolderId('');
+    void fetchMediaFolders();
+    void fetchMediaAssets();
+  };
+
+  const moveMediaToFolder = async (mediaId: string, folderId: string) => {
+    const res = await fetch(`/api/admin/media/${mediaId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ folderId: folderId || null }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({} as { error?: string }));
+      alert(j.error || 'Falha ao mover arquivo.');
+      return;
+    }
+    void fetchMediaAssets();
+    void fetchMediaFolders();
   };
 
   const fetchCourses = async (jwt?: string) => {
@@ -968,6 +1074,36 @@ export const Admin: React.FC = () => {
       }
     } catch {
       console.error('fetchForexSettings');
+    }
+  };
+
+  const saveEmailSettings = async () => {
+    const h = authHeaders();
+    if (!h.Authorization) return;
+    setEmailSaving(true);
+    try {
+      const res = await fetch('/api/admin/email-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...h },
+        body: JSON.stringify({
+          resend_api_key: emailSettings.resend_api_key ?? '',
+          sender_name: emailSettings.sender_name ?? '',
+          sender_email: emailSettings.sender_email ?? '',
+          welcome_template_pt: emailSettings.welcome_template_pt ?? '',
+          reset_template_pt: emailSettings.reset_template_pt ?? DEFAULT_RESET_TEMPLATE_PT,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        alert(j.error || 'Erro ao salvar configurações de e-mail.');
+        return;
+      }
+      alert('Configurações salvas com sucesso!');
+      void fetchEmailSettings();
+    } catch {
+      alert('Erro de conexão.');
+    } finally {
+      setEmailSaving(false);
     }
   };
 
@@ -1070,6 +1206,7 @@ export const Admin: React.FC = () => {
         fetchProducts(jwt),
         fetchShortLinks(jwt),
         fetchMediaAssets(jwt),
+        fetchMediaFolders(jwt),
         fetchForexSettings(jwt),
         fetchCourses(jwt),
       ]);
@@ -2000,13 +2137,20 @@ export const Admin: React.FC = () => {
   };
   const currentAdminMeta = adminTabMeta[activeTab];
   const filteredMediaAssets = (() => {
+    let list = mediaAssets;
+    if (mediaFolderFilter === 'none') {
+      list = list.filter((m: any) => !m.folderId);
+    } else if (mediaFolderFilter !== 'all') {
+      list = list.filter((m: any) => m.folderId === mediaFolderFilter);
+    }
     const q = mediaSearch.trim().toLowerCase();
-    if (!q) return mediaAssets;
-    return mediaAssets.filter((m: any) => {
+    if (!q) return list;
+    return list.filter((m: any) => {
       const name = String(m.originalName || '').toLowerCase();
       const url = String(m.url || '').toLowerCase();
       const kind = String(m.kind || '').toLowerCase();
-      return name.includes(q) || url.includes(q) || kind.includes(q);
+      const folderName = String(m.folder?.name || '').toLowerCase();
+      return name.includes(q) || url.includes(q) || kind.includes(q) || folderName.includes(q);
     });
   })();
 
@@ -3345,6 +3489,17 @@ export const Admin: React.FC = () => {
                 Envie imagens, vídeos, áudios e arquivos para gerar links públicos de uso em páginas ou download.
               </p>
 
+              <label>Pasta de destino</label>
+              <select
+                value={mediaUploadFolderId}
+                onChange={(e) => setMediaUploadFolderId(e.target.value)}
+              >
+                <option value="">Sem pasta (raiz)</option>
+                {mediaFolders.map((f: any) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+
               <label>Arquivo</label>
               <input
                 type="file"
@@ -3367,6 +3522,7 @@ export const Admin: React.FC = () => {
                     try {
                       const form = new FormData();
                       form.append('file', mediaFile);
+                      if (mediaUploadFolderId) form.append('folderId', mediaUploadFolderId);
                       const res = await fetch('/api/admin/media', {
                         method: 'POST',
                         headers: { ...authHeaders() },
@@ -3380,6 +3536,7 @@ export const Admin: React.FC = () => {
                       alert('Mídia enviada com sucesso!');
                       setMediaFile(null);
                       void fetchMediaAssets();
+                      void fetchMediaFolders();
                     } catch {
                       alert('Erro de conexão no upload.');
                     } finally {
@@ -3404,6 +3561,85 @@ export const Admin: React.FC = () => {
           </div>
 
           <div className="admin-table-container admin-table-container--full">
+            <div className="admin-media-folders">
+              <div className="admin-media-folders__row">
+                <span className="admin-media-folders__label">Pastas</span>
+                <button
+                  type="button"
+                  className={`admin-media-folder-chip ${mediaFolderFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setMediaFolderFilter('all')}
+                >
+                  Todas ({mediaAssets.length})
+                </button>
+                <button
+                  type="button"
+                  className={`admin-media-folder-chip ${mediaFolderFilter === 'none' ? 'active' : ''}`}
+                  onClick={() => setMediaFolderFilter('none')}
+                >
+                  Sem pasta ({mediaAssets.filter((m: any) => !m.folderId).length})
+                </button>
+                {mediaFolders.map((f: any) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    className={`admin-media-folder-chip ${mediaFolderFilter === f.id ? 'active' : ''}`}
+                    onClick={() => setMediaFolderFilter(f.id)}
+                    title={`${f._count?.assets ?? 0} arquivo(s)`}
+                  >
+                    <FolderOpen size={14} />
+                    {f.name} ({f._count?.assets ?? 0})
+                  </button>
+                ))}
+              </div>
+              <div className="admin-media-folders__create">
+                <input
+                  type="text"
+                  value={newMediaFolderName}
+                  onChange={(e) => setNewMediaFolderName(e.target.value)}
+                  placeholder="Nome da nova pasta"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void createMediaFolder();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn-secondary-sm"
+                  disabled={mediaFolderSaving || !newMediaFolderName.trim()}
+                  onClick={() => void createMediaFolder()}
+                >
+                  <FolderPlus size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
+                  {mediaFolderSaving ? 'Criando...' : 'Nova pasta'}
+                </button>
+                {mediaFolderFilter !== 'all' && mediaFolderFilter !== 'none' && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-secondary-sm"
+                      onClick={() => {
+                        const folder = mediaFolders.find((f: any) => f.id === mediaFolderFilter);
+                        if (folder) void renameMediaFolder(folder);
+                      }}
+                    >
+                      Renomear pasta
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-danger-sm"
+                      onClick={() => {
+                        const folder = mediaFolders.find((f: any) => f.id === mediaFolderFilter);
+                        if (folder) void deleteMediaFolder(folder);
+                      }}
+                    >
+                      Excluir pasta
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <h3>Biblioteca ({filteredMediaAssets.length})</h3>
               <div className="admin-search-bar" style={{ marginBottom: 0, minWidth: 260 }}>
@@ -3411,7 +3647,7 @@ export const Admin: React.FC = () => {
                 <input
                   value={mediaSearch}
                   onChange={(e) => setMediaSearch(e.target.value)}
-                  placeholder="Buscar por nome, tipo ou URL..."
+                  placeholder="Buscar por nome, tipo, pasta ou URL..."
                 />
               </div>
             </div>
@@ -3421,6 +3657,7 @@ export const Admin: React.FC = () => {
                   <tr>
                     <th>Tipo</th>
                     <th>Arquivo</th>
+                    <th>Pasta</th>
                     <th>Tamanho</th>
                     <th>Criado em</th>
                     <th />
@@ -3429,7 +3666,7 @@ export const Admin: React.FC = () => {
                 <tbody>
                   {filteredMediaAssets.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: 26, color: 'var(--text-secondary)' }}>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: 26, color: 'var(--text-secondary)' }}>
                         Nenhuma mídia encontrada.
                       </td>
                     </tr>
@@ -3454,6 +3691,18 @@ export const Admin: React.FC = () => {
                           <td style={{ maxWidth: 400 }}>
                             <div style={{ fontWeight: 600, marginBottom: 3 }}>{m.originalName}</div>
                             <code>{fileUrl.replace(window.location.origin, '')}</code>
+                          </td>
+                          <td style={{ minWidth: 160 }}>
+                            <select
+                              className="admin-media-move-select"
+                              value={m.folderId || ''}
+                              onChange={(e) => void moveMediaToFolder(m.id, e.target.value)}
+                            >
+                              <option value="">Sem pasta</option>
+                              {mediaFolders.map((f: any) => (
+                                <option key={f.id} value={f.id}>{f.name}</option>
+                              ))}
+                            </select>
                           </td>
                           <td>{Math.max(1, Math.round(Number(m.sizeBytes || 0) / 1024))} KB</td>
                           <td>{new Date(m.createdAt).toLocaleString('pt-BR')}</td>
@@ -3483,6 +3732,7 @@ export const Admin: React.FC = () => {
                                     return;
                                   }
                                   void fetchMediaAssets();
+                                  void fetchMediaFolders();
                                 }}
                               >
                                 Excluir
@@ -3737,12 +3987,20 @@ export const Admin: React.FC = () => {
                   </p>
                 </div>
                 <textarea
-                  rows={5}
-                  placeholder="HTML do e-mail de reset em PT (vazio = padrão)"
+                  rows={12}
+                  placeholder="HTML do e-mail de reset em PT"
                   value={emailSettings.reset_template_pt}
                   onChange={e => setEmailSettings(p => ({ ...p, reset_template_pt: e.target.value }))}
                   style={{ fontFamily: 'monospace', fontSize: '12px' }}
                 />
+                <button
+                  type="button"
+                  className="btn-secondary-sm"
+                  style={{ alignSelf: 'flex-start', marginTop: 4 }}
+                  onClick={() => setEmailSettings((p) => ({ ...p, reset_template_pt: DEFAULT_RESET_TEMPLATE_PT }))}
+                >
+                  Restaurar modelo de recuperação
+                </button>
                 <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
                   Apenas templates em português são editáveis aqui. Compradores de países hispanohablantes seguem recebendo o modelo padrão em espanhol do sistema.
                 </p>
@@ -3752,26 +4010,7 @@ export const Admin: React.FC = () => {
                 type="button"
                 className="login-submit-btn"
                 disabled={emailSaving}
-                onClick={async () => {
-                  setEmailSaving(true);
-                  try {
-                    const res = await fetch('/api/admin/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                      body: JSON.stringify({
-                        ...emailSettings,
-                        welcome_template_es: '',
-                        reset_template_es: ''
-                      })
-                    });
-                    if (res.ok) {
-                      alert('Configurações salvas com sucesso!');
-                      void fetchEmailSettings();
-                    } else {
-                      alert('Erro ao salvar configurações.');
-                    }
-                  } catch { alert('Erro de conexão.'); } finally { setEmailSaving(false); }
-                }}
+                onClick={() => void saveEmailSettings()}
                 style={{ 
                   marginTop: '10px', 
                   background: 'var(--accent-primary)', 

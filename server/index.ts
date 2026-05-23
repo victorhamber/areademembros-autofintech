@@ -20,6 +20,7 @@ import { hashMemberPassword, verifyUserPassword } from './lib/verifyUserPassword
 import { adminAuthMiddleware } from './middleware/adminAuth.js';
 import { validateAdminCredentials } from './lib/adminPassword.js';
 import { ensureDevTestAccount } from './lib/ensureDevTestAccount.js';
+import { DEFAULT_RESET_TEMPLATE_PT } from '../shared/emailTemplates.js';
 import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.js';
 
 const DEFAULT_PASSWORD = 'Mudar123@';
@@ -532,28 +533,10 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     if (!template) {
       template = lang === 'es'
-        ? `<div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:20px auto;padding:40px;border-radius:16px;background-color:#ffffff;box-shadow:0 4px 20px rgba(0,0,0,0.05);border:1px solid #f0f0f0;">
-            <div style="text-align:center;margin-bottom:30px;">
-              <img src="https://readlyme.com/logo.png" alt="Readlyme" style="width:180px;">
-            </div>
-            <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">Recuperación de Contraseña</h1>
-            <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Hola {{name}}, recibimos una solicitud para restablecer tu contraseña. Si no fuiste tú, puedes ignorar este correo.</p>
-            <div style="text-align:center;margin:30px 0;">
-              <a href="{{reset_link}}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Cambiar mi Contraseña</a>
-            </div>
-            <p style="color:#888;font-size:12px;text-align:center;margin-top:30px;">Este enlace caducará en 1 hora por motivos de seguridad.</p>
-          </div>`
-        : `<div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:20px auto;padding:40px;border-radius:16px;background-color:#ffffff;box-shadow:0 4px 20px rgba(0,0,0,0.05);border:1px solid #f0f0f0;">
-            <div style="text-align:center;margin-bottom:30px;">
-              <img src="https://readlyme.com/logo.png" alt="Readlyme" style="width:180px;">
-            </div>
-            <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">Recuperação de Senha</h1>
-            <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Olá {{name}}, recebemos uma solicitação para redefinir sua senha. Se não foi você, pode ignorar este e-mail.</p>
-            <div style="text-align:center;margin:30px 0;">
-              <a href="{{reset_link}}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Alterar minha Senha</a>
-            </div>
-            <p style="color:#888;font-size:12px;text-align:center;margin-top:30px;">Este link expirará em 1 hora por motivos de segurança.</p>
-          </div>`;
+        ? DEFAULT_RESET_TEMPLATE_PT.replace('Recuperação de senha', 'Recuperación de contraseña')
+            .replace('Olá, {{name}}', 'Hola, {{name}}')
+            .replace('Redefinir minha senha', 'Restablecer contraseña')
+        : DEFAULT_RESET_TEMPLATE_PT;
     }
 
     const html = template
@@ -562,7 +545,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       .replace(/\{\{country\}\}/g, user.country || '-')
       .replace(/\{\{reset_link\}\}/g, resetLink);
 
-    const subject = lang === 'es' ? 'Recuperación de Contraseña - Readlyme' : 'Recuperação de Senha - Readlyme';
+    const subject = lang === 'es' ? 'Recuperación de contraseña - Autofintech' : 'Recuperação de senha - Autofintech';
     await sendEmail(prisma, user.email, subject, html);
 
     res.json({ success: true });
@@ -971,9 +954,72 @@ app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), (req, 
   res.json({ url: fileUrl });
 });
 
+async function resolveMediaFolderId(raw: unknown): Promise<string | null | 'invalid'> {
+  const value = String(raw ?? '').trim();
+  if (!value) return null;
+  const folder = await prisma.mediaFolder.findUnique({ where: { id: value } });
+  return folder ? folder.id : 'invalid';
+}
+
+app.get('/api/admin/media-folders', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const rows = await prisma.mediaFolder.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      include: { _count: { select: { assets: true } } },
+    });
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: 'Falha ao listar pastas.' });
+  }
+});
+
+app.post('/api/admin/media-folders', adminAuthMiddleware, async (req, res) => {
+  try {
+    const name = String(req.body?.name ?? '').trim();
+    if (!name) return res.status(400).json({ error: 'Informe o nome da pasta.' });
+    const created = await prisma.mediaFolder.create({ data: { name } });
+    res.json(created);
+  } catch {
+    res.status(500).json({ error: 'Falha ao criar pasta.' });
+  }
+});
+
+app.put('/api/admin/media-folders/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    const name = String(req.body?.name ?? '').trim();
+    if (!name) return res.status(400).json({ error: 'Informe o nome da pasta.' });
+    const updated = await prisma.mediaFolder.update({
+      where: { id },
+      data: { name },
+    });
+    res.json(updated);
+  } catch {
+    res.status(500).json({ error: 'Falha ao renomear pasta.' });
+  }
+});
+
+app.delete('/api/admin/media-folders/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    const folder = await prisma.mediaFolder.findUnique({ where: { id } });
+    if (!folder) return res.status(404).json({ error: 'Pasta não encontrada.' });
+    await prisma.mediaAsset.updateMany({ where: { folderId: id }, data: { folderId: null } });
+    await prisma.mediaFolder.delete({ where: { id } });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Falha ao excluir pasta.' });
+  }
+});
+
 app.get('/api/admin/media', adminAuthMiddleware, async (_req, res) => {
   try {
-    const rows = await prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' } });
+    const rows = await prisma.mediaAsset.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { folder: { select: { id: true, name: true } } },
+    });
     res.json(rows);
   } catch {
     res.status(500).json({ error: 'Falha ao listar mídias.' });
@@ -983,6 +1029,8 @@ app.get('/api/admin/media', adminAuthMiddleware, async (_req, res) => {
 app.post('/api/admin/media', adminAuthMiddleware, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    const folderId = await resolveMediaFolderId(req.body?.folderId);
+    if (folderId === 'invalid') return res.status(400).json({ error: 'Pasta inválida.' });
     const created = await prisma.mediaAsset.create({
       data: {
         originalName: String(req.file.originalname || req.file.filename),
@@ -990,17 +1038,41 @@ app.post('/api/admin/media', adminAuthMiddleware, upload.single('file'), async (
         url: `/uploads/${req.file.filename}`,
         mimeType: req.file.mimetype || null,
         kind: detectMediaKind(req.file.mimetype),
-        sizeBytes: Number(req.file.size || 0)
-      }
+        sizeBytes: Number(req.file.size || 0),
+        folderId,
+      },
     });
     const publicUrl = mediaAssetPublicFileUrl(created.id);
     const saved = await prisma.mediaAsset.update({
       where: { id: created.id },
       data: { url: publicUrl },
+      include: { folder: { select: { id: true, name: true } } },
     });
     res.json(saved);
   } catch {
     res.status(500).json({ error: 'Falha ao salvar mídia.' });
+  }
+});
+
+app.patch('/api/admin/media/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'folderId')) {
+      return res.status(400).json({ error: 'Informe folderId para mover o arquivo.' });
+    }
+    const folderId = await resolveMediaFolderId(req.body.folderId);
+    if (folderId === 'invalid') return res.status(400).json({ error: 'Pasta inválida.' });
+    const row = await prisma.mediaAsset.findUnique({ where: { id } });
+    if (!row) return res.status(404).json({ error: 'Mídia não encontrada.' });
+    const saved = await prisma.mediaAsset.update({
+      where: { id },
+      data: { folderId },
+      include: { folder: { select: { id: true, name: true } } },
+    });
+    res.json(saved);
+  } catch {
+    res.status(500).json({ error: 'Falha ao mover mídia.' });
   }
 });
 
@@ -1144,6 +1216,34 @@ app.get('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+app.post('/api/admin/email-settings', adminAuthMiddleware, async (req, res) => {
+  try {
+    const body = req.body as Record<string, string>;
+    const allowed = ['resend_api_key', 'sender_name', 'sender_email', 'welcome_template_pt', 'reset_template_pt'] as const;
+    for (const key of allowed) {
+      if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+      let value = String(body[key] ?? '');
+      if (key === 'resend_api_key' && value.startsWith('••')) continue;
+      if (key === 'sender_email') {
+        const email = value.trim();
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return res.status(400).json({ error: 'E-mail do remetente inválido. Verifique o domínio (ex.: contato@seudominio.com).' });
+        }
+        value = email;
+      }
+      await prisma.setting.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value },
+      });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Email settings save]', error);
+    res.status(500).json({ error: 'Falha ao salvar configurações de e-mail.' });
   }
 });
 
