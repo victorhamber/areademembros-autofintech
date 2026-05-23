@@ -20,7 +20,21 @@ import { hashMemberPassword, verifyUserPassword } from './lib/verifyUserPassword
 import { adminAuthMiddleware } from './middleware/adminAuth.js';
 import { validateAdminCredentials } from './lib/adminPassword.js';
 import { ensureDevTestAccount } from './lib/ensureDevTestAccount.js';
-import { DEFAULT_RESET_TEMPLATE_PT } from '../shared/emailTemplates.js';
+import {
+  detectMediaKind,
+  resolveStoredMediaMime,
+  resolveUploadMime,
+  safeUploadFilename,
+} from './lib/uploadMime.js';
+import {
+  applyEmailPlaceholders,
+  buildResetEmailHtml,
+  buildWelcomeEmailHtml,
+  DEFAULT_RESET_BODY_PT,
+  DEFAULT_WELCOME_BODY_PT,
+  emailBodyFromStored,
+  type EmailLang,
+} from '../shared/emailTemplates.js';
 import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.js';
 
 const DEFAULT_PASSWORD = 'Mudar123@';
@@ -169,56 +183,21 @@ function applySmartRouting(
 }
 
 async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name: string | null, password: string, country: string | null) {
-  const lang = detectLang(country);
+  const lang: EmailLang = detectLang(country) === 'es' ? 'es' : 'pt';
   const templateKey = lang === 'es' ? 'welcome_template_es' : 'welcome_template_pt';
-  let template = await getSetting(prismaClient, templateKey);
-
-  // Fallback default template
-  if (!template) {
-    template = lang === 'es'
-      ? `<div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:20px auto;padding:40px;border-radius:16px;background-color:#ffffff;box-shadow:0 4px 20px rgba(0,0,0,0.05);border:1px solid #f0f0f0;">
-          <div style="text-align:center;margin-bottom:30px;">
-            <img src="https://readlyme.com/logo.png" alt="Readlyme" style="width:180px;">
-          </div>
-          <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">¡Bienvenido(a), {{name}}!</h1>
-          <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Estamos felices de tenerte con nosotros. Tu acceso a la biblioteca premium de <strong>Readlyme</strong> ya está activo.</p>
-          <div style="background-color:#f9f9f9;padding:20px;border-radius:12px;margin-bottom:30px;">
-            <p style="margin:0 0 10px 0;color:#666;font-size:14px;">Tus datos de acceso:</p>
-            <p style="margin:0;color:#1a1a1a;font-size:16px;"><strong>E-mail:</strong> {{email}}</p>
-            <p style="margin:5px 0 0 0;color:#1a1a1a;font-size:16px;"><strong>Contraseña temporal:</strong> <code style="background:#eee;padding:2px 6px;border-radius:4px;">{{password}}</code></p>
-          </div>
-          <div style="text-align:center;">
-            <a href="{{app_url}}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Entrar a la Biblioteca</a>
-          </div>
-          <p style="color:#888;font-size:13px;text-align:center;margin-top:30px;">Recomendamos que cambies tu contraseña después de tu primer inicio de sesión.</p>
-        </div>`
-      : `<div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:20px auto;padding:40px;border-radius:16px;background-color:#ffffff;box-shadow:0 4px 20px rgba(0,0,0,0.05);border:1px solid #f0f0f0;">
-          <div style="text-align:center;margin-bottom:30px;">
-            <img src="https://readlyme.com/logo.png" alt="Readlyme" style="width:180px;">
-          </div>
-          <h1 style="color:#1a1a1a;font-size:24px;text-align:center;margin-bottom:20px;">Bem-vindo(a), {{name}}!</h1>
-          <p style="color:#444;font-size:16px;line-height:1.6;margin-bottom:25px;">Ficamos felizes em ter você conosco. Seu acesso à biblioteca premium da <strong>Readlyme</strong> já está liberado.</p>
-          <div style="background-color:#f9f9f9;padding:20px;border-radius:12px;margin-bottom:30px;">
-            <p style="margin:0 0 10px 0;color:#666;font-size:14px;">Seus dados de acesso:</p>
-            <p style="margin:0;color:#1a1a1a;font-size:16px;"><strong>E-mail:</strong> {{email}}</p>
-            <p style="margin:5px 0 0 0;color:#1a1a1a;font-size:16px;"><strong>Senha temporária:</strong> <code style="background:#eee;padding:2px 6px;border-radius:4px;">{{password}}</code></p>
-          </div>
-          <div style="text-align:center;">
-            <a href="{{app_url}}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;padding:16px 32px;text-decoration:none;border-radius:12px;font-weight:bold;font-size:16px;">Acessar Biblioteca</a>
-          </div>
-          <p style="color:#888;font-size:13px;text-align:center;margin-top:30px;">Recomendamos que troque sua senha após o primeiro login.</p>
-        </div>`;
-  }
-
+  const stored = await getSetting(prismaClient, templateKey);
+  const bodyPlain = emailBodyFromStored(stored, DEFAULT_WELCOME_BODY_PT);
   const appUrl = getAppUrl();
-  const html = template
-    .replace(/\{\{name\}\}/g, name || (lang === 'es' ? 'Lector(a)' : 'Leitor(a)'))
-    .replace(/\{\{email\}\}/g, email)
-    .replace(/\{\{password\}\}/g, password)
-    .replace(/\{\{country\}\}/g, country || '-')
-    .replace(/\{\{app_url\}\}/g, appUrl);
+  const html = applyEmailPlaceholders(buildWelcomeEmailHtml(bodyPlain, lang), {
+    name: name || (lang === 'es' ? 'Cliente' : 'Cliente'),
+    email,
+    password,
+    country: country || '-',
+    app_url: appUrl,
+  });
 
-  const subject = lang === 'es' ? '¡Bienvenido(a) a Readlyme! Tu acceso está listo' : 'Bem-vindo(a) à Readlyme! Seu acesso está pronto';
+  const subject =
+    lang === 'es' ? 'Bienvenido(a) a Autofintech — tu acceso está listo' : 'Bem-vindo(a) à Autofintech — seu acesso está pronto';
   await sendEmail(prismaClient, email, subject, html);
 }
 
@@ -253,21 +232,32 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    // Sanitize filename to prevent encoding issues
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '');
-    cb(null, uniqueSuffix + '-' + safeName);
-  }
+    const safeName = safeUploadFilename(file.originalname || 'arquivo');
+    cb(null, `${uniqueSuffix}-${safeName}`);
+  },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 80 * 1024 * 1024 },
+});
 
-function detectMediaKind(mimeTypeRaw: string | undefined): 'imagem' | 'video' | 'audio' | 'arquivo' {
-  const mime = String(mimeTypeRaw || '').toLowerCase();
-  if (mime.startsWith('image/')) return 'imagem';
-  if (mime.startsWith('video/')) return 'video';
-  if (mime.startsWith('audio/')) return 'audio';
-  return 'arquivo';
+function respondMediaUploadError(err: unknown, res: express.Response): boolean {
+  const code = (err as { code?: string }).code;
+  if (code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ error: 'Arquivo muito grande (máx. 80 MB).' });
+    return true;
+  }
+  if (err instanceof multer.MulterError) {
+    res.status(400).json({ error: `Falha no upload: ${err.message}` });
+    return true;
+  }
+  if (err) {
+    console.error('[Upload]', err);
+    res.status(500).json({ error: 'Falha ao processar o arquivo enviado.' });
+    return true;
+  }
+  return false;
 }
 
 function mediaAssetPublicFileUrl(id: string): string {
@@ -437,8 +427,7 @@ app.get('/api/public/media/:id/file', async (req, res) => {
     const filePath = resolveMediaAssetFilePath(media.storedName);
     if (!filePath) return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
 
-    const mimeType = String(media.mimeType || '').trim();
-    if (mimeType) res.type(mimeType);
+    res.type(resolveStoredMediaMime(media.mimeType, media.storedName));
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.sendFile(filePath);
   } catch {
@@ -456,8 +445,7 @@ app.get('/api/public/media/:id/download', async (req, res) => {
     const filePath = resolveMediaAssetFilePath(media.storedName);
     if (!filePath) return res.status(404).json({ error: 'Arquivo não encontrado no servidor.' });
 
-    const mimeType = String(media.mimeType || '').trim();
-    if (mimeType) res.type(mimeType);
+    res.type(resolveStoredMediaMime(media.mimeType, media.storedName));
     return res.download(filePath, media.originalName || media.storedName);
   } catch {
     return res.status(500).json({ error: 'Falha ao baixar arquivo.' });
@@ -525,25 +513,20 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     // Send reset email
     const lang = detectLang(user.country);
-    const templateKey = lang === 'es' ? 'reset_template_es' : 'reset_template_pt';
-    let template = await getSetting(prisma, templateKey);
+    const emailLang: EmailLang = lang === 'es' ? 'es' : 'pt';
+    const templateKey = emailLang === 'es' ? 'reset_template_es' : 'reset_template_pt';
+    const stored = await getSetting(prisma, templateKey);
+    const bodyPlain = emailBodyFromStored(stored, DEFAULT_RESET_BODY_PT);
 
     const appUrl = getAppUrl();
     const resetLink = `${appUrl}?reset_token=${token}&user_id=${user.id}`;
 
-    if (!template) {
-      template = lang === 'es'
-        ? DEFAULT_RESET_TEMPLATE_PT.replace('Recuperação de senha', 'Recuperación de contraseña')
-            .replace('Olá, {{name}}', 'Hola, {{name}}')
-            .replace('Redefinir minha senha', 'Restablecer contraseña')
-        : DEFAULT_RESET_TEMPLATE_PT;
-    }
-
-    const html = template
-      .replace(/\{\{name\}\}/g, user.name || (lang === 'es' ? 'Usuario' : 'Usuário'))
-      .replace(/\{\{email\}\}/g, user.email)
-      .replace(/\{\{country\}\}/g, user.country || '-')
-      .replace(/\{\{reset_link\}\}/g, resetLink);
+    const html = applyEmailPlaceholders(buildResetEmailHtml(bodyPlain, emailLang), {
+      name: user.name || (emailLang === 'es' ? 'Usuario' : 'Usuário'),
+      email: user.email,
+      country: user.country || '-',
+      reset_link: resetLink,
+    });
 
     const subject = lang === 'es' ? 'Recuperación de contraseña - Autofintech' : 'Recuperação de senha - Autofintech';
     await sendEmail(prisma, user.email, subject, html);
@@ -1026,18 +1009,25 @@ app.get('/api/admin/media', adminAuthMiddleware, async (_req, res) => {
   }
 });
 
-app.post('/api/admin/media', adminAuthMiddleware, upload.single('file'), async (req, res) => {
+app.post('/api/admin/media', adminAuthMiddleware, (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (respondMediaUploadError(err, res)) return;
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     const folderId = await resolveMediaFolderId(req.body?.folderId);
     if (folderId === 'invalid') return res.status(400).json({ error: 'Pasta inválida.' });
+    const originalName = String(req.file.originalname || req.file.filename);
+    const mimeType = resolveUploadMime(req.file.mimetype, originalName);
     const created = await prisma.mediaAsset.create({
       data: {
-        originalName: String(req.file.originalname || req.file.filename),
+        originalName,
         storedName: String(req.file.filename),
         url: `/uploads/${req.file.filename}`,
-        mimeType: req.file.mimetype || null,
-        kind: detectMediaKind(req.file.mimetype),
+        mimeType,
+        kind: detectMediaKind(req.file.mimetype, originalName),
         sizeBytes: Number(req.file.size || 0),
         folderId,
       },
@@ -1559,6 +1549,7 @@ if (fs.existsSync(distPath)) {
       res.status(404).type('text/plain; charset=utf-8').send('Arquivo não encontrado.');
       return;
     }
+    res.type(resolveStoredMediaMime(null, filename));
     res.sendFile(filePath);
   });
 

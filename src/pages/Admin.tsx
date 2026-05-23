@@ -1,7 +1,11 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, FolderPlus, Image as ImageIcon, Film, Music2, File as FileIcon } from 'lucide-react';
 import { resolveProductForLicense } from '@shared/licenseProductMatch';
-import { DEFAULT_RESET_TEMPLATE_PT } from '@shared/emailTemplates';
+import {
+  DEFAULT_RESET_BODY_PT,
+  DEFAULT_WELCOME_BODY_PT,
+  emailBodyFromStored,
+} from '@shared/emailTemplates';
 import { MEMBER_THEME_DEFAULTS, type MemberThemeKey } from '@shared/memberTheme';
 import './Admin.css';
 
@@ -346,8 +350,8 @@ export const Admin: React.FC = () => {
   // -- EMAIL SETTINGS STATE --
   const [emailSettings, setEmailSettings] = useState<Record<string, string>>({
     resend_api_key: '', sender_name: '', sender_email: '',
-    welcome_template_pt: '',
-    reset_template_pt: DEFAULT_RESET_TEMPLATE_PT,
+    welcome_template_pt: DEFAULT_WELCOME_BODY_PT,
+    reset_template_pt: DEFAULT_RESET_BODY_PT,
     member_hero_background_url: '',
     member_hero_kicker: '',
     member_support_url: '',
@@ -842,11 +846,11 @@ export const Admin: React.FC = () => {
       const res = await fetch('/api/admin/settings', { headers: h });
       if (res.ok) {
         const data = await res.json();
-        const resetPt = String(data.reset_template_pt || '').trim();
         setEmailSettings((prev) => ({
           ...prev,
           ...data,
-          reset_template_pt: resetPt || DEFAULT_RESET_TEMPLATE_PT,
+          welcome_template_pt: emailBodyFromStored(data.welcome_template_pt, DEFAULT_WELCOME_BODY_PT),
+          reset_template_pt: emailBodyFromStored(data.reset_template_pt, DEFAULT_RESET_BODY_PT),
         }));
         if (!builderLoadedOnce) {
           const pagesRaw = String(data?.[PAGE_BUILDER_PAGES_SETTING_KEY] || '').trim();
@@ -1089,8 +1093,8 @@ export const Admin: React.FC = () => {
           resend_api_key: emailSettings.resend_api_key ?? '',
           sender_name: emailSettings.sender_name ?? '',
           sender_email: emailSettings.sender_email ?? '',
-          welcome_template_pt: emailSettings.welcome_template_pt ?? '',
-          reset_template_pt: emailSettings.reset_template_pt ?? DEFAULT_RESET_TEMPLATE_PT,
+          welcome_template_pt: emailSettings.welcome_template_pt ?? DEFAULT_WELCOME_BODY_PT,
+          reset_template_pt: emailSettings.reset_template_pt ?? DEFAULT_RESET_BODY_PT,
         }),
       });
       const j = (await res.json().catch(() => ({}))) as { error?: string };
@@ -3503,6 +3507,7 @@ export const Admin: React.FC = () => {
               <label>Arquivo</label>
               <input
                 type="file"
+                accept="image/*,.webp,video/*,audio/*,.pdf,.zip"
                 onChange={(e) => setMediaFile(e.target?.files?.[0] || null)}
               />
               {mediaFile && (
@@ -3966,43 +3971,56 @@ export const Admin: React.FC = () => {
               }}>
                 <h4 style={{ margin: '0 0 5px 0', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇧🇷 Português (Brasil)</h4>
                 
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+                  Edite apenas o <strong>texto</strong> dos e-mails. O layout visual (cores, botão e cabeçalho Autofintech) é aplicado automaticamente no envio.
+                </p>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ marginTop: '0' }}>E-mail de Boas-vindas</label>
                   <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
-                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'}
+                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'} — use linha em branco entre parágrafos.
                   </p>
                 </div>
                 <textarea
-                  rows={5}
-                  placeholder="HTML do e-mail em PT (vazio = padrão)"
+                  rows={8}
+                  className="admin-email-body-text"
+                  placeholder="Texto do e-mail de boas-vindas..."
                   value={emailSettings.welcome_template_pt}
                   onChange={e => setEmailSettings(p => ({ ...p, welcome_template_pt: e.target.value }))}
-                  style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '10px' }}
+                  style={{ marginBottom: '10px' }}
                 />
+                <button
+                  type="button"
+                  className="btn-secondary-sm"
+                  style={{ alignSelf: 'flex-start', marginBottom: 14 }}
+                  onClick={() => setEmailSettings((p) => ({ ...p, welcome_template_pt: DEFAULT_WELCOME_BODY_PT }))}
+                >
+                  Restaurar texto de boas-vindas
+                </button>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ marginTop: '0' }}>Recuperação de Senha</label>
                   <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
-                    Placeholders: {'{{name}}'}, {'{{reset_link}}'}
+                    Placeholders: {'{{name}}'}, {'{{reset_link}}'} — o botão &quot;Redefinir senha&quot; é incluído automaticamente.
                   </p>
                 </div>
                 <textarea
-                  rows={12}
-                  placeholder="HTML do e-mail de reset em PT"
+                  rows={8}
+                  className="admin-email-body-text"
+                  placeholder="Texto do e-mail de recuperação de senha..."
                   value={emailSettings.reset_template_pt}
                   onChange={e => setEmailSettings(p => ({ ...p, reset_template_pt: e.target.value }))}
-                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
                 />
                 <button
                   type="button"
                   className="btn-secondary-sm"
                   style={{ alignSelf: 'flex-start', marginTop: 4 }}
-                  onClick={() => setEmailSettings((p) => ({ ...p, reset_template_pt: DEFAULT_RESET_TEMPLATE_PT }))}
+                  onClick={() => setEmailSettings((p) => ({ ...p, reset_template_pt: DEFAULT_RESET_BODY_PT }))}
                 >
-                  Restaurar modelo de recuperação
+                  Restaurar texto de recuperação
                 </button>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
-                  Apenas templates em português são editáveis aqui. Compradores de países hispanohablantes seguem recebendo o modelo padrão em espanhol do sistema.
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '12px 0 0' }}>
+                  Apenas textos em português são editáveis aqui. Compradores de países hispanohablantes seguem o modelo padrão em espanhol do sistema.
                 </p>
               </div>
 
@@ -4033,8 +4051,8 @@ export const Admin: React.FC = () => {
               <ul style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.7, paddingLeft: '18px' }}>
                 <li>Usamos o provedor <strong>Resend</strong> para envio de e-mails transacionais.</li>
                 <li>O token é salvo no banco de dados e usado apenas no backend.</li>
-                <li>Os templates aceitam placeholders que serão substituídos automaticamente.</li>
-                <li>Se o template estiver vazio, um template padrão será usado.</li>
+                <li>Os textos aceitam placeholders substituídos automaticamente no envio.</li>
+                <li>O design do e-mail (layout) é fixo; você edita somente a mensagem.</li>
                 <li>Novos compradores recebem a senha padrão <code>Mudar123@</code>.</li>
                 <li>O idioma do e-mail é definido automaticamente pelo país do comprador.</li>
               </ul>

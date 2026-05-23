@@ -2355,6 +2355,25 @@
   font-size: 13px;
 }
 
+.admin-email-body-text {
+  width: 100%;
+  min-height: 140px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-main);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.admin-email-body-text:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+}
+
 .admin-media-move-select,
 .admin-form select {
   width: 100%;
