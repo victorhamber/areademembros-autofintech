@@ -73,14 +73,18 @@ export async function processLicenseWebhook(prisma: PrismaClient, data: Record<s
 async function ensureUser(prisma: PrismaClient, email: string, buyerName: string) {
   const em = email.toLowerCase().trim();
   let user = await prisma.user.findUnique({ where: { email: em } });
+  let isNewUser = false;
   if (!user) {
+    const { hashMemberPassword } = await import('../lib/verifyUserPassword.js');
+    const DEFAULT_PASSWORD = 'Mudar123@';
     user = await prisma.user.create({
-      data: { email: em, name: buyerName || null, password: null }
+      data: { email: em, name: buyerName || null, password: hashMemberPassword(DEFAULT_PASSWORD) }
     });
+    isNewUser = true;
   } else if (buyerName && !user.name) {
     user = await prisma.user.update({ where: { id: user.id }, data: { name: buyerName } });
   }
-  return user;
+  return { user, isNewUser };
 }
 
 async function activateLicense(prisma: PrismaClient, data: Record<string, unknown>) {
@@ -104,7 +108,10 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
   const plano = product?.plano || 'mensal';
   const data_expiracao = addDuration(plano);
 
-  await ensureUser(prisma, email, buyer_name);
+  const { isNewUser } = await ensureUser(prisma, email, buyer_name);
+  if (isNewUser) {
+    log('INFO', `Novo usuário criado via webhook de licença: ${email} (senha padrão: Mudar123@)`);
+  }
 
   for (const [idx, system_id] of systemIds.entries()) {
     const isFirst = idx === 0;

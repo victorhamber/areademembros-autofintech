@@ -285,7 +285,8 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
 
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      user = await prisma.user.create({ data: { email, name: name || null, password: null } });
+      const { hashMemberPassword } = await import('../lib/verifyUserPassword.js');
+      user = await prisma.user.create({ data: { email, name: name || null, password: hashMemberPassword('Mudar123@') } });
     }
 
     const ebooks = await prisma.ebook.findMany({ where: { licenseSystemId: systemId } });

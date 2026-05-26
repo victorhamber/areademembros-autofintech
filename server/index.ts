@@ -761,7 +761,7 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
       let isNewUser = false;
       if (!user) {
         user = await prisma.user.create({
-          data: { email: buyerEmail, name: buyerName, password: DEFAULT_PASSWORD, country: buyerCountry }
+          data: { email: buyerEmail, name: buyerName, password: hashMemberPassword(DEFAULT_PASSWORD), country: buyerCountry }
         });
         isNewUser = true;
       } else {
@@ -1130,11 +1130,12 @@ app.get('/api/admin/users', adminAuthMiddleware, async (req, res) => {
 
 app.post('/api/admin/users', adminAuthMiddleware, async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, name } = req.body;
+    const pwd = String(req.body.password || '').trim() || DEFAULT_PASSWORD;
     const user = await prisma.user.create({
       data: {
         email,
-        password,
+        password: hashMemberPassword(pwd),
         name: name != null && String(name).trim() ? String(name).trim() : null
       }
     });
