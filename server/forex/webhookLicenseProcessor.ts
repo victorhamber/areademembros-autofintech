@@ -3,6 +3,7 @@ import { log } from '../lib/logger.js';
 import { grantEbookAccessForSystem, revokeEbookAccessForSystem } from './licenseService.js';
 import { postRobotJson } from './robotNotify.js';
 import { parseCsv, csvIncludes } from '../lib/csv.js';
+import { sendWelcomeEmail } from '../lib/welcomeEmail.js';
 
 async function findProductByOfferCode(prisma: PrismaClient, offerCode: string) {
   const code = offerCode.trim();
@@ -111,6 +112,9 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
   const { isNewUser } = await ensureUser(prisma, email, buyer_name);
   if (isNewUser) {
     log('INFO', `Novo usuário criado via webhook de licença: ${email} (senha padrão: Mudar123@)`);
+    sendWelcomeEmail(prisma, email, buyer_name || null, 'Mudar123@', null).catch(err =>
+      log('ERROR', `Falha ao enviar e-mail de boas-vindas para ${email}: ${err}`)
+    );
   }
 
   for (const [idx, system_id] of systemIds.entries()) {

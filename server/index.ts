@@ -33,13 +33,12 @@ import { assertUploadDirectoryWritable, resolveUploadDirectory } from './lib/upl
 import {
   applyEmailPlaceholders,
   buildResetEmailHtml,
-  buildWelcomeEmailHtml,
   DEFAULT_RESET_BODY_PT,
-  DEFAULT_WELCOME_BODY_PT,
   emailBodyFromStored,
   type EmailLang,
 } from '../shared/emailTemplates.js';
 import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.js';
+import { sendWelcomeEmail, detectLang } from './lib/welcomeEmail.js';
 import {
   findBuilderPageBySlug,
   isBuilderPagePublished,
@@ -57,9 +56,6 @@ function getAppUrl() {
   const raw = (process.env.APP_URL || DEFAULT_APP_URL).trim();
   return raw.endsWith('/') ? raw.slice(0, -1) : raw;
 }
-
-// Spanish-speaking country ISO codes
-const ES_COUNTRIES = ['AR','BO','CL','CO','CR','CU','DO','EC','SV','GQ','GT','HN','MX','NI','PA','PY','PE','ES','UY','VE'];
 
 // ==========================================
 // EMAIL HELPER (RESEND)
@@ -89,11 +85,6 @@ async function sendEmail(prismaClient: PrismaClient, to: string, subject: string
   } catch (err) {
     console.error('[Email] Failed to send:', err);
   }
-}
-
-function detectLang(country: string | null | undefined): 'es' | 'pt' {
-  if (!country) return 'pt';
-  return ES_COUNTRIES.includes(country.toUpperCase()) ? 'es' : 'pt';
 }
 
 function normalizeShortLinkSlug(raw: string): string {
@@ -193,25 +184,6 @@ function applySmartRouting(
   } catch {
     return targetUrl;
   }
-}
-
-async function sendWelcomeEmail(prismaClient: PrismaClient, email: string, name: string | null, password: string, country: string | null) {
-  const lang: EmailLang = detectLang(country) === 'es' ? 'es' : 'pt';
-  const templateKey = lang === 'es' ? 'welcome_template_es' : 'welcome_template_pt';
-  const stored = await getSetting(prismaClient, templateKey);
-  const bodyPlain = emailBodyFromStored(stored, DEFAULT_WELCOME_BODY_PT);
-  const appUrl = getAppUrl();
-  const html = applyEmailPlaceholders(buildWelcomeEmailHtml(bodyPlain, lang), {
-    name: name || (lang === 'es' ? 'Cliente' : 'Cliente'),
-    email,
-    password,
-    country: country || '-',
-    app_url: appUrl,
-  });
-
-  const subject =
-    lang === 'es' ? 'Bienvenido(a) a Autofintech — tu acceso está listo' : 'Bem-vindo(a) à Autofintech — seu acesso está pronto';
-  await sendEmail(prismaClient, email, subject, html);
 }
 
 // ES Modules directory name polyfill
