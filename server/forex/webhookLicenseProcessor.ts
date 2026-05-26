@@ -265,58 +265,74 @@ async function deactivateLicense(prisma: PrismaClient, data: Record<string, unkn
 
   if (!email) return { ok: false, status: 400, message: 'Email obrigatório para desativação' };
 
-  let license = null as Awaited<ReturnType<typeof prisma.license.findFirst>> | null;
+  const productId = extractProductId(data);
+
+  // --- 1) Desativar licença(s) do produto específico ---
+  let licensesDeactivated = 0;
+  let deactivatedSystemIds: string[] = [];
+
+  // Tentar encontrar por subscriber_code (mais preciso)
   if (subscriber_code) {
-    license = await prisma.license.findFirst({
+    const bySubscriber = await prisma.license.findMany({
       where: { subscriberCode: subscriber_code, email, statusLicenca: 'ativa' }
     });
-  }
-  if (!license && event_id) {
-    license = await prisma.license.findFirst({ where: { eventId: event_id, statusLicenca: 'ativa' } });
-  }
-  let productSystemIds: string[] = [];
-  if (!license && offer_code) {
-    const product = await findProductByOfferCode(prisma, offer_code);
-    productSystemIds = parseCsv(product?.systemId || '');
-    if (productSystemIds.length) {
-      const list = await prisma.license.findMany({
-        where: { email, systemId: { in: productSystemIds }, statusLicenca: 'ativa' },
-        orderBy: { id: 'desc' }
-      });
-      if (list.length) license = list[0];
-    }
-  }
-  if (!license) {
-    license = await prisma.license.findFirst({
-      where: { email, statusLicenca: 'ativa' },
-      orderBy: { id: 'desc' }
-    });
-  }
-
-  // Desativar licenças encontradas
-  if (license) {
-    const targets = productSystemIds.length ? productSystemIds : [license.systemId];
-    const toDeactivate = await prisma.license.findMany({
-      where: { email, systemId: { in: targets }, statusLicenca: 'ativa' }
-    });
-    for (const lic of toDeactivate) {
+    for (const lic of bySubscriber) {
       await prisma.license.update({
         where: { id: lic.id },
         data: { statusLicenca: 'desativada', dataCancelamento: new Date() }
       });
-      if (lic.systemId) await revokeContentAccessForSystem(prisma, email, lic.systemId);
+      if (lic.systemId) deactivatedSystemIds.push(lic.systemId);
       await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
-        email: lic.email,
-        numero_conta: lic.numeroConta,
-        system_id: lic.systemId,
-        event_id
+        email: lic.email, numero_conta: lic.numeroConta, system_id: lic.systemId, event_id
       });
+      licensesDeactivated++;
     }
-    log('INFO', `Licenças desativadas para ${email}`);
   }
 
-  // Revogar acesso ao conteúdo pelo offerCode
-  const productId = extractProductId(data);
+  // Tentar por event_id (transaction)
+  if (!licensesDeactivated && event_id) {
+    const byEvent = await prisma.license.findFirst({ where: { eventId: event_id, statusLicenca: 'ativa' } });
+    if (byEvent) {
+      await prisma.license.update({
+        where: { id: byEvent.id },
+        data: { statusLicenca: 'desativada', dataCancelamento: new Date() }
+      });
+      if (byEvent.systemId) deactivatedSystemIds.push(byEvent.systemId);
+      await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
+        email: byEvent.email, numero_conta: byEvent.numeroConta, system_id: byEvent.systemId, event_id
+      });
+      licensesDeactivated++;
+    }
+  }
+
+  // Tentar por offer_code → product → systemId
+  if (!licensesDeactivated && offer_code) {
+    const product = await findProductByOfferCode(prisma, offer_code);
+    const systemIds = parseCsv(product?.systemId || '');
+    if (systemIds.length) {
+      const bySystem = await prisma.license.findMany({
+        where: { email, systemId: { in: systemIds }, statusLicenca: 'ativa' }
+      });
+      for (const lic of bySystem) {
+        await prisma.license.update({
+          where: { id: lic.id },
+          data: { statusLicenca: 'desativada', dataCancelamento: new Date() }
+        });
+        if (lic.systemId) deactivatedSystemIds.push(lic.systemId);
+        await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
+          email: lic.email, numero_conta: lic.numeroConta, system_id: lic.systemId, event_id
+        });
+        licensesDeactivated++;
+      }
+    }
+  }
+
+  // NÃO usar fallback genérico — se não encontrou licença específica, não desativa nenhuma
+  if (licensesDeactivated > 0) {
+    log('INFO', `${licensesDeactivated} licença(s) desativada(s) para ${email} (event=${event_id}, offer=${offer_code})`);
+  }
+
+  // --- 2) Revogar acesso ao conteúdo do produto reembolsado (mas preservar outros) ---
   const searchCode = offer_code || productId;
   if (searchCode) {
     const user = await prisma.user.findUnique({ where: { email } });
@@ -333,21 +349,93 @@ async function deactivateLicense(prisma: PrismaClient, data: Record<string, unkn
         const codes = c.hotmartOffer.split(',').map(s => s.trim());
         return codes.includes(offer_code) || codes.includes(productId);
       });
+
       if (contentsToRevoke.length > 0) {
+        // Verificar quais conteúdos o usuário tem acesso por OUTROS produtos/licenças ativos
+        const otherActiveLicenses = await prisma.license.findMany({
+          where: { email, statusLicenca: 'ativa' }
+        });
+        const otherActiveSystemIds = otherActiveLicenses
+          .map(l => l.systemId)
+          .filter(s => s && !deactivatedSystemIds.includes(s));
+
+        // Conteúdos protegidos por outras licenças ativas
+        const protectedByOtherLicense = new Set<string>();
+        if (otherActiveSystemIds.length > 0) {
+          const protectedContents = await prisma.content.findMany({
+            where: { licenseSystemId: { in: otherActiveSystemIds } },
+            select: { id: true }
+          });
+          for (const pc of protectedContents) protectedByOtherLicense.add(pc.id);
+        }
+
+        // Verificar se o conteúdo está vinculado a outro offerCode que o usuário ainda possui
+        const allUserPurchases = await prisma.purchase.findMany({
+          where: { userId: user.id },
+          select: { contentId: true }
+        });
+        const userContentIds = new Set(allUserPurchases.map(p => p.contentId));
+
         let idsToRemove: string[] = [];
         for (const c of contentsToRevoke) {
+          if (protectedByOtherLicense.has(c.id)) {
+            log('INFO', `Conteúdo "${c.title}" mantido — protegido por outra licença ativa`);
+            continue;
+          }
           idsToRemove.push(c.id);
           const bonuses = await prisma.content.findMany({ where: { parentContentId: c.id }, select: { id: true } });
-          idsToRemove.push(...bonuses.map(b => b.id));
+          for (const b of bonuses) {
+            if (!protectedByOtherLicense.has(b.id)) {
+              idsToRemove.push(b.id);
+            }
+          }
         }
-        await prisma.purchase.deleteMany({ where: { userId: user.id, contentId: { in: idsToRemove } } });
-        log('INFO', `Acesso ao conteúdo revogado: ${email} -> ${contentsToRevoke.map(c => c.title).join(', ')}`);
+
+        if (idsToRemove.length > 0) {
+          await prisma.purchase.deleteMany({ where: { userId: user.id, contentId: { in: idsToRemove } } });
+          log('INFO', `Acesso revogado: ${email} -> ${idsToRemove.length} conteúdo(s) (offer=${offer_code})`);
+        }
       }
     }
   }
 
-  if (!license && !searchCode) {
-    return { ok: false, status: 400, message: 'Licença ativa não encontrada' };
+  // Também revogar acesso a conteúdos por systemId desativado, respeitando outras licenças
+  if (deactivatedSystemIds.length > 0) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const otherActiveLicenses = await prisma.license.findMany({
+        where: { email, statusLicenca: 'ativa' }
+      });
+      const stillActiveSystemIds = otherActiveLicenses.map(l => l.systemId).filter(Boolean);
+
+      for (const sysId of deactivatedSystemIds) {
+        const contentsForSystem = await prisma.content.findMany({
+          where: { licenseSystemId: sysId },
+          select: { id: true, title: true }
+        });
+
+        for (const c of contentsForSystem) {
+          // Se outra licença ativa cobre este conteúdo, não revogar
+          const coveredByOther = await prisma.content.findFirst({
+            where: { id: c.id, licenseSystemId: { in: stillActiveSystemIds } }
+          });
+          if (coveredByOther) {
+            log('INFO', `Conteúdo "${c.title}" mantido — coberto por outra licença ativa`);
+            continue;
+          }
+          await prisma.purchase.deleteMany({ where: { userId: user.id, contentId: c.id } });
+          const bonuses = await prisma.content.findMany({ where: { parentContentId: c.id }, select: { id: true } });
+          if (bonuses.length) {
+            await prisma.purchase.deleteMany({ where: { userId: user.id, contentId: { in: bonuses.map(b => b.id) } } });
+          }
+        }
+      }
+    }
+  }
+
+  if (!licensesDeactivated && !searchCode) {
+    log('WARN', `Reembolso sem identificação de produto: ${email} event=${event_id} offer=${offer_code}`);
+    return { ok: true, status: 200, message: 'Webhook recebido mas nenhum produto específico identificado para desativação' };
   }
 
   return { ok: true, status: 200, message: 'Webhook processado com sucesso!' };
