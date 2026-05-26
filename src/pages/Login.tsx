@@ -71,7 +71,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
       }
 
       if (res.ok) {
-        if (data.token) localStorage.setItem('ebookpro_token', data.token);
+        if (data.token) localStorage.setItem('contentpro_token', data.token);
         if (data.id && data.email) onLogin(data.id, data.email);
         else alert(tr.login_error_fields);
       } else {
@@ -164,7 +164,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, lang, setLang }) => {
       });
       const loginData = (await loginRes.json().catch(() => ({}))) as { token?: string; id?: string; email?: string };
       if (loginRes.ok && loginData.token && loginData.id && loginData.email) {
-        localStorage.setItem('ebookpro_token', loginData.token);
+        localStorage.setItem('contentpro_token', loginData.token);
         onLogin(loginData.id, loginData.email);
         return;
       }

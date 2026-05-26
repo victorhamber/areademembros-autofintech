@@ -9,7 +9,7 @@ function isInsideProtectedContent(target: EventTarget | null): boolean {
 }
 
 export function setupSecurity() {
-  // Bloqueia menu/cópia só dentro de áreas explicitamente protegidas (ex.: leitor de ebook).
+  // Bloqueia menu/cópia só dentro de áreas explicitamente protegidas (ex.: leitor de conteúdo).
   document.addEventListener(
     'contextmenu',
     (e) => {

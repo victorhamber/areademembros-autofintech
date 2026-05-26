@@ -7,7 +7,7 @@ const SPANISH_COUNTRIES = new Set([
   'MX','NI','PA','PY','PE','PR','ES','UY','VE','GQ',
 ]);
 
-const STORAGE_KEY = 'ebookpro_lang';
+const STORAGE_KEY = 'contentpro_lang';
 
 function detectFromBrowser(): Lang {
   const nav = navigator.language || (navigator as any).userLanguage || '';

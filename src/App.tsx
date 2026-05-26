@@ -16,7 +16,7 @@ import './App.css'
 
 type MemberTab = 'home' | 'courses' | 'downloads' | 'validation' | 'ranking' | 'profile'
 
-const MEMBER_TAB_KEY = 'ebookpro_member_tab'
+const MEMBER_TAB_KEY = 'contentpro_member_tab'
 const MEMBER_TABS: MemberTab[] = ['home', 'courses', 'downloads', 'validation', 'ranking', 'profile']
 
 type MemberThemeSettings = {
@@ -170,9 +170,9 @@ function App() {
   const tr = t(lang)
 
   const [routePathname, setRoutePathname] = useState(() => window.location.pathname)
-  const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('ebookpro_userId'))
-  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('ebookpro_userEmail'))
-  const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('ebookpro_userName'))
+  const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('contentpro_userId'))
+  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('contentpro_userEmail'))
+  const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('contentpro_userName'))
   const [activeTab, setActiveTabState] = useState<MemberTab>(readStoredMemberTab)
   const setActiveTab = (tab: MemberTab) => {
     setActiveTabState(tab)
@@ -190,7 +190,7 @@ function App() {
   const authHeaders = (json = false): Record<string, string> => {
     const h: Record<string, string> = {}
     if (userId) h['x-user-id'] = userId
-    const tok = localStorage.getItem('ebookpro_token')
+    const tok = localStorage.getItem('contentpro_token')
     if (tok) h['Authorization'] = `Bearer ${tok}`
     if (json) h['Content-Type'] = 'application/json'
     return h
@@ -199,23 +199,23 @@ function App() {
   const handleLogin = (id: string, email: string) => {
     setUserId(id)
     setUserEmail(email)
-    localStorage.setItem('ebookpro_userId', id)
-    localStorage.setItem('ebookpro_userEmail', email)
+    localStorage.setItem('contentpro_userId', id)
+    localStorage.setItem('contentpro_userEmail', email)
   }
 
   const handleLogout = () => {
     setUserId(null); setUserEmail(null); setUserName(null)
-    localStorage.removeItem('ebookpro_userId')
-    localStorage.removeItem('ebookpro_userEmail')
-    localStorage.removeItem('ebookpro_userName')
-    localStorage.removeItem('ebookpro_token')
+    localStorage.removeItem('contentpro_userId')
+    localStorage.removeItem('contentpro_userEmail')
+    localStorage.removeItem('contentpro_userName')
+    localStorage.removeItem('contentpro_token')
   }
 
   const fetchData = () => {
     if (!userId) return
     setIsLoading(true)
     Promise.all([fetch('/api/profile', { headers: authHeaders() }).then(r => r.json())]).then(([profile]) => {
-      if (profile?.name) { setUserName(profile.name); localStorage.setItem('ebookpro_userName', profile.name) }
+      if (profile?.name) { setUserName(profile.name); localStorage.setItem('contentpro_userName', profile.name) }
       
       // Auto-set language based on user's country if not manually set recently
       if (profile?.country) {
@@ -294,7 +294,7 @@ function App() {
 
   const handleProfileUpdate = (newName: string) => {
     setUserName(newName)
-    localStorage.setItem('ebookpro_userName', newName)
+    localStorage.setItem('contentpro_userName', newName)
   }
 
   if (showShowcase) {

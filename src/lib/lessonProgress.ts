@@ -1,5 +1,5 @@
 /** Persistência local da última aula aberta (retomar navegação). */
-const EAD_STATE_KEY = 'ebookpro_ead_state';
+const EAD_STATE_KEY = 'contentpro_ead_state';
 
 export type EadResumeState = {
   courseSlug: string;

@@ -117,7 +117,7 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
       include: {
         modules: {
           orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-          include: { lessons: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { ebook: true } } },
+          include: { lessons: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { content: true } } },
         },
       },
     });
@@ -149,7 +149,7 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
           include: {
             lessons: {
               orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-              include: { ebook: { select: { id: true, title: true, coverUrl: true } } },
+              include: { content: { select: { id: true, title: true, coverUrl: true } } },
             },
           },
         },
@@ -289,10 +289,10 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
       user = await prisma.user.create({ data: { email, name: name || null, password: hashMemberPassword('Mudar123@') } });
     }
 
-    const ebooks = await prisma.ebook.findMany({ where: { licenseSystemId: systemId } });
-    for (const eb of ebooks) {
+    const contents = await prisma.content.findMany({ where: { licenseSystemId: systemId } });
+    for (const c of contents) {
       try {
-        await prisma.purchase.create({ data: { userId: user.id, ebookId: eb.id } });
+        await prisma.purchase.create({ data: { userId: user.id, contentId: c.id } });
       } catch {
         /* */
       }
@@ -307,7 +307,7 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
       include: {
         modules: {
           orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-          include: { lessons: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { ebook: true } } },
+          include: { lessons: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], include: { content: true } } },
         },
       },
     });
@@ -389,11 +389,11 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
   });
 
   app.post('/api/admin/course-lessons', admin, async (req, res) => {
-    const { moduleId, title, sortOrder, ebookId, videoUrl, bodyText, actionLabel, actionUrl } = req.body as {
+    const { moduleId, title, sortOrder, contentId, videoUrl, bodyText, actionLabel, actionUrl } = req.body as {
       moduleId?: string;
       title?: string;
       sortOrder?: number;
-      ebookId?: string | null;
+      contentId?: string | null;
       videoUrl?: string | null;
       bodyText?: string | null;
       actionLabel?: string | null;
@@ -413,7 +413,7 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
         moduleId,
         title,
         sortOrder: nextSortOrder,
-        ebookId: ebookId || null,
+        contentId: contentId || null,
         videoUrl: videoUrl || null,
         bodyText: bodyText || null,
         actionLabel: actionLabel || null,
@@ -444,10 +444,10 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
   });
 
   app.put('/api/admin/course-lessons/:id', admin, async (req, res) => {
-    const { title, sortOrder, ebookId, videoUrl, bodyText, actionLabel, actionUrl } = req.body as {
+    const { title, sortOrder, contentId, videoUrl, bodyText, actionLabel, actionUrl } = req.body as {
       title?: string;
       sortOrder?: number;
-      ebookId?: string | null;
+      contentId?: string | null;
       videoUrl?: string | null;
       bodyText?: string | null;
       actionLabel?: string | null;
@@ -459,7 +459,7 @@ export function registerEadAndTrialRoutes(app: express.Application, prisma: Pris
         data: {
           title: title ?? undefined,
           sortOrder: sortOrder ?? undefined,
-          ebookId: ebookId === undefined ? undefined : ebookId || null,
+          contentId: contentId === undefined ? undefined : contentId || null,
           videoUrl: videoUrl === undefined ? undefined : videoUrl,
           bodyText: bodyText === undefined ? undefined : bodyText,
           actionLabel: actionLabel === undefined ? undefined : actionLabel,

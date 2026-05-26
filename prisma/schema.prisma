@@ -22,12 +22,12 @@ model User {
 }
 
 model Category {
-  id     String  @id @default(uuid())
-  name   String  @unique
-  ebooks Ebook[]
+  id       String    @id @default(uuid())
+  name     String    @unique
+  contents Content[]
 }
 
-model Ebook {
+model Content {
   id               String    @id @default(uuid())
   title            String
   author           String?
@@ -46,42 +46,44 @@ model Ebook {
   externalUrl      String?
   redirectUrl      String?
   isBonus          Boolean   @default(false)
-  parentEbookId    String?
-  parentEbook      Ebook?    @relation("EbookBonuses", fields: [parentEbookId], references: [id])
-  bonuses          Ebook[]   @relation("EbookBonuses")
+  parentContentId  String?   @map("parentEbookId")
+  parentContent    Content?  @relation("ContentBonuses", fields: [parentContentId], references: [id])
+  bonuses          Content[] @relation("ContentBonuses")
   language         String    @default("pt")
   lessons          CourseLesson[]
   createdAt        DateTime  @default(now())
+
+  @@map("Ebook")
 }
 
 model Purchase {
   id         String   @id @default(uuid())
   userId     String
-  ebookId    String
+  contentId  String   @map("ebookId")
   user       User     @relation(fields: [userId], references: [id])
-  ebook      Ebook    @relation(fields: [ebookId], references: [id])
+  content    Content  @relation(fields: [contentId], references: [id])
   lastReadAt DateTime?
   lastPage   Int      @default(0)
   createdAt  DateTime @default(now())
 
-  @@unique([userId, ebookId])
+  @@unique([userId, contentId])
 }
 
 model Wishlist {
   id        String   @id @default(uuid())
   userId    String
-  ebookId   String
+  contentId String   @map("ebookId")
   user      User     @relation(fields: [userId], references: [id])
-  ebook     Ebook    @relation(fields: [ebookId], references: [id])
+  content   Content  @relation(fields: [contentId], references: [id])
   createdAt DateTime @default(now())
 
-  @@unique([userId, ebookId])
+  @@unique([userId, contentId])
 }
 
 model Highlight {
   id         String   @id @default(uuid())
   userId     String
-  ebookId    String
+  contentId  String   @map("ebookId")
   pageNumber Int
   text       String
   color      String   @default("yellow")
@@ -248,8 +250,8 @@ model CourseLesson {
   module    CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   title     String
   sortOrder Int      @default(0)
-  ebookId   String?
-  ebook     Ebook?   @relation(fields: [ebookId], references: [id], onDelete: SetNull)
+  contentId String?  @map("ebookId")
+  content   Content? @relation(fields: [contentId], references: [id], onDelete: SetNull)
   videoUrl  String?  // youtube/vimeo/link mp4
   bodyText  String?  // texto da aula
   actionLabel String? // texto do botão

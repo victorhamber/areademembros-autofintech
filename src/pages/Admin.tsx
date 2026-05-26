@@ -137,8 +137,8 @@ function compareLicenseStatusLabel(a: string, b: string): number {
   return a.localeCompare(b, 'pt');
 }
 
-const ADMIN_JWT_KEY = 'ebookpro_admin_jwt';
-const ADMIN_UI_KEY = 'ebookpro_admin_ui';
+const ADMIN_JWT_KEY = 'contentpro_admin_jwt';
+const ADMIN_UI_KEY = 'contentpro_admin_ui';
 
 type AdminTab =
   | 'courses'
@@ -2041,7 +2041,7 @@ export const Admin: React.FC = () => {
         body: JSON.stringify({
           moduleId: selectedModuleId,
           title,
-          ebookId: null,
+          contentId: null,
           videoUrl: newLessonVideoUrl.trim() || null,
           bodyText: newLessonBodyText.trim() || null,
           actionLabel: newLessonActionLabel.trim() || null,
@@ -2213,7 +2213,7 @@ export const Admin: React.FC = () => {
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           title: editLessonTitle.trim(),
-          ebookId: null,
+          contentId: null,
           videoUrl: editLessonVideoUrl.trim() || null,
           bodyText: editLessonBodyText.trim() || null,
           actionLabel: editLessonActionLabel.trim() || null,

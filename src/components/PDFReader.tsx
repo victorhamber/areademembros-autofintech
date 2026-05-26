@@ -13,7 +13,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 function memberHeaders(userId: string, json = false): Record<string, string> {
   const h: Record<string, string> = { 'x-user-id': userId };
-  const tok = localStorage.getItem('ebookpro_token');
+  const tok = localStorage.getItem('contentpro_token');
   if (tok) h['Authorization'] = `Bearer ${tok}`;
   if (json) h['Content-Type'] = 'application/json';
   return h;
@@ -30,7 +30,7 @@ interface PDFReaderProps {
   url: string;
   title: string;
   initialPage?: number;
-  ebookId: string;
+  contentId: string;
   userId: string;
   lang: Lang;
   onClose: (lastPage?: number) => void;
@@ -43,7 +43,7 @@ const HIGHLIGHT_COLORS = [
   { name: 'Rosa', value: 'pink', bg: 'rgba(240, 98, 146, 0.4)' },
 ];
 
-export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 1, ebookId, userId, lang, onClose }) => {
+export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 1, contentId, userId, lang, onClose }) => {
   const tr = t(lang);
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
@@ -70,11 +70,11 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
 
   // Fetch highlights from DB
   useEffect(() => {
-    fetch(`/api/highlights/${ebookId}`, { headers: memberHeaders(userId) })
+    fetch(`/api/highlights/${contentId}`, { headers: memberHeaders(userId) })
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setHighlights(data); })
       .catch(console.error);
-  }, [ebookId, userId]);
+  }, [contentId, userId]);
 
   // Apply highlights on the text layer after page renders
   const applyHighlightsToTextLayer = useCallback(() => {
@@ -120,7 +120,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
             const res = await fetch('/api/highlights', {
               method: 'POST',
               headers: memberHeaders(userId, true),
-              body: JSON.stringify({ ebookId, pageNumber, text, color: activeHighlightColor })
+              body: JSON.stringify({ contentId, pageNumber, text, color: activeHighlightColor })
             });
             const newHighlight = await res.json();
             setHighlights(prev => [...prev, newHighlight]);
@@ -142,7 +142,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ url, title, initialPage = 
       document.removeEventListener('mouseup', handleSelection);
       document.removeEventListener('touchend', handleSelection);
     };
-  }, [activeHighlightColor, ebookId, pageNumber, userId, applyHighlightsToTextLayer]);
+  }, [activeHighlightColor, contentId, pageNumber, userId, applyHighlightsToTextLayer]);
 
   // Deprecated manual save function
   const saveHighlight = async (color: string) => {

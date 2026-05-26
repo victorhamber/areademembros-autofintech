@@ -115,41 +115,41 @@ export async function validateLicenseHandler(
   return result;
 }
 
-export async function grantEbookAccessForSystem(prisma: PrismaClient, email: string, systemId: string) {
+export async function grantContentAccessForSystem(prisma: PrismaClient, email: string, systemId: string) {
   if (!systemId) return;
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
   if (!user) return;
-  const ebooks = await prisma.ebook.findMany({ where: { licenseSystemId: systemId } });
-  for (const eb of ebooks) {
+  const contents = await prisma.content.findMany({ where: { licenseSystemId: systemId } });
+  for (const c of contents) {
     try {
-      await prisma.purchase.create({ data: { userId: user.id, ebookId: eb.id } });
+      await prisma.purchase.create({ data: { userId: user.id, contentId: c.id } });
     } catch {
       /* unique */
     }
-    const bonuses = await prisma.ebook.findMany({ where: { isBonus: true, parentEbookId: eb.id } });
+    const bonuses = await prisma.content.findMany({ where: { isBonus: true, parentContentId: c.id } });
     if (bonuses.length) {
       await prisma.purchase.createMany({
-        data: bonuses.map(b => ({ userId: user.id, ebookId: b.id })),
+        data: bonuses.map(b => ({ userId: user.id, contentId: b.id })),
         skipDuplicates: true
       });
     }
   }
 }
 
-export async function revokeEbookAccessForSystem(prisma: PrismaClient, email: string, systemId: string) {
+export async function revokeContentAccessForSystem(prisma: PrismaClient, email: string, systemId: string) {
   if (!systemId) return;
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
   if (!user) return;
-  const ebooks = await prisma.ebook.findMany({
+  const contents = await prisma.content.findMany({
     where: { licenseSystemId: systemId },
     select: { id: true }
   });
-  const ids = [...ebooks.map(e => e.id)];
-  for (const eb of ebooks) {
-    const bonuses = await prisma.ebook.findMany({ where: { parentEbookId: eb.id }, select: { id: true } });
+  const ids = [...contents.map(c => c.id)];
+  for (const c of contents) {
+    const bonuses = await prisma.content.findMany({ where: { parentContentId: c.id }, select: { id: true } });
     ids.push(...bonuses.map(b => b.id));
   }
   if (ids.length) {
-    await prisma.purchase.deleteMany({ where: { userId: user.id, ebookId: { in: ids } } });
+    await prisma.purchase.deleteMany({ where: { userId: user.id, contentId: { in: ids } } });
   }
 }

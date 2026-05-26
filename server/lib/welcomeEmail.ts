@@ -32,7 +32,7 @@ async function sendEmail(prismaClient: PrismaClient, to: string, subject: string
     const apiKey = await getSetting(prismaClient, 'resend_api_key');
     if (!apiKey) { console.log('[Email] No Resend API key configured. Skipping.'); return; }
 
-    const senderName = (await getSetting(prismaClient, 'sender_name')) || 'EbookPro';
+    const senderName = (await getSetting(prismaClient, 'sender_name')) || 'Autofintech';
     const senderEmail = (await getSetting(prismaClient, 'sender_email')) || 'noreply@example.com';
 
     const resend = new Resend(apiKey);

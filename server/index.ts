@@ -12,6 +12,7 @@ import multer from 'multer';
 import { signUserToken, signAdminJwt } from './auth/jwt.js';
 import { resolveUserId } from './auth/resolveUser.js';
 import { registerForexRoutes } from './forex/forexRoutes.js';
+import { processLicenseWebhook } from './forex/webhookLicenseProcessor.js';
 import { registerMemberApiRoutes } from './routes/memberApi.js';
 import { registerEadAndTrialRoutes } from './routes/eadAndTrial.js';
 import { registerAdminForexRoutes } from './routes/adminForex.js';
@@ -70,7 +71,7 @@ async function sendEmail(prismaClient: PrismaClient, to: string, subject: string
     const apiKey = await getSetting(prismaClient, 'resend_api_key');
     if (!apiKey) { console.log('[Email] No Resend API key configured. Skipping.'); return; }
 
-    const senderName = (await getSetting(prismaClient, 'sender_name')) || 'EbookPro';
+    const senderName = (await getSetting(prismaClient, 'sender_name')) || 'Autofintech';
     const senderEmail = (await getSetting(prismaClient, 'sender_email')) || 'noreply@example.com';
 
     const resend = new Resend(apiKey);
@@ -276,14 +277,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/public/ebooks', async (req, res) => {
+app.get('/api/public/contents', async (req, res) => {
   try {
-    const ebooks = await prisma.ebook.findMany({ 
+    const contents = await prisma.content.findMany({ 
       where: { isBonus: false },
       orderBy: { createdAt: 'desc' },
       include: { category: true }
     });
-    res.json(ebooks);
+    res.json(contents);
   } catch (error) {
     res.status(500).json({ error: 'Failed' });
   }
@@ -538,18 +539,18 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
-app.get('/api/ebooks/my', async (req, res) => {
+app.get('/api/contents/my', async (req, res) => {
   try {
     const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     const purchases = await prisma.purchase.findMany({
       where: { userId },
-      include: { ebook: true }
+      include: { content: true }
     });
 
     const myBooks = purchases.map(p => ({
-      ...p.ebook,
+      ...p.content,
       lastReadAt: p.lastReadAt,
       lastPage: p.lastPage
     }));
@@ -602,9 +603,9 @@ app.post('/api/reading-progress', async (req, res) => {
   try {
     const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    const { ebookId, page } = req.body;
+    const { contentId, page } = req.body;
     await prisma.purchase.updateMany({
-      where: { userId, ebookId },
+      where: { userId, contentId },
       data: { lastReadAt: new Date(), lastPage: page || 1 }
     });
     res.json({ success: true });
@@ -612,13 +613,13 @@ app.post('/api/reading-progress', async (req, res) => {
 });
 
 // HIGHLIGHTS
-app.get('/api/highlights/:ebookId', async (req, res) => {
+app.get('/api/highlights/:contentId', async (req, res) => {
   try {
     const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    const { ebookId } = req.params;
+    const { contentId } = req.params;
     const highlights = await prisma.highlight.findMany({
-      where: { userId, ebookId },
+      where: { userId, contentId },
       orderBy: { createdAt: 'asc' }
     });
     res.json(highlights);
@@ -629,9 +630,9 @@ app.post('/api/highlights', async (req, res) => {
   try {
     const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    const { ebookId, pageNumber, text, color } = req.body;
+    const { contentId, pageNumber, text, color } = req.body;
     const highlight = await prisma.highlight.create({
-      data: { userId, ebookId, pageNumber, text, color: color || 'yellow' }
+      data: { userId, contentId, pageNumber, text, color: color || 'yellow' }
     });
     res.json(highlight);
   } catch (error) { res.status(500).json({ error: 'Failed' }); }
@@ -651,8 +652,8 @@ app.get('/api/wishlist', async (req, res) => {
   try {
     const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    const items = await prisma.wishlist.findMany({ where: { userId }, select: { ebookId: true } });
-    res.json(items.map(i => i.ebookId));
+    const items = await prisma.wishlist.findMany({ where: { userId }, select: { contentId: true } });
+    res.json(items.map(i => i.contentId));
   } catch (error) {
     res.status(500).json({ error: 'Failed' });
   }
@@ -662,14 +663,14 @@ app.post('/api/wishlist/toggle', async (req, res) => {
   try {
     const userId = resolveUserId(req);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    const { ebookId } = req.body;
+    const { contentId } = req.body;
     
-    const existing = await prisma.wishlist.findUnique({ where: { userId_ebookId: { userId, ebookId } } });
+    const existing = await prisma.wishlist.findUnique({ where: { userId_contentId: { userId, contentId } } });
     if (existing) {
       await prisma.wishlist.delete({ where: { id: existing.id } });
       return res.json({ wishlisted: false });
     } else {
-      await prisma.wishlist.create({ data: { userId, ebookId } });
+      await prisma.wishlist.create({ data: { userId, contentId } });
       return res.json({ wishlisted: true });
     }
   } catch (error) {
@@ -677,21 +678,22 @@ app.post('/api/wishlist/toggle', async (req, res) => {
   }
 });
 
-app.get('/api/ebooks', async (req, res) => {
+app.get('/api/contents', async (req, res) => {
   try {
-    const ebooks = await prisma.ebook.findMany({ 
+    const contents = await prisma.content.findMany({ 
       orderBy: { createdAt: 'desc' },
       include: {
         category: true,
         _count: { select: { purchases: true } }
       }
     });
-    res.json(ebooks);
+    res.json(contents);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch catalog' });
   }
 });
 
+// Webhook unificado Hotmart — cria usuário + ativa licença + concede acesso ao conteúdo
 app.post('/api/webhooks/hotmart', async (req, res) => {
   try {
     const hottok = (req.headers['x-hotmart-hottok'] || req.query.hottok) as string;
@@ -705,153 +707,21 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
     const body = req.body;
     const event = body.event || 'UNKNOWN';
     const buyerEmail = body.data?.buyer?.email?.toLowerCase()?.trim();
-    const buyerName = body.data?.buyer?.name || body.data?.buyer?.first_name || null;
-    const buyerCountry = body.data?.purchase?.checkout_country?.iso || body.data?.buyer?.address?.country || null;
-    const productId = String(body.data?.product?.id || body.data?.product?.ucode || '').trim();
-    const offerCode = String(body.data?.product?.offer_code || body.data?.purchase?.offer?.code || productId).trim();
+    const offerCode = String(body.data?.product?.offer_code || body.data?.purchase?.offer?.code || body.data?.product?.id || '').trim();
 
-    console.log(`[Hotmart Webhook] Event: ${event}, Buyer: ${buyerEmail}, Country: ${buyerCountry}, Product: ${productId}, Offer: ${offerCode}`);
+    console.log(`[Hotmart Webhook Unificado] Event: ${event}, Buyer: ${buyerEmail}, Offer: ${offerCode}`);
 
-    if (!productId && !offerCode) {
-      await prisma.webhookLog.create({
-        data: { event, status: 'ignored', details: 'Missing product ID and offer code' }
-      });
-      return res.status(200).json({ status: 'Ignored: missing product or offer info' });
-    }
+    const raw = JSON.stringify(body);
+    const logRow = await prisma.licenseWebhookRawLog.create({ data: { rawData: raw, processed: false } });
 
-    // PURCHASE_APPROVED — Create user + grant access
-    if (event === 'PURCHASE_APPROVED' || event === 'PURCHASE_COMPLETE') {
-      if (!buyerEmail) {
-        await prisma.webhookLog.create({
-          data: { event, status: 'error', details: 'Missing buyer email' }
-        });
-        return res.status(200).json({ status: 'Error: no buyer email' });
-      }
+    const result = await processLicenseWebhook(prisma, body as Record<string, unknown>);
+    await prisma.licenseWebhookRawLog.update({ where: { id: logRow.id }, data: { processed: true } });
 
-      // Find or create user with default password
-      let user = await prisma.user.findUnique({ where: { email: buyerEmail } });
-      let isNewUser = false;
-      if (!user) {
-        user = await prisma.user.create({
-          data: { email: buyerEmail, name: buyerName, password: hashMemberPassword(DEFAULT_PASSWORD), country: buyerCountry }
-        });
-        isNewUser = true;
-      } else {
-        // Update name and country if missing
-        const updates: any = {};
-        if (buyerName && !user.name) updates.name = buyerName;
-        if (buyerCountry && !user.country) updates.country = buyerCountry;
-        if (Object.keys(updates).length > 0) {
-          user = await prisma.user.update({ where: { id: user.id }, data: updates });
-        }
-      }
-
-      // Find ebooks by hotmartOffer
-      const possibleEbooks = await prisma.ebook.findMany({
-        where: {
-          OR: [
-            { hotmartOffer: { contains: offerCode } },
-            { hotmartOffer: { contains: productId } }
-          ]
-        }
-      });
-      
-      const ebooksToProcess = possibleEbooks.filter(e => {
-        const codes = e.hotmartOffer.split(',').map(s => s.trim());
-        return codes.includes(offerCode) || codes.includes(productId);
-      });
-
-      if (ebooksToProcess.length === 0) {
-        await prisma.webhookLog.create({
-          data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'error', details: `No ebook found for offer: ${offerCode}` }
-        });
-        return res.status(200).json({ status: 'No matching ebook' });
-      }
-
-      // Grant access (idempotent, supports repurchasing/reactivation)
-      for (const ebook of ebooksToProcess) {
-        try {
-          await prisma.purchase.create({
-            data: { userId: user.id, ebookId: ebook.id }
-          });
-        } catch (e: any) {
-          if (!e.message?.includes('Unique constraint')) {
-            throw e;
-          }
-        }
-
-        // Grant access to bonuses linked to this ebook
-        const bonuses = await prisma.ebook.findMany({ where: { isBonus: true, parentEbookId: ebook.id } });
-        if (bonuses.length > 0) {
-          const newPurchases = bonuses.map(b => ({ userId: user.id, ebookId: b.id }));
-          await prisma.purchase.createMany({ data: newPurchases, skipDuplicates: true });
-          console.log(`[Hotmart] 🎁 Granted bonuses to ${buyerEmail}: ` + bonuses.map(b => b.title).join(', '));
-        }
-      }
-
-      // Send welcome email for new users
-      if (isNewUser) {
-        sendWelcomeEmail(prisma, buyerEmail, buyerName, DEFAULT_PASSWORD, buyerCountry).catch(err =>
-          console.error('[Email] Welcome email failed:', err)
-        );
-      }
-
-      const titles = ebooksToProcess.map(e => e.title).join(', ');
-      await prisma.webhookLog.create({
-        data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Granted access to "${titles}"${isNewUser ? ' (new user, welcome email queued)' : ''}` }
-      });
-
-      console.log(`[Hotmart] ✅ Access granted: ${buyerEmail} -> ${titles}${isNewUser ? ' (new user)' : ''}`);
-      return res.status(200).json({ status: 'Access granted' });
-    }
-
-    if (event === 'PURCHASE_CANCELED' || event === 'PURCHASE_REFUNDED' || event === 'PURCHASE_CHARGEBACK' || event === 'PURCHASE_PROTEST') {
-      if (buyerEmail) {
-        const user = await prisma.user.findUnique({ where: { email: buyerEmail } });
-        
-        const possibleEbooks = await prisma.ebook.findMany({
-          where: {
-            OR: [
-              { hotmartOffer: { contains: offerCode } },
-              { hotmartOffer: { contains: productId } }
-            ]
-          }
-        });
-        
-        const ebooksToProcess = possibleEbooks.filter(e => {
-          const codes = e.hotmartOffer.split(',').map(s => s.trim());
-          return codes.includes(offerCode) || codes.includes(productId);
-        });
-
-        if (user && ebooksToProcess.length > 0) {
-          let idsToRemove: string[] = [];
-          for (const eb of ebooksToProcess) {
-            idsToRemove.push(eb.id);
-            const linkedBonuses = await prisma.ebook.findMany({ where: { parentEbookId: eb.id } });
-            idsToRemove.push(...linkedBonuses.map(b => b.id));
-          }
-          
-          await prisma.purchase.deleteMany({ where: { userId: user.id, ebookId: { in: idsToRemove } } });
-          const titles = ebooksToProcess.map(e => e.title).join(', ');
-          await prisma.webhookLog.create({
-            data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'success', details: `Revoked access to "${titles}"` }
-          });
-          console.log(`[Hotmart] ❌ Access revoked: ${buyerEmail} -> ${titles}`);
-        } else {
-          await prisma.webhookLog.create({
-            data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'warning', details: 'User or ebook not found for revocation' }
-          });
-        }
-      }
-      return res.status(200).json({ status: 'Processed' });
-    }
-
-    // Other events — just log
     await prisma.webhookLog.create({
-      data: { event, buyerEmail, buyerName, buyerCountry, productId: offerCode, status: 'ignored', details: `Unhandled event type: ${event}` }
+      data: { event, buyerEmail, productId: offerCode, status: result.ok ? 'success' : 'error', details: result.message }
     });
 
-    return res.status(200).json({ status: 'Event logged' });
+    return res.status(result.status).json({ status: result.ok ? 'success' : 'error', message: result.message });
   } catch (error) {
     console.error('[Hotmart Webhook Error]', error);
     await prisma.webhookLog.create({
@@ -1091,7 +961,7 @@ app.get('/api/admin/users', adminAuthMiddleware, async (req, res) => {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        purchases: { include: { ebook: true } }
+        purchases: { include: { content: true } }
       }
     });
     res.json(users);
@@ -1119,19 +989,19 @@ app.post('/api/admin/users', adminAuthMiddleware, async (req, res) => {
 
 app.post('/api/admin/purchases', adminAuthMiddleware, async (req, res) => {
   try {
-    const { userId, ebookId } = req.body;
-    const purchase = await prisma.purchase.create({ data: { userId, ebookId } });
+    const { userId, contentId } = req.body;
+    const purchase = await prisma.purchase.create({ data: { userId, contentId } });
     res.json(purchase);
   } catch (error) {
     res.status(400).json({ error: 'Falha ao conceder acesso ou o usuário já o possui.' });
   }
 });
 
-app.delete('/api/admin/purchases/:userId/:ebookId', adminAuthMiddleware, async (req, res) => {
+app.delete('/api/admin/purchases/:userId/:contentId', adminAuthMiddleware, async (req, res) => {
   try {
     const userId = String(req.params.userId);
-    const ebookId = String(req.params.ebookId);
-    await prisma.purchase.deleteMany({ where: { userId, ebookId } });
+    const contentId = String(req.params.contentId);
+    await prisma.purchase.deleteMany({ where: { userId, contentId } });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Falha ao revogar acesso' });
@@ -1408,26 +1278,25 @@ app.delete('/api/admin/links/:id', adminAuthMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/admin/ebooks', adminAuthMiddleware, async (req, res) => {
+app.get('/api/admin/contents', adminAuthMiddleware, async (req, res) => {
   try {
-    const ebooks = await prisma.ebook.findMany({ 
+    const contents = await prisma.content.findMany({ 
       orderBy: { createdAt: 'desc' },
       include: { category: true }
     });
-    res.json(ebooks);
+    res.json(contents);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch eBooks' });
+    res.status(500).json({ error: 'Failed to fetch contents' });
   }
 });
 
-app.post('/api/admin/ebooks', adminAuthMiddleware, async (req, res) => {
+app.post('/api/admin/contents', adminAuthMiddleware, async (req, res) => {
   try {
-    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, licenseSystemId, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, licenseSystemId, categoryId, featuredList, isBonus, parentContentId, language } = req.body;
     
-    // Auto-generate hotmartOffer if it's a bonus and not provided
     const finalOffer = isBonus && !hotmartOffer ? `bonus_${crypto.randomUUID()}` : hotmartOffer;
 
-    const newEbook = await prisma.ebook.create({
+    const newContent = await prisma.content.create({
       data: { 
         title, 
         author: author || null, 
@@ -1442,38 +1311,36 @@ app.post('/api/admin/ebooks', adminAuthMiddleware, async (req, res) => {
         categoryId: categoryId || null, 
         featuredList: featuredList || null,
         isBonus: isBonus || false,
-        parentEbookId: (isBonus && parentEbookId) ? String(parentEbookId) : null,
+        parentContentId: (isBonus && parentContentId) ? String(parentContentId) : null,
         language: language || 'pt',
         licenseSystemId: licenseSystemId ? String(licenseSystemId).trim() : null
       }
     });
 
-    // Retroactive logic: If it's a bonus, distribute access to all existing buyers of the parent ebook
-    if (newEbook.isBonus && newEbook.parentEbookId) {
-      const parentPurchases = await prisma.purchase.findMany({ where: { ebookId: newEbook.parentEbookId } });
+    if (newContent.isBonus && newContent.parentContentId) {
+      const parentPurchases = await prisma.purchase.findMany({ where: { contentId: newContent.parentContentId } });
       if (parentPurchases.length > 0) {
-        const newPurchases = parentPurchases.map(p => ({ userId: p.userId, ebookId: newEbook.id }));
+        const newPurchases = parentPurchases.map(p => ({ userId: p.userId, contentId: newContent.id }));
         await prisma.purchase.createMany({ data: newPurchases, skipDuplicates: true });
-        console.log(`[Bônus] ✅ Distribuído bônus "${newEbook.title}" para ${newPurchases.length} clientes do Produto Principal.`);
+        console.log(`[Bônus] ✅ Distribuído bônus "${newContent.title}" para ${newPurchases.length} clientes do Produto Principal.`);
       }
     }
 
-    res.json(newEbook);
+    res.json(newContent);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create eBook' });
+    res.status(500).json({ error: 'Failed to create content' });
   }
 });
 
-app.put('/api/admin/ebooks/:id', adminAuthMiddleware, async (req, res) => {
+app.put('/api/admin/contents/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, licenseSystemId, categoryId, featuredList, isBonus, parentEbookId, language } = req.body;
-    const currentEbook = await prisma.ebook.findUnique({ where: { id: String(id) } });
+    const { title, author, description, coverUrl, pdfUrl, htmlUrl, externalUrl, redirectUrl, salesUrl, hotmartOffer, licenseSystemId, categoryId, featuredList, isBonus, parentContentId, language } = req.body;
+    const currentContent = await prisma.content.findUnique({ where: { id: String(id) } });
 
-    // Ensure hotmartOffer remains unique for bonuses if sent as empty string
-    const finalOffer = isBonus && !hotmartOffer ? (currentEbook?.hotmartOffer || `bonus_${crypto.randomUUID()}`) : hotmartOffer;
+    const finalOffer = isBonus && !hotmartOffer ? (currentContent?.hotmartOffer || `bonus_${crypto.randomUUID()}`) : hotmartOffer;
 
-    const updatedEbook = await prisma.ebook.update({
+    const updatedContent = await prisma.content.update({
       where: { id: String(id) },
       data: { 
         title, 
@@ -1489,37 +1356,36 @@ app.put('/api/admin/ebooks/:id', adminAuthMiddleware, async (req, res) => {
         categoryId: categoryId || null, 
         featuredList: featuredList || null,
         isBonus: isBonus || false,
-        parentEbookId: (isBonus && parentEbookId) ? String(parentEbookId) : null,
+        parentContentId: (isBonus && parentContentId) ? String(parentContentId) : null,
         language: language || 'pt',
         licenseSystemId: licenseSystemId !== undefined ? (licenseSystemId ? String(licenseSystemId).trim() : null) : undefined
       }
     });
 
-    // Retroactive logic if parentEbookId changed
-    if (updatedEbook.isBonus && updatedEbook.parentEbookId) {
-      if (!currentEbook?.isBonus || currentEbook.parentEbookId !== updatedEbook.parentEbookId) {
-        const parentPurchases = await prisma.purchase.findMany({ where: { ebookId: updatedEbook.parentEbookId } });
+    if (updatedContent.isBonus && updatedContent.parentContentId) {
+      if (!currentContent?.isBonus || currentContent.parentContentId !== updatedContent.parentContentId) {
+        const parentPurchases = await prisma.purchase.findMany({ where: { contentId: updatedContent.parentContentId } });
         if (parentPurchases.length > 0) {
-          const newPurchases = parentPurchases.map(p => ({ userId: p.userId, ebookId: updatedEbook.id }));
+          const newPurchases = parentPurchases.map(p => ({ userId: p.userId, contentId: updatedContent.id }));
           await prisma.purchase.createMany({ data: newPurchases, skipDuplicates: true });
-          console.log(`[Bônus] ✅ Atualização: Distribuído bônus "${updatedEbook.title}" para ${newPurchases.length} clientes do Produto Principal.`);
+          console.log(`[Bônus] ✅ Atualização: Distribuído bônus "${updatedContent.title}" para ${newPurchases.length} clientes do Produto Principal.`);
         }
       }
     }
 
-    res.json(updatedEbook);
+    res.json(updatedContent);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update eBook' });
+    res.status(500).json({ error: 'Failed to update content' });
   }
 });
 
-app.delete('/api/admin/ebooks/:id', adminAuthMiddleware, async (req, res) => {
+app.delete('/api/admin/contents/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const id = String(req.params.id);
-    await prisma.ebook.delete({ where: { id } });
+    await prisma.content.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete eBook' });
+    res.status(500).json({ error: 'Failed to delete content' });
   }
 });
 
@@ -1639,7 +1505,7 @@ async function startServer() {
   server.requestTimeout = 120_000;
   server.headersTimeout = 125_000;
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[EbookPro API] Server running on 0.0.0.0:${PORT}`);
+    console.log(`[ContentPro API] Server running on 0.0.0.0:${PORT}`);
   });
 }
 

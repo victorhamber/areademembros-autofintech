@@ -16,7 +16,7 @@ export async function ensureDevTestAccount(prisma: PrismaClient): Promise<void> 
     create: { name: '_seed_local' }
   });
 
-  const ebook = await prisma.ebook.upsert({
+  const content = await prisma.content.upsert({
     where: { id: '00000000-0000-4000-8000-000000000001' },
     update: {
       title: 'Conteúdo de teste (local)',
@@ -49,8 +49,8 @@ export async function ensureDevTestAccount(prisma: PrismaClient): Promise<void> 
   });
 
   await prisma.purchase.upsert({
-    where: { userId_ebookId: { userId: user.id, ebookId: ebook.id } },
+    where: { userId_contentId: { userId: user.id, contentId: content.id } },
     update: {},
-    create: { userId: user.id, ebookId: ebook.id }
+    create: { userId: user.id, contentId: content.id }
   });
 }

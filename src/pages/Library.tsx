@@ -28,8 +28,8 @@ export const Library: React.FC<LibraryProps> = ({ isLoading, lang }) => {
   const [loadingDownloads, setLoadingDownloads] = useState(true);
 
   useEffect(() => {
-    const tok = localStorage.getItem('ebookpro_token');
-    const userId = localStorage.getItem('ebookpro_userId');
+    const tok = localStorage.getItem('contentpro_token');
+    const userId = localStorage.getItem('contentpro_userId');
     const h: Record<string, string> = {};
     if (userId) h['x-user-id'] = userId;
     if (tok) h['Authorization'] = `Bearer ${tok}`;

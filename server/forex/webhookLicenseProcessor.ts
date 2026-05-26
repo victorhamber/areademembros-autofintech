@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { log } from '../lib/logger.js';
-import { grantEbookAccessForSystem, revokeEbookAccessForSystem } from './licenseService.js';
+import { grantContentAccessForSystem, revokeContentAccessForSystem } from './licenseService.js';
 import { postRobotJson } from './robotNotify.js';
 import { parseCsv, csvIncludes } from '../lib/csv.js';
 import { sendWelcomeEmail } from '../lib/welcomeEmail.js';
@@ -71,7 +71,7 @@ export async function processLicenseWebhook(prisma: PrismaClient, data: Record<s
   return { ok: true, status: 200, message: 'Event ignored' };
 }
 
-async function ensureUser(prisma: PrismaClient, email: string, buyerName: string) {
+async function ensureUser(prisma: PrismaClient, email: string, buyerName: string, country?: string | null) {
   const em = email.toLowerCase().trim();
   let user = await prisma.user.findUnique({ where: { email: em } });
   let isNewUser = false;
@@ -79,11 +79,16 @@ async function ensureUser(prisma: PrismaClient, email: string, buyerName: string
     const { hashMemberPassword } = await import('../lib/verifyUserPassword.js');
     const DEFAULT_PASSWORD = 'Mudar123@';
     user = await prisma.user.create({
-      data: { email: em, name: buyerName || null, password: hashMemberPassword(DEFAULT_PASSWORD) }
+      data: { email: em, name: buyerName || null, password: hashMemberPassword(DEFAULT_PASSWORD), country: country || null }
     });
     isNewUser = true;
-  } else if (buyerName && !user.name) {
-    user = await prisma.user.update({ where: { id: user.id }, data: { name: buyerName } });
+  } else {
+    const updates: Record<string, string> = {};
+    if (buyerName && !user.name) updates.name = buyerName;
+    if (country && !user.country) updates.country = country;
+    if (Object.keys(updates).length > 0) {
+      user = await prisma.user.update({ where: { id: user.id }, data: updates });
+    }
   }
   return { user, isNewUser };
 }
@@ -93,98 +98,140 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
   const buyer = (d?.buyer || {}) as Record<string, unknown>;
   const purchase = (d?.purchase || {}) as Record<string, unknown>;
   const offer = (purchase.offer || {}) as Record<string, unknown>;
+  const productObj = (d?.product || {}) as Record<string, unknown>;
 
   const email = String(buyer.email || '').trim().toLowerCase();
-  const buyer_name = String(buyer.name || '').trim();
+  const buyer_name = String(buyer.name || buyer.first_name || '').trim();
+  const buyer_country = String(purchase.checkout_country?.toString() || (buyer.address as any)?.country || '').trim() || null;
   let event_id = String(purchase.transaction || '').trim();
   if (!event_id) event_id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const offer_code = String(offer.code || '').trim();
+  const offer_code = String(offer.code || productObj.offer_code || '').trim();
+  const product_id = String(productObj.id || productObj.ucode || '').trim();
   const subscriber_code = extractSubscriberCode(data);
 
   if (!email) return { ok: false, status: 400, message: 'Missing buyer email' };
 
-  const product = offer_code ? await findProductByOfferCode(prisma, offer_code) : null;
-  const systemIds = parseCsv(product?.systemId || '');
-  if (!systemIds.length) systemIds.push('');
-  const plano = product?.plano || 'mensal';
-  const data_expiracao = addDuration(plano);
-
-  const { isNewUser } = await ensureUser(prisma, email, buyer_name);
+  const { user, isNewUser } = await ensureUser(prisma, email, buyer_name, buyer_country);
   if (isNewUser) {
-    log('INFO', `Novo usuário criado via webhook de licença: ${email} (senha padrão: Mudar123@)`);
-    sendWelcomeEmail(prisma, email, buyer_name || null, 'Mudar123@', null).catch(err =>
+    log('INFO', `Novo usuário criado via webhook: ${email} (senha padrão: Mudar123@)`);
+    sendWelcomeEmail(prisma, email, buyer_name || null, 'Mudar123@', buyer_country).catch(err =>
       log('ERROR', `Falha ao enviar e-mail de boas-vindas para ${email}: ${err}`)
     );
   }
 
-  for (const [idx, system_id] of systemIds.entries()) {
-    const isFirst = idx === 0;
-    let existing = null as Awaited<ReturnType<typeof prisma.license.findFirst>> | null;
-    if (subscriber_code && system_id) {
-      existing = await prisma.license.findFirst({
-        where: { subscriberCode: subscriber_code, email, systemId: system_id }
-      });
-    }
-    if (!existing && system_id) {
-      existing = await prisma.license.findFirst({ where: { email, systemId: system_id } });
-    }
-    if (!existing && isFirst) {
-      existing = await prisma.license.findFirst({ where: { eventId: event_id } });
-    }
+  const product = offer_code ? await findProductByOfferCode(prisma, offer_code) : null;
+  const systemIds = parseCsv(product?.systemId || '');
+  const hasProduct = systemIds.length > 0;
+  if (!systemIds.length) systemIds.push('');
+  const plano = product?.plano || 'mensal';
+  const data_expiracao = addDuration(plano);
 
-    if (existing) {
-      const update: {
-        email: string;
-        buyerName: string | null;
-        plano: string;
-        statusLicenca: string;
-        dataExpiracao: Date;
-        systemId: string;
-        dataAtivacao: Date;
-        subscriberCode?: string | null;
-        eventId?: string;
-        offerCode?: string | null;
-      } = {
-        email,
-        buyerName: buyer_name || existing.buyerName,
-        plano,
-        statusLicenca: 'ativa',
-        dataExpiracao: data_expiracao,
-        systemId: system_id || existing.systemId,
-        dataAtivacao: new Date()
-      };
-      if (subscriber_code) update.subscriberCode = subscriber_code;
-      if (offer_code) update.offerCode = offer_code;
-      if (isFirst && (!subscriber_code || !existing.subscriberCode)) update.eventId = event_id;
-      await prisma.license.update({ where: { id: existing.id }, data: update });
-      log('INFO', `Licença ${existing.id} reativada/renovada ${email} sys=${system_id} offer=${offer_code}`);
-    } else {
-      await prisma.license.create({
-        data: {
+  // --- 1) Ativar licença(s) se houver Product cadastrado ---
+  if (hasProduct) {
+    for (const [idx, system_id] of systemIds.entries()) {
+      const isFirst = idx === 0;
+      let existing = null as Awaited<ReturnType<typeof prisma.license.findFirst>> | null;
+      if (subscriber_code && system_id) {
+        existing = await prisma.license.findFirst({
+          where: { subscriberCode: subscriber_code, email, systemId: system_id }
+        });
+      }
+      if (!existing && system_id) {
+        existing = await prisma.license.findFirst({ where: { email, systemId: system_id } });
+      }
+      if (!existing && isFirst) {
+        existing = await prisma.license.findFirst({ where: { eventId: event_id } });
+      }
+
+      if (existing) {
+        const update: {
+          email: string;
+          buyerName: string | null;
+          plano: string;
+          statusLicenca: string;
+          dataExpiracao: Date;
+          systemId: string;
+          dataAtivacao: Date;
+          subscriberCode?: string | null;
+          eventId?: string;
+          offerCode?: string | null;
+        } = {
           email,
-          buyerName: buyer_name || null,
-          numeroConta: '',
-          eventId: isFirst ? event_id : `${event_id}_${system_id || idx}`,
+          buyerName: buyer_name || existing.buyerName,
           plano,
           statusLicenca: 'ativa',
           dataExpiracao: data_expiracao,
-          systemId: system_id,
-          dataAtivacao: new Date(),
-          subscriberCode: subscriber_code || null,
-          offerCode: offer_code || null
-        }
+          systemId: system_id || existing.systemId,
+          dataAtivacao: new Date()
+        };
+        if (subscriber_code) update.subscriberCode = subscriber_code;
+        if (offer_code) update.offerCode = offer_code;
+        if (isFirst && (!subscriber_code || !existing.subscriberCode)) update.eventId = event_id;
+        await prisma.license.update({ where: { id: existing.id }, data: update });
+        log('INFO', `Licença ${existing.id} reativada/renovada ${email} sys=${system_id} offer=${offer_code}`);
+      } else {
+        await prisma.license.create({
+          data: {
+            email,
+            buyerName: buyer_name || null,
+            numeroConta: '',
+            eventId: isFirst ? event_id : `${event_id}_${system_id || idx}`,
+            plano,
+            statusLicenca: 'ativa',
+            dataExpiracao: data_expiracao,
+            systemId: system_id,
+            dataAtivacao: new Date(),
+            subscriberCode: subscriber_code || null,
+            offerCode: offer_code || null
+          }
+        });
+        log('INFO', `Nova licença criada ${email} event=${event_id} sys=${system_id} offer=${offer_code}`);
+      }
+
+      if (system_id) await grantContentAccessForSystem(prisma, email, system_id);
+
+      await postRobotJson(process.env.ROBOT_ACTIVATE_URL, {
+        email,
+        numero_conta: '',
+        system_id,
+        event_id
       });
-      log('INFO', `Nova licença criada ${email} event=${event_id} sys=${system_id} offer=${offer_code}`);
     }
+  }
 
-    if (system_id) await grantEbookAccessForSystem(prisma, email, system_id);
-
-    await postRobotJson(process.env.ROBOT_ACTIVATE_URL, {
-      email,
-      numero_conta: '',
-      system_id,
-      event_id
+  // --- 2) Conceder acesso a conteúdos pelo offerCode/productId ---
+  const searchCode = offer_code || product_id;
+  if (searchCode) {
+    const possibleContents = await prisma.content.findMany({
+      where: {
+        OR: [
+          { hotmartOffer: { contains: searchCode } },
+          ...(product_id && product_id !== searchCode ? [{ hotmartOffer: { contains: product_id } }] : [])
+        ]
+      }
     });
+    const contentsToGrant = possibleContents.filter(c => {
+      const codes = c.hotmartOffer.split(',').map(s => s.trim());
+      return codes.includes(offer_code) || codes.includes(product_id);
+    });
+
+    if (contentsToGrant.length > 0) {
+      for (const content of contentsToGrant) {
+        try {
+          await prisma.purchase.create({ data: { userId: user.id, contentId: content.id } });
+        } catch (e: any) {
+          if (!e.message?.includes('Unique constraint')) throw e;
+        }
+        const bonuses = await prisma.content.findMany({ where: { isBonus: true, parentContentId: content.id } });
+        if (bonuses.length > 0) {
+          await prisma.purchase.createMany({
+            data: bonuses.map(b => ({ userId: user.id, contentId: b.id })),
+            skipDuplicates: true
+          });
+        }
+      }
+      log('INFO', `Acesso ao conteúdo concedido: ${email} -> ${contentsToGrant.map(c => c.title).join(', ')}`);
+    }
   }
 
   return { ok: true, status: 200, message: 'Webhook processado com sucesso!' };
@@ -246,25 +293,68 @@ async function deactivateLicense(prisma: PrismaClient, data: Record<string, unkn
     });
   }
 
-  if (!license) return { ok: false, status: 400, message: 'Licença ativa não encontrada' };
+  // Desativar licenças encontradas
+  if (license) {
+    const targets = productSystemIds.length ? productSystemIds : [license.systemId];
+    const toDeactivate = await prisma.license.findMany({
+      where: { email, systemId: { in: targets }, statusLicenca: 'ativa' }
+    });
+    for (const lic of toDeactivate) {
+      await prisma.license.update({
+        where: { id: lic.id },
+        data: { statusLicenca: 'desativada', dataCancelamento: new Date() }
+      });
+      if (lic.systemId) await revokeContentAccessForSystem(prisma, email, lic.systemId);
+      await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
+        email: lic.email,
+        numero_conta: lic.numeroConta,
+        system_id: lic.systemId,
+        event_id
+      });
+    }
+    log('INFO', `Licenças desativadas para ${email}`);
+  }
 
-  const targets = productSystemIds.length ? productSystemIds : [license.systemId];
-  const toDeactivate = await prisma.license.findMany({
-    where: { email, systemId: { in: targets }, statusLicenca: 'ativa' }
-  });
-  for (const lic of toDeactivate) {
-    await prisma.license.update({
-      where: { id: lic.id },
-      data: { statusLicenca: 'desativada', dataCancelamento: new Date() }
-    });
-    if (lic.systemId) await revokeEbookAccessForSystem(prisma, email, lic.systemId);
-    await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
-      email: lic.email,
-      numero_conta: lic.numeroConta,
-      system_id: lic.systemId,
-      event_id
-    });
+  // Revogar acesso ao conteúdo pelo offerCode
+  const productId = extractProductId(data);
+  const searchCode = offer_code || productId;
+  if (searchCode) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const possibleContents = await prisma.content.findMany({
+        where: {
+          OR: [
+            { hotmartOffer: { contains: searchCode } },
+            ...(productId && productId !== searchCode ? [{ hotmartOffer: { contains: productId } }] : [])
+          ]
+        }
+      });
+      const contentsToRevoke = possibleContents.filter(c => {
+        const codes = c.hotmartOffer.split(',').map(s => s.trim());
+        return codes.includes(offer_code) || codes.includes(productId);
+      });
+      if (contentsToRevoke.length > 0) {
+        let idsToRemove: string[] = [];
+        for (const c of contentsToRevoke) {
+          idsToRemove.push(c.id);
+          const bonuses = await prisma.content.findMany({ where: { parentContentId: c.id }, select: { id: true } });
+          idsToRemove.push(...bonuses.map(b => b.id));
+        }
+        await prisma.purchase.deleteMany({ where: { userId: user.id, contentId: { in: idsToRemove } } });
+        log('INFO', `Acesso ao conteúdo revogado: ${email} -> ${contentsToRevoke.map(c => c.title).join(', ')}`);
+      }
+    }
+  }
+
+  if (!license && !searchCode) {
+    return { ok: false, status: 400, message: 'Licença ativa não encontrada' };
   }
 
   return { ok: true, status: 200, message: 'Webhook processado com sucesso!' };
+}
+
+function extractProductId(data: Record<string, unknown>): string {
+  const d = data.data as Record<string, unknown> | undefined;
+  const product = (d?.product || {}) as Record<string, unknown>;
+  return String(product.id || product.ucode || '').trim();
 }

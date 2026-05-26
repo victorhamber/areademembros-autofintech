@@ -12,7 +12,7 @@ type Lesson = {
   id: string;
   title: string;
   sortOrder: number;
-  ebookId: string | null;
+  contentId: string | null;
   videoUrl?: string | null;
   bodyText?: string | null;
   actionLabel?: string | null;
@@ -70,7 +70,7 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   const buildHeaders = (): Record<string, string> => {
     if (authHeaders) return authHeaders();
     const h: Record<string, string> = { 'x-user-id': userId };
-    const tok = localStorage.getItem('ebookpro_token');
+    const tok = localStorage.getItem('contentpro_token');
     if (tok) h['Authorization'] = `Bearer ${tok}`;
     return h;
   };
