@@ -47,8 +47,7 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   width: 100vw;
   height: 100vh;
-  user-select: none; /* Prevent blinking cursor (caret) on text clicks */
-  /* Allow natural scrolling/pull-to-refresh on the body if needed, or handled by inner containers */
+  /* Seleção de texto permitida por padrão; controles de UI abaixo evitam cursor piscando em botões */
 }
 
 /* Scrollbar moderna (global) */
@@ -92,8 +91,33 @@ html {
 }
 
 
-input, textarea, [contenteditable="true"] {
+input,
+textarea,
+[contenteditable='true'],
+p,
+span,
+li,
+td,
+th,
+label,
+pre,
+code,
+a,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   user-select: text;
+}
+
+button,
+[role='button'],
+input[type='button'],
+input[type='submit'],
+input[type='reset'] {
+  user-select: none;
 }
 
 /* Base typography */

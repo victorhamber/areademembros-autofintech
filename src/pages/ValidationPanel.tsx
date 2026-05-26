@@ -94,15 +94,7 @@ export function ValidationPanel({
       return;
     }
 
-    const existingAccount = String(editingLicense.numeroConta || '').trim();
     const status = effectiveLicenseStatus(editingLicense);
-    if (status === 'ativa' && existingAccount && existingAccount !== account) {
-      setToast({
-        type: 'err',
-        text: tr.validation_account_locked,
-      });
-      return;
-    }
 
     setSaving(true);
     setToast(null);
