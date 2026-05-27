@@ -2,6 +2,7 @@ import express from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { resolveUserId } from '../auth/resolveUser.js';
 import { validateLicenseHandler } from '../forex/licenseService.js';
+import { invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
 import { checkRateLimit } from '../lib/rateLimitMem.js';
 import { resolveOwnedProductIds, resolveOwnedSystemIds, resolveProductForLicense } from '../lib/licenseProductMatch.js';
 
@@ -69,6 +70,7 @@ export function registerMemberApiRoutes(app: express.Application, prisma: Prisma
     });
     if (!lic) return res.status(404).json({ error: 'License not found' });
     await prisma.license.update({ where: { id }, data: { numeroConta } });
+    invalidateLicenseCacheForEmail(user.email);
     res.json({ success: true });
   });
 

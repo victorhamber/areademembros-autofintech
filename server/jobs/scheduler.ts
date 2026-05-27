@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { log } from '../lib/logger.js';
+import { invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
 import { postRobotJson } from '../forex/robotNotify.js';
 
 export function startScheduledJobs(prisma: PrismaClient) {
@@ -18,6 +19,7 @@ export function startScheduledJobs(prisma: PrismaClient) {
         where: { id: lic.id },
         data: { statusLicenca: 'expirada' }
       });
+      invalidateLicenseCacheForEmail(lic.email);
       log('INFO', `Licença ${lic.id} (${lic.email}) expirada.`);
       await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
         email: lic.email,

@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import { cacheGet, cacheSet } from '../lib/licenseValidationCache.js';
+import { cacheGet, cacheSet, invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
 import { log } from '../lib/logger.js';
 
 const ACTIVE = 'ativa';
@@ -71,7 +71,9 @@ export async function validateLicenseHandler(
         where: { id: license.id },
         data: { numeroConta: numero_conta },
       });
+      invalidateLicenseCacheForEmail(email);
     } else if (currentAccount !== numero_conta) {
+      invalidateLicenseCacheForEmail(email);
       return {
         status: 403,
         json: {
@@ -94,6 +96,7 @@ export async function validateLicenseHandler(
       const now = new Date();
       if (license.dataExpiracao && license.dataExpiracao < now) {
         await prisma.license.update({ where: { id: license.id }, data: { statusLicenca: EXPIRED } });
+        invalidateLicenseCacheForEmail(email);
         result = { status: 403, json: { status: 'error', message: 'Licença expirada.' } };
       } else {
         result = {

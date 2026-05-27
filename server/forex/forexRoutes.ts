@@ -97,4 +97,6 @@ export function registerForexRoutes(app: express.Application, prisma: PrismaClie
 
   app.use('/api/forex-rendimento/v1', router);
   app.post('/api/forex-rendimento/v2/validate_license', validate);
+  // Compatibilidade com EAs que ainda chamam a URL legada do WordPress
+  app.post('/wp-json/forex-rendimento/v2/validate_license', validate);
 }

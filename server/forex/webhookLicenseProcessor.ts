@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { log } from '../lib/logger.js';
+import { invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
 import { grantContentAccessForSystem, revokeContentAccessForSystem } from './licenseService.js';
 import { postRobotJson } from './robotNotify.js';
 import { parseCsv, csvIncludes } from '../lib/csv.js';
@@ -168,6 +169,7 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
         if (offer_code) update.offerCode = offer_code;
         if (isFirst && (!subscriber_code || !existing.subscriberCode)) update.eventId = event_id;
         await prisma.license.update({ where: { id: existing.id }, data: update });
+        invalidateLicenseCacheForEmail(email);
         log('INFO', `Licença ${existing.id} reativada/renovada ${email} sys=${system_id} offer=${offer_code}`);
       } else {
         await prisma.license.create({
@@ -281,6 +283,7 @@ async function deactivateLicense(prisma: PrismaClient, data: Record<string, unkn
         where: { id: lic.id },
         data: { statusLicenca: 'desativada', dataCancelamento: new Date() }
       });
+      invalidateLicenseCacheForEmail(lic.email);
       if (lic.systemId) deactivatedSystemIds.push(lic.systemId);
       await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
         email: lic.email, numero_conta: lic.numeroConta, system_id: lic.systemId, event_id
@@ -297,6 +300,7 @@ async function deactivateLicense(prisma: PrismaClient, data: Record<string, unkn
         where: { id: byEvent.id },
         data: { statusLicenca: 'desativada', dataCancelamento: new Date() }
       });
+      invalidateLicenseCacheForEmail(byEvent.email);
       if (byEvent.systemId) deactivatedSystemIds.push(byEvent.systemId);
       await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
         email: byEvent.email, numero_conta: byEvent.numeroConta, system_id: byEvent.systemId, event_id
@@ -318,6 +322,7 @@ async function deactivateLicense(prisma: PrismaClient, data: Record<string, unkn
           where: { id: lic.id },
           data: { statusLicenca: 'desativada', dataCancelamento: new Date() }
         });
+        invalidateLicenseCacheForEmail(lic.email);
         if (lic.systemId) deactivatedSystemIds.push(lic.systemId);
         await postRobotJson(process.env.ROBOT_DEACTIVATE_URL, {
           email: lic.email, numero_conta: lic.numeroConta, system_id: lic.systemId, event_id

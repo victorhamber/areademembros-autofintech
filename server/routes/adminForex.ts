@@ -1,5 +1,6 @@
 import express from 'express';
 import type { PrismaClient } from '@prisma/client';
+import { invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
 
 function addDurationByPlan(planoRaw: string | null | undefined): Date {
   const plano = String(planoRaw || 'mensal').toLowerCase().trim();
@@ -89,6 +90,7 @@ export function registerAdminForexRoutes(
           subscriberCode: b.subscriberCode !== undefined ? (b.subscriberCode ? String(b.subscriberCode) : null) : undefined
         }
       });
+      invalidateLicenseCacheForEmail(lic.email);
       res.json(lic);
     } catch (e) {
       res.status(400).json({ error: String(e) });
