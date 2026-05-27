@@ -2948,6 +2948,9 @@ export const Admin: React.FC = () => {
               O destaque no início da área do membro mostra o selo e as boas-vindas. Se a URL da imagem estiver vazia, o sistema usa a <strong>capa do primeiro curso publicado</strong> (com imagem) como fundo do banner — ideal para o fluxo EAD.
             </p>
             <label style={{ display: 'block', marginTop: '14px', marginBottom: '6px', fontWeight: 600 }}>URL da imagem de fundo (opcional)</label>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '-2px', marginBottom: '8px', lineHeight: 1.5 }}>
+              Tamanho ideal: <strong>1920×600</strong> (ou <strong>1600×500</strong>). Use JPG/PNG/WebP e mantenha o texto/logos na área central para não cortar em telas menores.
+            </p>
             <input
               type="url"
               placeholder="https://… ou /api/public/media/…/file"
