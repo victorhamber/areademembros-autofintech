@@ -2949,7 +2949,9 @@ export const Admin: React.FC = () => {
             </p>
             <label style={{ display: 'block', marginTop: '14px', marginBottom: '6px', fontWeight: 600 }}>URL da imagem de fundo (opcional)</label>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '-2px', marginBottom: '8px', lineHeight: 1.5 }}>
-              Tamanho ideal: <strong>1920×600</strong> (ou <strong>1600×500</strong>). Use JPG/PNG/WebP e mantenha o texto/logos na área central para não cortar em telas menores.
+              Para preencher a largura até as bordas (sem faixas pretas nas laterais), prefira arte <strong>muito panorâmica</strong>:
+              proporcão em torno de <strong>3,5:1 a 4,5:1</strong>. Ex.: <strong>2560×640</strong>, <strong>2880×720</strong> ou{' '}
+              <strong>2400×600</strong>. Use JPG/PNG/WebP e concentre logotipo/rosto/conteúdo importante no centro (20–60% da largura).
             </p>
             <input
               type="url"
