@@ -178,7 +178,7 @@
 }
 
 .lesson-copy-block {
-  display: flex;
+  display: inline-flex;
   align-items: stretch;
   margin: 10px 0 14px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -187,6 +187,7 @@
   overflow: hidden;
   cursor: pointer;
   max-width: 100%;
+  width: fit-content;
 }
 
 .lesson-copy-block:hover {
@@ -194,7 +195,7 @@
 }
 
 .lesson-copy-block-text {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   padding: 10px 12px;

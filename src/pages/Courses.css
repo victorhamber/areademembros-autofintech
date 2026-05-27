@@ -564,7 +564,7 @@
 }
 
 .lesson-info-body--rich .lesson-copy-block {
-  display: flex;
+  display: inline-flex;
   align-items: stretch;
   margin: 12px 0 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -573,6 +573,7 @@
   overflow: hidden;
   cursor: pointer;
   max-width: 100%;
+  width: fit-content;
 }
 
 .lesson-info-body--rich .lesson-copy-block:hover {
@@ -580,7 +581,7 @@
 }
 
 .lesson-info-body--rich .lesson-copy-block-text {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   padding: 10px 12px;
