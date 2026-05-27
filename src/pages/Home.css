@@ -167,19 +167,27 @@
 }
 
 .home-content {
-  margin-top: clamp(-32px, -4vh, -16px);
+  margin-top: clamp(-48px, -5vh, -24px);
   position: relative;
   z-index: 3;
   background: linear-gradient(
     180deg,
     transparent 0,
-    color-mix(in srgb, var(--bg-main) 40%, transparent) 28px,
-    var(--bg-main) 56px
+    color-mix(in srgb, var(--bg-main) 35%, transparent) 32px,
+    var(--bg-main) 72px
   );
   padding-top: 0;
   padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
   box-sizing: border-box;
+}
+
+.home-welcome {
+  position: relative;
+  z-index: 4;
+  max-width: min(100%, 36rem);
+  padding-top: clamp(8px, 1.5vh, 16px);
+  padding-bottom: clamp(12px, 2vh, 20px);
 }
 
 .home-content .search-container.search-container--row {

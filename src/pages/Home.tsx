@@ -199,12 +199,6 @@ export const Home: React.FC<HomeProps> = ({
             role="region"
             aria-label={tr.hero_banner_aria}
           >
-            <div className="hero-inner">
-              <div className="hero-content">
-                <p className="hero-kicker">{heroKickerText}</p>
-                <h1 className="hero-greeting">{getGreeting()}</h1>
-              </div>
-            </div>
             <div className="hero-overlay" aria-hidden />
           </div>
         </div>
@@ -212,6 +206,10 @@ export const Home: React.FC<HomeProps> = ({
       </div>
 
       <div className="home-content">
+        <div className="home-welcome">
+          <p className="hero-kicker">{heroKickerText}</p>
+          <h1 className="hero-greeting">{getGreeting()}</h1>
+        </div>
         <div className="search-container search-container--row">
           <div className="search-field-wrap">
             <Search size={18} className="search-icon" />
