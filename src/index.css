@@ -50,6 +50,18 @@ html, body {
   /* Seleção de texto permitida por padrão; controles de UI abaixo evitam cursor piscando em botões */
 }
 
+/* Evita o "tracinho piscando" (caret) ao clicar em textos não-editáveis */
+body {
+  caret-color: transparent;
+}
+
+/* Mantém o caret apenas onde o usuário realmente digita */
+input,
+textarea,
+[contenteditable='true'] {
+  caret-color: auto;
+}
+
 /* Scrollbar moderna (global) */
 html {
   scrollbar-width: thin;
