@@ -196,7 +196,7 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
             <button type="button" className="btn-primary" onClick={insertLink}>
               Inserir
             </button>
-            <button type="button" onClick={() => setLinkOpen(false)}>
+            <button type="button" className="lesson-rte-btn-secondary" onClick={() => setLinkOpen(false)}>
               Cancelar
             </button>
           </div>
