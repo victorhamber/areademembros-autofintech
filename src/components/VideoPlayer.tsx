@@ -11,6 +11,8 @@ interface Props {
   title?: string;
   /** Percentual salvo (0–100) para retomar a reprodução */
   initialPercent?: number;
+  /** Esconde capa de pause (ex.: contagem para próxima aula) */
+  hidePauseOverlay?: boolean;
   onProgress?: (percent: number) => void;
   onEnded?: () => void;
 }
@@ -70,19 +72,37 @@ function ensurePlayerAudio(player: Plyr) {
 
 const PROGRESS_SAVE_INTERVAL_MS = 8000;
 
-/** Só no fim real do vídeo (evento ended ou últimos ~50 ms). */
+/** Fim do vídeo — embeds (YouTube) costumam parar um pouco antes do duration reportado. */
 function isPlaybackFinished(player: Plyr): boolean {
   if (player.ended) return true;
   const duration = player.duration;
   const current = player.currentTime;
   if (!Number.isFinite(current) || !Number.isFinite(duration) || duration <= 0) return false;
-  return current >= duration - 0.05;
+  const remaining = duration - current;
+  if (remaining <= 0.05) return true;
+  const ratio = current / duration;
+  if (ratio >= 0.985) return true;
+  // Pausou nos últimos ~3s: trata como fim (YouTube raramente dispara 'ended')
+  if (player.paused && remaining <= 3) return true;
+  return false;
+}
+
+function handleNaturalPlaybackEnd(
+  player: Plyr,
+  setPauseCover: (v: boolean) => void,
+  firePlaybackEnded: () => void
+) {
+  setPauseCover(false);
+  if (isPlaybackFinished(player)) {
+    firePlaybackEnded();
+  }
 }
 
 export const VideoPlayer = memo(function VideoPlayer({
   video,
   title,
   initialPercent = 0,
+  hidePauseOverlay = false,
   onProgress,
   onEnded,
 }: Props) {
@@ -108,10 +128,10 @@ export const VideoPlayer = memo(function VideoPlayer({
   const hideYoutubeUi = video.provider === 'youtube';
 
   useEffect(() => {
+    endedFiredRef.current = false;
     const bounded = Math.min(100, Math.max(0, Math.round(initialPercent)));
     initialResumePercentRef.current = bounded;
     setResumePercentDisplay(bounded);
-    endedFiredRef.current = false;
     lastSavedPercentRef.current = bounded;
   }, [video.videoId, video.provider, initialPercent]);
 
@@ -132,6 +152,7 @@ export const VideoPlayer = memo(function VideoPlayer({
   const firePlaybackEnded = useCallback(() => {
     if (endedFiredRef.current) return;
     endedFiredRef.current = true;
+    setPauseCover(false);
     lastSavedPercentRef.current = 100;
     onProgressRef.current?.(100);
     onEndedRef.current?.();
@@ -186,9 +207,12 @@ export const VideoPlayer = memo(function VideoPlayer({
     };
 
     const onPause = () => {
-      if (hasPlayedRef.current) {
+      if (!hasPlayedRef.current) return;
+      reportProgress(player, true);
+      if (isPlaybackFinished(player)) {
+        handleNaturalPlaybackEnd(player, setPauseCover, firePlaybackEnded);
+      } else {
         setPauseCover(true);
-        reportProgress(player, true);
       }
     };
     const onPlay = () => {
@@ -199,7 +223,7 @@ export const VideoPlayer = memo(function VideoPlayer({
     const onPlaying = () => ensurePlayerAudio(player);
     const onTimeUpdate = () => reportProgress(player);
     const onEndedEvent = () => {
-      firePlaybackEnded();
+      handleNaturalPlaybackEnd(player, setPauseCover, firePlaybackEnded);
     };
 
     player.on('ready', () => {
@@ -317,7 +341,7 @@ export const VideoPlayer = memo(function VideoPlayer({
   return (
     <div className={`video-player-wrap${hideYoutubeUi ? ' hide-youtube-ui' : ''}`}>
       <div ref={containerRef} className="video-player-plyr-mount" />
-      {pauseCover && (
+      {pauseCover && !hidePauseOverlay && (
         <button
           type="button"
           className="video-player-pause-cover"

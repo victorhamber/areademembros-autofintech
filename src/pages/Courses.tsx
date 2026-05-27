@@ -127,6 +127,9 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   const pendingAdvanceLessonIdRef = useRef<string | null>(null);
   const [nextVideoCountdown, setNextVideoCountdown] = useState<number | null>(null);
   const lessonResumeAppliedRef = useRef<string | null>(null);
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
+  const [videoResumePercent, setVideoResumePercent] = useState(0);
 
   const saveProgress = useCallback(
     (lessonId: string, patch: { completed?: boolean; percent?: number }) => {
@@ -214,6 +217,13 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   useEffect(() => {
     setNextVideoCountdown(null);
     pendingAdvanceLessonIdRef.current = null;
+  }, [activeLessonId]);
+
+  useEffect(() => {
+    if (!activeLessonId) return;
+    const p = progressRef.current[activeLessonId];
+    const done = !!p?.completed;
+    setVideoResumePercent(done ? 0 : (p?.percent ?? 0));
   }, [activeLessonId]);
 
   const handleVideoProgress = useCallback(
@@ -354,8 +364,6 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   if (activeCourse) {
     const stats = courseLessonStats(activeCourse, progress);
     const lessonDone = !!activeLesson && !!progress[activeLesson.id]?.completed;
-    const lessonPercent = activeLesson ? progress[activeLesson.id]?.percent ?? 0 : 0;
-    const videoResumePercent = lessonDone ? 0 : lessonPercent;
     const lessonOrder = new Map<string, number>();
     allCourseLessons.forEach((l, idx) => lessonOrder.set(l.id, idx + 1));
     const suggestedLesson = firstSuggestedLesson(activeCourse, progress);
@@ -434,6 +442,7 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
                         video={activeLessonVideo}
                         title={activeLesson.title}
                         initialPercent={videoResumePercent}
+                        hidePauseOverlay={nextVideoCountdown !== null}
                         onProgress={(pct) => handleVideoProgress(activeLesson.id, pct)}
                         onEnded={() => handleLessonComplete(activeLesson.id)}
                       />
