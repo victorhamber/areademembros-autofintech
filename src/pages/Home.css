@@ -22,7 +22,9 @@
 /* ========== Hero (área alta — arte em largura total; conteúdo desce abaixo) ========== */
 .hero-fullbleed--netflix {
   background-color: var(--bg-main);
-  background-image: url('https://autofintech.com.br/wp-content/uploads/2025/03/Cabecalho-12-copiar.webp');
+  /* A imagem do banner é configurável (Admin) e aplicada via inline style no React.
+     Não manter URL fixa aqui evita “piscar” um banner antigo no reload. */
+  background-image: none;
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;

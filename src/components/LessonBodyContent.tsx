@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { MemberTabLink } from '../lib/memberTabs';
-import { parseMemberTabFromHref } from '../lib/memberTabs';
+import { openMemberTabInNewWindow, parseMemberTabFromHref } from '../lib/memberTabs';
 import { copyTextToClipboard } from '../lib/copyToClipboard';
 import { isLessonBodyHtml, LESSON_COPY_BLOCK_CLASS, sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
 
@@ -38,16 +38,14 @@ export function LessonBodyContent({ bodyText, onNavigateMemberTab }: Props) {
         (anchor.getAttribute('data-member-tab') as MemberTabLink | null) || parseMemberTabFromHref(href);
       const newTab = anchor.getAttribute('target') === '_blank';
 
-      if (tab && !newTab && onNavigateMemberTab) {
+      if (tab && onNavigateMemberTab) {
         e.preventDefault();
-        onNavigateMemberTab(tab);
+        if (newTab) {
+          openMemberTabInNewWindow(tab);
+        } else {
+          onNavigateMemberTab(tab);
+        }
         return;
-      }
-
-      if (tab && newTab && href.startsWith('#member-tab:')) {
-        e.preventDefault();
-        const url = `${window.location.origin}/?tab=${encodeURIComponent(tab)}`;
-        window.open(url, '_blank', 'noopener,noreferrer');
       }
     },
     [onNavigateMemberTab]

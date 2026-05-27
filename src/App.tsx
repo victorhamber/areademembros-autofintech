@@ -12,11 +12,12 @@ import { InstallPrompt } from './components/InstallPrompt'
 import { useLanguage } from './i18n/useLanguage'
 import { t } from './i18n/translations'
 import type { Lang } from './i18n/translations'
+import { clearMemberTabQueryFromUrl, MEMBER_TAB_STORAGE_KEY } from './lib/memberTabs'
 import './App.css'
 
 type MemberTab = 'home' | 'courses' | 'downloads' | 'validation' | 'ranking' | 'profile'
 
-const MEMBER_TAB_KEY = 'contentpro_member_tab'
+const MEMBER_TAB_KEY = MEMBER_TAB_STORAGE_KEY
 const MEMBER_TABS: MemberTab[] = ['home', 'courses', 'downloads', 'validation', 'ranking', 'profile']
 
 const SHOW_RANKING = false
@@ -179,6 +180,7 @@ function App() {
   const setActiveTab = (tab: MemberTab) => {
     setActiveTabState(tab)
     sessionStorage.setItem(MEMBER_TAB_KEY, tab)
+    clearMemberTabQueryFromUrl()
   }
   const [showShowcase, setShowShowcase] = useState(false)
   const [showcaseSlug, setShowcaseSlug] = useState<string | null>(null)
@@ -239,18 +241,24 @@ function App() {
   useEffect(() => {
     const onPopState = () => setRoutePathname(window.location.pathname)
     window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const qLang = params.get('lang')
     if (qLang === 'pt' || qLang === 'es') setLang(qLang)
+  }, [setLang])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
     const qTab = params.get('tab')
     if (qTab && MEMBER_TABS.includes(qTab as MemberTab)) {
       setActiveTabState(qTab as MemberTab)
       sessionStorage.setItem(MEMBER_TAB_KEY, qTab)
     }
-
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [setLang])
+    clearMemberTabQueryFromUrl()
+  }, [])
 
   useEffect(() => {
     let cancelled = false
