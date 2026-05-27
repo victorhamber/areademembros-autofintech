@@ -157,7 +157,7 @@ export const Home: React.FC<HomeProps> = ({
     memberHero?.backgroundUrl && memberHero.backgroundUrl.length > 0
       ? {
           backgroundImage: `url(${memberHero.backgroundUrl})`,
-          backgroundSize: 'contain',
+          backgroundSize: 'cover',
           backgroundPosition: 'center top',
           backgroundRepeat: 'no-repeat',
         }

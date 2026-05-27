@@ -23,7 +23,7 @@
 .hero-fullbleed--netflix {
   background-color: var(--bg-main);
   background-image: url('https://autofintech.com.br/wp-content/uploads/2025/03/Cabecalho-12-copiar.webp');
-  background-size: contain;
+  background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
 }
@@ -104,21 +104,22 @@
   height: 100%;
 }
 
-/* Fade longo para o preto da página — sem “linha” entre banner e conteúdo */
+/* Degradê na base do banner — transição suave para o fundo da página */
 .hero-fullbleed--netflix::after {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: min(42%, 300px);
+  height: min(58%, 360px);
   z-index: 1;
   pointer-events: none;
   background: linear-gradient(
     180deg,
     transparent 0%,
-    rgba(0, 0, 0, 0.35) 42%,
-    rgba(0, 0, 0, 0.72) 72%,
+    color-mix(in srgb, var(--bg-main) 12%, transparent) 28%,
+    color-mix(in srgb, var(--bg-main) 55%, transparent) 52%,
+    color-mix(in srgb, var(--bg-main) 88%, transparent) 78%,
     var(--bg-main) 100%
   );
 }
@@ -130,10 +131,10 @@
   pointer-events: none;
   background: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0.08) 0%,
-    transparent 45%,
-    rgba(0, 0, 0, 0.25) 72%,
-    rgba(0, 0, 0, 0.65) 88%,
+    rgba(0, 0, 0, 0.12) 0%,
+    transparent 38%,
+    color-mix(in srgb, var(--bg-main) 35%, transparent) 68%,
+    color-mix(in srgb, var(--bg-main) 75%, transparent) 84%,
     var(--bg-main) 100%
   );
 }
@@ -166,10 +167,15 @@
 }
 
 .home-content {
-  margin-top: clamp(-20px, -2vh, -8px);
+  margin-top: clamp(-32px, -4vh, -16px);
   position: relative;
   z-index: 3;
-  background: var(--bg-main);
+  background: linear-gradient(
+    180deg,
+    transparent 0,
+    color-mix(in srgb, var(--bg-main) 40%, transparent) 28px,
+    var(--bg-main) 56px
+  );
   padding-top: 0;
   padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));

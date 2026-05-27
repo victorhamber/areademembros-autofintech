@@ -2949,9 +2949,9 @@ export const Admin: React.FC = () => {
             </p>
             <label style={{ display: 'block', marginTop: '14px', marginBottom: '6px', fontWeight: 600 }}>URL da imagem de fundo (opcional)</label>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '-2px', marginBottom: '8px', lineHeight: 1.5 }}>
-              Para preencher a largura até as bordas (sem faixas pretas nas laterais), prefira arte <strong>muito panorâmica</strong>:
-              proporcão em torno de <strong>3,5:1 a 4,5:1</strong>. Ex.: <strong>2560×640</strong>, <strong>2880×720</strong> ou{' '}
-              <strong>2400×600</strong>. Use JPG/PNG/WebP e concentre logotipo/rosto/conteúdo importante no centro (20–60% da largura).
+              A imagem preenche a largura inteira (modo cover). Use arte <strong>panorâmica</strong> (~<strong>3,5:1 a 4,5:1</strong>), ex.{' '}
+              <strong>2560×640</strong> ou <strong>2880×720</strong>. Mantenha rosto, logo e textos no <strong>centro</strong> (as bordas podem
+              ser levemente cortadas). A base do banner recebe degradê automático até o fundo da página.
             </p>
             <input
               type="url"
