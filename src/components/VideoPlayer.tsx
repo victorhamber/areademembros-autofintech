@@ -70,11 +70,13 @@ function ensurePlayerAudio(player: Plyr) {
 
 const PROGRESS_SAVE_INTERVAL_MS = 8000;
 
-/** Só considera “fim do vídeo” no último instante (evita pular aula aos 92%). */
-function isPlaybackFinished(current: number, duration: number): boolean {
+/** Só no fim real do vídeo (evento ended ou últimos ~50 ms). */
+function isPlaybackFinished(player: Plyr): boolean {
+  if (player.ended) return true;
+  const duration = player.duration;
+  const current = player.currentTime;
   if (!Number.isFinite(current) || !Number.isFinite(duration) || duration <= 0) return false;
-  if (current >= duration - 0.5) return true;
-  return current / duration >= 0.995;
+  return current >= duration - 0.05;
 }
 
 export const VideoPlayer = memo(function VideoPlayer({
@@ -141,12 +143,12 @@ export const VideoPlayer = memo(function VideoPlayer({
       const current = player.currentTime;
       if (!duration || duration <= 0) return;
       const pct = percentFromTime(current, duration);
-      if (!force && pct <= lastSavedPercentRef.current && !isPlaybackFinished(current, duration)) return;
+      if (!force && pct <= lastSavedPercentRef.current && !isPlaybackFinished(player)) return;
       lastSavedPercentRef.current = Math.max(lastSavedPercentRef.current, pct);
       onProgressRef.current?.(pct);
 
-      // Fallback: alguns embeds (YouTube) não disparam 'ended' — só perto do fim real
-      if (!endedFiredRef.current && isPlaybackFinished(current, duration)) {
+      // Fallback: alguns embeds (YouTube) não disparam 'ended' — só no último instante
+      if (!endedFiredRef.current && isPlaybackFinished(player)) {
         firePlaybackEnded();
       }
     },

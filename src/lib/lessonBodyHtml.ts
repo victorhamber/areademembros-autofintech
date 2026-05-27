@@ -43,6 +43,33 @@ function isCopyBlockEl(el: HTMLElement): boolean {
   return el.tagName === 'DIV' && el.classList.contains(LESSON_COPY_BLOCK_CLASS);
 }
 
+/** Normaliza cor para uso seguro em style="color:…" (hex, rgb/rgba, hsl, nomes). */
+export function normalizeLessonColor(color: string, doc: Document): string | null {
+  const c = color.trim().replace(/\s+/g, ' ');
+  if (!c) return null;
+  if (/^#[0-9a-f]{3,8}$/i.test(c)) return c.toLowerCase();
+  if (/^rgba?\(/i.test(c) || /^hsla?\(/i.test(c)) return c;
+  try {
+    const probe = doc.createElement('span');
+    probe.style.color = c;
+    const resolved = probe.style.color;
+    return resolved || null;
+  } catch {
+    return null;
+  }
+}
+
+function fontToSpan(el: HTMLElement, doc: Document): HTMLSpanElement {
+  const span = doc.createElement('span');
+  const colorAttr = el.getAttribute('color');
+  if (colorAttr) {
+    const normalized = normalizeLessonColor(colorAttr, doc);
+    if (normalized) span.setAttribute('style', `color:${normalized}`);
+  }
+  while (el.firstChild) span.appendChild(el.firstChild);
+  return span;
+}
+
 /** Sanitiza HTML permitindo apenas formatação básica e links. */
 export function sanitizeLessonBodyHtml(raw: string): string {
   if (!raw.trim()) return '';
@@ -81,6 +108,13 @@ export function sanitizeLessonBodyHtml(raw: string): string {
         continue;
       }
 
+      if (el.tagName === 'FONT') {
+        const span = fontToSpan(el, doc);
+        el.parentNode?.replaceChild(span, el);
+        clean(span);
+        continue;
+      }
+
       if (!allowedTags.has(el.tagName)) {
         while (el.firstChild) el.parentNode?.insertBefore(el.firstChild, el);
         el.parentNode?.removeChild(el);
@@ -112,10 +146,8 @@ export function sanitizeLessonBodyHtml(raw: string): string {
         const colorMatch = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
         el.removeAttribute('style');
         if (colorMatch?.[1]) {
-          const color = colorMatch[1].trim();
-          if (/^#[0-9a-f]{3,8}$/i.test(color) || /^rgb\(/i.test(color) || /^hsl\(/i.test(color)) {
-            el.setAttribute('style', `color:${color}`);
-          }
+          const normalized = normalizeLessonColor(colorMatch[1], doc);
+          if (normalized) el.setAttribute('style', `color:${normalized}`);
         }
       }
 

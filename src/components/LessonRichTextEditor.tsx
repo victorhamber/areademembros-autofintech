@@ -49,10 +49,19 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
     if (el.innerHTML !== next) el.innerHTML = next;
   }, [value]);
 
-  const saveSelection = () => {
+  const saveSelection = useCallback(() => {
+    const el = editorRef.current;
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) savedRange.current = sel.getRangeAt(0).cloneRange();
-  };
+    if (!el || !sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!el.contains(range.commonAncestorContainer)) return;
+    savedRange.current = range.cloneRange();
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', saveSelection);
+    return () => document.removeEventListener('selectionchange', saveSelection);
+  }, [saveSelection]);
 
   const restoreSelection = () => {
     const sel = window.getSelection();
@@ -65,6 +74,41 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
     editorRef.current?.focus();
     restoreSelection();
     document.execCommand(cmd, false, val);
+    emitChange();
+  };
+
+  const wrapSelectionWithColor = (color: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    restoreSelection();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!el.contains(range.commonAncestorContainer)) return;
+    if (range.collapsed) return;
+
+    const normalized = color.trim();
+    if (!normalized) return;
+
+    const span = document.createElement('span');
+    span.style.color = normalized;
+
+    try {
+      const fragment = range.extractContents();
+      span.appendChild(fragment);
+      range.insertNode(span);
+      const after = document.createRange();
+      after.selectNodeContents(span);
+      after.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(after);
+      savedRange.current = after.cloneRange();
+    } catch {
+      document.execCommand('styleWithCSS', false, 'true');
+      document.execCommand('foreColor', false, normalized);
+      saveSelection();
+    }
     emitChange();
   };
 
@@ -103,7 +147,7 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
   };
 
   const applyColor = (color: string) => {
-    exec('foreColor', color);
+    wrapSelectionWithColor(color);
   };
 
   const openCopyDialog = () => {
@@ -155,7 +199,10 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
             type="button"
             className="lesson-rte-btn"
             title="Cor do texto selecionado"
-            onMouseDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              saveSelection();
+            }}
             onClick={() => colorInputRef.current?.click()}
           >
             <Palette size={16} />
@@ -165,6 +212,7 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
             type="color"
             className="lesson-rte-color-input"
             defaultValue="#fbbf24"
+            onMouseDown={(e) => e.preventDefault()}
             onChange={(e) => applyColor(e.target.value)}
           />
           {TEXT_COLORS.map((c) => (
@@ -174,8 +222,10 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
               className="lesson-rte-swatch"
               style={{ backgroundColor: c }}
               title={c}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => applyColor(c)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyColor(c);
+              }}
             />
           ))}
         </div>

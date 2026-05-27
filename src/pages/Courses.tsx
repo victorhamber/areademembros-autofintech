@@ -35,6 +35,8 @@ type Course = {
 
 type ProgressMap = Record<string, { completed: boolean; percent: number }>;
 
+const NEXT_LESSON_COUNTDOWN_SEC = 5;
+
 function courseLessonStats(course: Course, progress: ProgressMap) {
   const lessons = course.modules.flatMap(m => m.lessons);
   const total = lessons.length;
@@ -122,6 +124,8 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
 
   const allCourseLessonsRef = useRef<Lesson[]>([]);
   const lessonCompleteGuardRef = useRef<Set<string>>(new Set());
+  const pendingAdvanceLessonIdRef = useRef<string | null>(null);
+  const [nextVideoCountdown, setNextVideoCountdown] = useState<number | null>(null);
   const lessonResumeAppliedRef = useRef<string | null>(null);
 
   const saveProgress = useCallback(
@@ -170,10 +174,8 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
     const idx = lessons.findIndex((l) => l.id === lessonId);
     const next = idx >= 0 && idx < lessons.length - 1 ? lessons[idx + 1] : null;
     if (next) {
-      window.setTimeout(() => {
-        setActiveLessonId(next.id);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 800);
+      setActiveLessonId(next.id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, []);
 
@@ -182,10 +184,37 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
       if (lessonCompleteGuardRef.current.has(lessonId)) return;
       lessonCompleteGuardRef.current.add(lessonId);
       saveProgress(lessonId, { completed: true, percent: 100 });
-      advanceToNextLesson(lessonId);
+
+      const lessons = allCourseLessonsRef.current;
+      const idx = lessons.findIndex((l) => l.id === lessonId);
+      const hasNext = idx >= 0 && idx < lessons.length - 1;
+      if (hasNext) {
+        pendingAdvanceLessonIdRef.current = lessonId;
+        setNextVideoCountdown(NEXT_LESSON_COUNTDOWN_SEC);
+      }
     },
-    [saveProgress, advanceToNextLesson]
+    [saveProgress]
   );
+
+  useEffect(() => {
+    if (nextVideoCountdown === null) return;
+    if (nextVideoCountdown <= 0) {
+      const fromId = pendingAdvanceLessonIdRef.current;
+      pendingAdvanceLessonIdRef.current = null;
+      setNextVideoCountdown(null);
+      if (fromId) advanceToNextLesson(fromId);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setNextVideoCountdown((c) => (c !== null ? c - 1 : null));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [nextVideoCountdown, advanceToNextLesson]);
+
+  useEffect(() => {
+    setNextVideoCountdown(null);
+    pendingAdvanceLessonIdRef.current = null;
+  }, [activeLessonId]);
 
   const handleVideoProgress = useCallback(
     (lessonId: string, percent: number) => {
@@ -238,9 +267,16 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   }, [activeCourse?.id]);
 
   const openLesson = (lessonId: string) => {
+    setNextVideoCountdown(null);
+    pendingAdvanceLessonIdRef.current = null;
     lessonCompleteGuardRef.current.delete(lessonId);
     setActiveLessonId(lessonId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelNextVideoCountdown = () => {
+    setNextVideoCountdown(null);
+    pendingAdvanceLessonIdRef.current = null;
   };
 
   useEffect(() => {
@@ -401,6 +437,22 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
                         onProgress={(pct) => handleVideoProgress(activeLesson.id, pct)}
                         onEnded={() => handleLessonComplete(activeLesson.id)}
                       />
+                      {nextVideoCountdown !== null && nextVideoCountdown > 0 && nextLesson && (
+                        <div className="lesson-video-countdown" role="status" aria-live="polite">
+                          <p className="lesson-video-countdown__label">Próximo vídeo em</p>
+                          <span className="lesson-video-countdown__number" aria-hidden="true">
+                            {nextVideoCountdown}
+                          </span>
+                          <p className="lesson-video-countdown__next">{nextLesson.title}</p>
+                          <button
+                            type="button"
+                            className="lesson-video-countdown__cancel"
+                            onClick={cancelNextVideoCountdown}
+                          >
+                            Ficar nesta aula
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="lesson-video lesson-video--empty">Sem vídeo nesta aula.</div>
