@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { MemberTabLink } from '../lib/memberTabs';
 import { parseMemberTabFromHref } from '../lib/memberTabs';
-import { isLessonBodyHtml, plainTextToLessonHtml, sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
+import { isLessonBodyHtml, sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
 
 type Props = {
   bodyText: string;
