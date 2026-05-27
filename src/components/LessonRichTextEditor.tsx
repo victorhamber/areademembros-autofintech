@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Link2, Palette } from 'lucide-react';
+import { Bold, ClipboardCopy, Italic, Link2, Palette } from 'lucide-react';
 import {
   MEMBER_TAB_LINK_OPTIONS,
   memberTabHref,
   type MemberTabLink,
 } from '../lib/memberTabs';
-import { isLessonBodyHtml, plainTextToLessonHtml, sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
+import { buildLessonCopyBlockHtml, isLessonBodyHtml, plainTextToLessonHtml, sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
+import { copyTextToClipboard } from '../lib/copyToClipboard';
 import './LessonRichTextEditor.css';
 
 type Props = {
@@ -26,6 +27,8 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
   const [linkTab, setLinkTab] = useState<MemberTabLink>('downloads');
   const [linkUrl, setLinkUrl] = useState('https://');
   const [linkNewTab, setLinkNewTab] = useState(true);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyBlockText, setCopyBlockText] = useState('');
   const savedRange = useRef<Range | null>(null);
 
   const emitChange = useCallback(() => {
@@ -103,6 +106,41 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
     exec('foreColor', color);
   };
 
+  const openCopyDialog = () => {
+    saveSelection();
+    setCopyBlockText('');
+    setCopyOpen(true);
+    setLinkOpen(false);
+  };
+
+  const insertCopyBlock = () => {
+    const html = buildLessonCopyBlockHtml(copyBlockText);
+    if (!html) return;
+    editorRef.current?.focus();
+    restoreSelection();
+    document.execCommand('insertHTML', false, html);
+    setCopyOpen(false);
+    setCopyBlockText('');
+    emitChange();
+  };
+
+  const handleEditorClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+    const block = (e.target as HTMLElement).closest('.lesson-copy-block');
+    if (!block) return;
+    const text = block.getAttribute('data-copy') || '';
+    if (!text) return;
+    e.preventDefault();
+    const ok = await copyTextToClipboard(text);
+    const copyBtn = block.querySelector('[data-copy-btn]') as HTMLButtonElement | null;
+    if (copyBtn) {
+      const prev = copyBtn.textContent;
+      copyBtn.textContent = ok ? 'Copiado!' : 'Erro';
+      window.setTimeout(() => {
+        copyBtn.textContent = prev || 'Copiar';
+      }, 2000);
+    }
+  };
+
   return (
     <div className="lesson-rte">
       <div className="lesson-rte-toolbar" role="toolbar" aria-label="Formatação do texto da aula">
@@ -145,6 +183,16 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
           <Link2 size={16} />
           <span>Link / menu</span>
         </button>
+        <button
+          type="button"
+          className="lesson-rte-btn lesson-rte-btn--link"
+          title="Inserir texto copiável"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={openCopyDialog}
+        >
+          <ClipboardCopy size={16} />
+          <span>Texto copiável</span>
+        </button>
       </div>
 
       <div
@@ -159,7 +207,32 @@ export function LessonRichTextEditor({ value, onChange, placeholder, minHeight =
         onBlur={emitChange}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
+        onClick={handleEditorClick}
       />
+
+      {copyOpen && (
+        <div className="lesson-rte-link-panel">
+          <strong>Texto copiável</strong>
+          <p className="lesson-rte-hint">
+            O aluno verá um quadro com o texto e o botão <strong>Copiar</strong>. Clicar no texto ou no botão copia sem erro.
+          </p>
+          <label>Texto exato para copiar</label>
+          <textarea
+            rows={4}
+            value={copyBlockText}
+            onChange={(e) => setCopyBlockText(e.target.value)}
+            placeholder="Ex: https://app.autofintech.com.br ou número da conta MT5"
+          />
+          <div className="lesson-rte-link-actions">
+            <button type="button" className="btn-primary" onClick={insertCopyBlock}>
+              Inserir
+            </button>
+            <button type="button" className="lesson-rte-btn-secondary" onClick={() => setCopyOpen(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {linkOpen && (
         <div className="lesson-rte-link-panel">

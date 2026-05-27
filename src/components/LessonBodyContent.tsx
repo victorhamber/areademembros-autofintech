@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import type { MemberTabLink } from '../lib/memberTabs';
 import { parseMemberTabFromHref } from '../lib/memberTabs';
-import { isLessonBodyHtml, sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
+import { copyTextToClipboard } from '../lib/copyToClipboard';
+import { isLessonBodyHtml, LESSON_COPY_BLOCK_CLASS, sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
 
 type Props = {
   bodyText: string;
@@ -11,6 +12,25 @@ type Props = {
 export function LessonBodyContent({ bodyText, onNavigateMemberTab }: Props) {
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      const copyBlock = (e.target as HTMLElement).closest(`.${LESSON_COPY_BLOCK_CLASS}`);
+      if (copyBlock) {
+        const text = copyBlock.getAttribute('data-copy') || '';
+        if (text) {
+          e.preventDefault();
+          void copyTextToClipboard(text).then((ok) => {
+            const copyBtn = copyBlock.querySelector('[data-copy-btn]') as HTMLButtonElement | null;
+            if (copyBtn) {
+              const prev = copyBtn.textContent;
+              copyBtn.textContent = ok ? 'Copiado!' : 'Erro';
+              window.setTimeout(() => {
+                copyBtn.textContent = prev || 'Copiar';
+              }, 2000);
+            }
+          });
+        }
+        return;
+      }
+
       const anchor = (e.target as HTMLElement).closest('a');
       if (!anchor) return;
       const href = anchor.getAttribute('href') || '';
