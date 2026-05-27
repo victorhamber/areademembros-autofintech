@@ -12,7 +12,11 @@ import { InstallPrompt } from './components/InstallPrompt'
 import { useLanguage } from './i18n/useLanguage'
 import { t } from './i18n/translations'
 import type { Lang } from './i18n/translations'
-import { clearMemberTabQueryFromUrl, MEMBER_TAB_STORAGE_KEY } from './lib/memberTabs'
+import {
+  clearMemberTabNavigationFromUrl,
+  MEMBER_TAB_STORAGE_KEY,
+  readMemberTabFromLocation,
+} from './lib/memberTabs'
 import './App.css'
 
 type MemberTab = 'home' | 'courses' | 'downloads' | 'validation' | 'ranking' | 'profile'
@@ -71,6 +75,8 @@ function isAdminRoute(pathname: string): boolean {
 }
 
 function readStoredMemberTab(): MemberTab {
+  const fromUrl = readMemberTabFromLocation()
+  if (fromUrl && MEMBER_TABS.includes(fromUrl as MemberTab)) return fromUrl as MemberTab
   const raw = sessionStorage.getItem(MEMBER_TAB_KEY)
   return raw && MEMBER_TABS.includes(raw as MemberTab) ? (raw as MemberTab) : 'home'
 }
@@ -180,7 +186,7 @@ function App() {
   const setActiveTab = (tab: MemberTab) => {
     setActiveTabState(tab)
     sessionStorage.setItem(MEMBER_TAB_KEY, tab)
-    clearMemberTabQueryFromUrl()
+    clearMemberTabNavigationFromUrl()
   }
   const [showShowcase, setShowShowcase] = useState(false)
   const [showcaseSlug, setShowcaseSlug] = useState<string | null>(null)
@@ -251,13 +257,12 @@ function App() {
   }, [setLang])
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const qTab = params.get('tab')
-    if (qTab && MEMBER_TABS.includes(qTab as MemberTab)) {
-      setActiveTabState(qTab as MemberTab)
-      sessionStorage.setItem(MEMBER_TAB_KEY, qTab)
+    const tab = readMemberTabFromLocation()
+    if (tab && MEMBER_TABS.includes(tab as MemberTab)) {
+      setActiveTabState(tab as MemberTab)
+      sessionStorage.setItem(MEMBER_TAB_KEY, tab)
     }
-    clearMemberTabQueryFromUrl()
+    clearMemberTabNavigationFromUrl()
   }, [])
 
   useEffect(() => {
