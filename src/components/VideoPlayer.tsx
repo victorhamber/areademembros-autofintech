@@ -69,7 +69,13 @@ function ensurePlayerAudio(player: Plyr) {
 }
 
 const PROGRESS_SAVE_INTERVAL_MS = 8000;
-const COMPLETE_AT_PERCENT = 92;
+
+/** Só considera “fim do vídeo” no último instante (evita pular aula aos 92%). */
+function isPlaybackFinished(current: number, duration: number): boolean {
+  if (!Number.isFinite(current) || !Number.isFinite(duration) || duration <= 0) return false;
+  if (current >= duration - 0.5) return true;
+  return current / duration >= 0.995;
+}
 
 export const VideoPlayer = memo(function VideoPlayer({
   video,
@@ -121,20 +127,31 @@ export const VideoPlayer = memo(function VideoPlayer({
     };
   }, [video.provider, video.videoId]);
 
-  const reportProgress = useCallback((player: Plyr, force = false) => {
-    const duration = player.duration;
-    const current = player.currentTime;
-    if (!duration || duration <= 0) return;
-    const pct = percentFromTime(current, duration);
-    if (!force && pct <= lastSavedPercentRef.current && pct < COMPLETE_AT_PERCENT) return;
-    lastSavedPercentRef.current = Math.max(lastSavedPercentRef.current, pct);
-    onProgressRef.current?.(pct);
-
-    if (!endedFiredRef.current && pct >= COMPLETE_AT_PERCENT) {
-      endedFiredRef.current = true;
-      onEndedRef.current?.();
-    }
+  const firePlaybackEnded = useCallback(() => {
+    if (endedFiredRef.current) return;
+    endedFiredRef.current = true;
+    lastSavedPercentRef.current = 100;
+    onProgressRef.current?.(100);
+    onEndedRef.current?.();
   }, []);
+
+  const reportProgress = useCallback(
+    (player: Plyr, force = false) => {
+      const duration = player.duration;
+      const current = player.currentTime;
+      if (!duration || duration <= 0) return;
+      const pct = percentFromTime(current, duration);
+      if (!force && pct <= lastSavedPercentRef.current && !isPlaybackFinished(current, duration)) return;
+      lastSavedPercentRef.current = Math.max(lastSavedPercentRef.current, pct);
+      onProgressRef.current?.(pct);
+
+      // Fallback: alguns embeds (YouTube) não disparam 'ended' — só perto do fim real
+      if (!endedFiredRef.current && isPlaybackFinished(current, duration)) {
+        firePlaybackEnded();
+      }
+    },
+    [firePlaybackEnded]
+  );
 
   const seekToSavedPosition = useCallback(
     (player: Plyr) => {
@@ -180,10 +197,7 @@ export const VideoPlayer = memo(function VideoPlayer({
     const onPlaying = () => ensurePlayerAudio(player);
     const onTimeUpdate = () => reportProgress(player);
     const onEndedEvent = () => {
-      if (endedFiredRef.current) return;
-      endedFiredRef.current = true;
-      onProgressRef.current?.(100);
-      onEndedRef.current?.();
+      firePlaybackEnded();
     };
 
     player.on('ready', () => {
@@ -233,7 +247,7 @@ export const VideoPlayer = memo(function VideoPlayer({
       player.off('timeupdate', onTimeUpdate);
       player.off('ended', onEndedEvent);
     };
-  }, [video.provider, video.videoId, posterUrl, reportProgress, seekToSavedPosition]);
+  }, [video.provider, video.videoId, posterUrl, reportProgress, seekToSavedPosition, firePlaybackEnded]);
 
   useEffect(() => {
     if (!activated || !useFacade) return;
