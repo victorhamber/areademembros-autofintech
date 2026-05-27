@@ -7,6 +7,8 @@ import {
   emailBodyFromStored,
 } from '@shared/emailTemplates';
 import { MEMBER_THEME_DEFAULTS, type MemberThemeKey } from '@shared/memberTheme';
+import { LessonRichTextEditor } from '../components/LessonRichTextEditor';
+import { sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
 import './Admin.css';
 
 const MEMBER_THEME_COLOR_FIELDS: { key: MemberThemeKey; label: string }[] = [
@@ -2043,7 +2045,7 @@ export const Admin: React.FC = () => {
           title,
           contentId: null,
           videoUrl: newLessonVideoUrl.trim() || null,
-          bodyText: newLessonBodyText.trim() || null,
+          bodyText: sanitizeLessonBodyHtml(newLessonBodyText) || null,
           actionLabel: newLessonActionLabel.trim() || null,
           actionUrl: newLessonActionUrl.trim() || null,
         }),
@@ -2215,7 +2217,7 @@ export const Admin: React.FC = () => {
           title: editLessonTitle.trim(),
           contentId: null,
           videoUrl: editLessonVideoUrl.trim() || null,
-          bodyText: editLessonBodyText.trim() || null,
+          bodyText: sanitizeLessonBodyHtml(editLessonBodyText) || null,
           actionLabel: editLessonActionLabel.trim() || null,
           actionUrl: editLessonActionUrl.trim() || null,
         }),
@@ -3376,12 +3378,14 @@ export const Admin: React.FC = () => {
                           <label>Link do vídeo</label>
                           <input placeholder="Link do YouTube (watch ou youtu.be) ou embed" value={newLessonVideoUrl} onChange={(e) => setNewLessonVideoUrl(e.target.value)} />
                           <label>Texto da aula</label>
-                          <textarea
-                            rows={4}
+                          <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            Selecione trechos para negrito, itálico, cor ou link (menu interno ou URL em nova guia).
+                          </p>
+                          <LessonRichTextEditor
                             value={newLessonBodyText}
-                            onChange={(e) => setNewLessonBodyText(e.target.value)}
-                            style={{ width: '100%' }}
-                            placeholder="Conteúdo em texto..."
+                            onChange={setNewLessonBodyText}
+                            placeholder="Conteúdo da aula…"
+                            minHeight={140}
                           />
                           <label>Texto do botão</label>
                           <input placeholder="Ex: Baixar arquivos" value={newLessonActionLabel} onChange={(e) => setNewLessonActionLabel(e.target.value)} />
@@ -3412,7 +3416,14 @@ export const Admin: React.FC = () => {
                           <label>Link do vídeo</label>
                           <input value={editLessonVideoUrl} onChange={(e) => setEditLessonVideoUrl(e.target.value)} />
                           <label>Texto da aula</label>
-                          <textarea rows={6} value={editLessonBodyText} onChange={(e) => setEditLessonBodyText(e.target.value)} style={{ width: '100%' }} />
+                          <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            Selecione trechos para negrito, itálico, cor ou link (menu interno ou URL em nova guia).
+                          </p>
+                          <LessonRichTextEditor
+                            value={editLessonBodyText}
+                            onChange={setEditLessonBodyText}
+                            minHeight={180}
+                          />
                           <label>Texto do botão</label>
                           <input value={editLessonActionLabel} onChange={(e) => setEditLessonActionLabel(e.target.value)} />
                           <label>Link do botão</label>

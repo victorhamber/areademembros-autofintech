@@ -542,6 +542,27 @@
   margin: 0 0 8px;
 }
 
+.lesson-info-body--rich a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.lesson-info-body--rich a:hover {
+  color: var(--accent-primary-hover, #60a5fa);
+}
+
+.lesson-info-body--rich strong,
+.lesson-info-body--rich b {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.lesson-info-body--rich em,
+.lesson-info-body--rich i {
+  font-style: italic;
+}
+
 .lesson-info-action {
   display: inline-flex;
   align-items: center;

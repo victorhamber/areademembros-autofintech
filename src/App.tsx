@@ -243,6 +243,11 @@ function App() {
     const params = new URLSearchParams(window.location.search)
     const qLang = params.get('lang')
     if (qLang === 'pt' || qLang === 'es') setLang(qLang)
+    const qTab = params.get('tab')
+    if (qTab && MEMBER_TABS.includes(qTab as MemberTab)) {
+      setActiveTabState(qTab as MemberTab)
+      sessionStorage.setItem(MEMBER_TAB_KEY, qTab)
+    }
 
     return () => window.removeEventListener('popstate', onPopState)
   }, [setLang])
@@ -419,6 +424,7 @@ function App() {
                   initialSlug={pendingCourseSlug}
                   onInitialSlugConsumed={clearPendingCourseSlug}
                   authHeaders={authHeaders}
+                  onNavigateMemberTab={(tab) => setActiveTab(tab)}
                 />
               )}
               {activeTab === 'downloads' && (

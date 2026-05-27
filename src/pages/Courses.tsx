@@ -5,6 +5,8 @@ import { t } from '../i18n/translations';
 import { parseVideoUrl } from '../lib/videoEmbed';
 import { readEadResumeState, writeEadResumeState } from '../lib/lessonProgress';
 import { VideoPlayer } from '../components/VideoPlayer';
+import { LessonBodyContent } from '../components/LessonBodyContent';
+import type { MemberTabLink } from '../lib/memberTabs';
 import '../components/VideoPlayer.css';
 import './Courses.css';
 
@@ -55,9 +57,10 @@ interface CoursesProps {
   initialSlug?: string | null;
   onInitialSlugConsumed?: () => void;
   authHeaders?: (json?: boolean) => Record<string, string>;
+  onNavigateMemberTab?: (tab: MemberTabLink) => void;
 }
 
-export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, authHeaders }: CoursesProps) {
+export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, authHeaders, onNavigateMemberTab }: CoursesProps) {
   const tr = t(lang);
   const [courses, setCourses] = useState<Course[]>([]);
   const [progress, setProgress] = useState<ProgressMap>({});
@@ -402,11 +405,10 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
                     <h1 className="lesson-info-title">{activeLesson.title}</h1>
 
                     {activeLesson.bodyText && (
-                      <div className="lesson-info-body">
-                        {activeLesson.bodyText.split('\n').map((line, idx) => (
-                          <p key={idx}>{line || '\u00A0'}</p>
-                        ))}
-                      </div>
+                      <LessonBodyContent
+                        bodyText={activeLesson.bodyText}
+                        onNavigateMemberTab={onNavigateMemberTab}
+                      />
                     )}
 
                     {activeLesson.actionUrl && (

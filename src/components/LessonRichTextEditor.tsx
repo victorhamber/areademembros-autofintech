@@ -1,0 +1,207 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Bold, Italic, Link2, Palette } from 'lucide-react';
+import {
+  MEMBER_TAB_LINK_OPTIONS,
+  memberTabHref,
+  type MemberTabLink,
+} from '../lib/memberTabs';
+import { isLessonBodyHtml, plainTextToLessonHtml, sanitizeLessonBodyHtml } from '../lib/lessonBodyHtml';
+import './LessonRichTextEditor.css';
+
+type Props = {
+  value: string;
+  onChange: (html: string) => void;
+  placeholder?: string;
+  minHeight?: number;
+};
+
+const TEXT_COLORS = ['#ffffff', '#fbbf24', '#34d399', '#60a5fa', '#f87171', '#c084fc', '#fb923c'];
+
+export function LessonRichTextEditor({ value, onChange, placeholder, minHeight = 160 }: Props) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkText, setLinkText] = useState('');
+  const [linkMode, setLinkMode] = useState<'menu' | 'url'>('menu');
+  const [linkTab, setLinkTab] = useState<MemberTabLink>('downloads');
+  const [linkUrl, setLinkUrl] = useState('https://');
+  const [linkNewTab, setLinkNewTab] = useState(true);
+  const savedRange = useRef<Range | null>(null);
+
+  const emitChange = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const html = sanitizeLessonBodyHtml(el.innerHTML);
+    onChange(html);
+  }, [onChange]);
+
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const next = value.trim()
+      ? isLessonBodyHtml(value)
+        ? sanitizeLessonBodyHtml(value)
+        : plainTextToLessonHtml(value)
+      : '';
+    if (el.innerHTML !== next) el.innerHTML = next;
+  }, [value]);
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) savedRange.current = sel.getRangeAt(0).cloneRange();
+  };
+
+  const restoreSelection = () => {
+    const sel = window.getSelection();
+    if (!sel || !savedRange.current) return;
+    sel.removeAllRanges();
+    sel.addRange(savedRange.current);
+  };
+
+  const exec = (cmd: string, val?: string) => {
+    editorRef.current?.focus();
+    restoreSelection();
+    document.execCommand(cmd, false, val);
+    emitChange();
+  };
+
+  const openLinkDialog = () => {
+    saveSelection();
+    const sel = window.getSelection();
+    const selected = sel?.toString().trim() || '';
+    setLinkText(selected || 'clique aqui');
+    setLinkMode('menu');
+    setLinkTab('downloads');
+    setLinkUrl('https://');
+    setLinkNewTab(true);
+    setLinkOpen(true);
+  };
+
+  const insertLink = () => {
+    editorRef.current?.focus();
+    restoreSelection();
+    const text = linkText.trim() || 'clique aqui';
+    let href = linkUrl.trim();
+    let dataTab = '';
+
+    if (linkMode === 'menu') {
+      href = memberTabHref(linkTab, linkNewTab);
+      dataTab = linkTab;
+    } else if (!/^https?:\/\//i.test(href)) {
+      href = `https://${href}`;
+    }
+
+    const target = linkNewTab ? ' target="_blank" rel="noopener noreferrer"' : '';
+    const dataAttr = dataTab ? ` data-member-tab="${dataTab}"` : '';
+    const html = `<a href="${href.replace(/"/g, '&quot;')}"${dataAttr}${target}>${text.replace(/</g, '&lt;')}</a>`;
+    document.execCommand('insertHTML', false, html);
+    setLinkOpen(false);
+    emitChange();
+  };
+
+  const applyColor = (color: string) => {
+    exec('foreColor', color);
+  };
+
+  return (
+    <div className="lesson-rte">
+      <div className="lesson-rte-toolbar" role="toolbar" aria-label="Formatação do texto da aula">
+        <button type="button" className="lesson-rte-btn" title="Negrito" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('bold')}>
+          <Bold size={16} />
+        </button>
+        <button type="button" className="lesson-rte-btn" title="Itálico" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('italic')}>
+          <Italic size={16} />
+        </button>
+        <div className="lesson-rte-colors">
+          <button
+            type="button"
+            className="lesson-rte-btn"
+            title="Cor do texto selecionado"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => colorInputRef.current?.click()}
+          >
+            <Palette size={16} />
+          </button>
+          <input
+            ref={colorInputRef}
+            type="color"
+            className="lesson-rte-color-input"
+            defaultValue="#fbbf24"
+            onChange={(e) => applyColor(e.target.value)}
+          />
+          {TEXT_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className="lesson-rte-swatch"
+              style={{ backgroundColor: c }}
+              title={c}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => applyColor(c)}
+            />
+          ))}
+        </div>
+        <button type="button" className="lesson-rte-btn lesson-rte-btn--link" title="Inserir link" onMouseDown={(e) => e.preventDefault()} onClick={openLinkDialog}>
+          <Link2 size={16} />
+          <span>Link / menu</span>
+        </button>
+      </div>
+
+      <div
+        ref={editorRef}
+        className="lesson-rte-editor"
+        contentEditable
+        role="textbox"
+        aria-multiline="true"
+        data-placeholder={placeholder || 'Conteúdo da aula…'}
+        style={{ minHeight }}
+        onInput={emitChange}
+        onBlur={emitChange}
+        onMouseUp={saveSelection}
+        onKeyUp={saveSelection}
+      />
+
+      {linkOpen && (
+        <div className="lesson-rte-link-panel">
+          <strong>Inserir link</strong>
+          <label>Texto do link</label>
+          <input value={linkText} onChange={(e) => setLinkText(e.target.value)} placeholder="Ex: clique aqui" />
+          <label>Tipo</label>
+          <select value={linkMode} onChange={(e) => setLinkMode(e.target.value as 'menu' | 'url')}>
+            <option value="menu">Menu da área de membros</option>
+            <option value="url">URL externa</option>
+          </select>
+          {linkMode === 'menu' ? (
+            <>
+              <label>Menu de destino</label>
+              <select value={linkTab} onChange={(e) => setLinkTab(e.target.value as MemberTabLink)}>
+                {MEMBER_TAB_LINK_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <>
+              <label>URL</label>
+              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." />
+            </>
+          )}
+          <label className="lesson-rte-check">
+            <input type="checkbox" checked={linkNewTab} onChange={(e) => setLinkNewTab(e.target.checked)} />
+            Abrir em nova guia (recomendado — não interrompe o vídeo)
+          </label>
+          <div className="lesson-rte-link-actions">
+            <button type="button" className="btn-primary" onClick={insertLink}>
+              Inserir
+            </button>
+            <button type="button" onClick={() => setLinkOpen(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

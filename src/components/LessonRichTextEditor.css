@@ -1,0 +1,130 @@
+.lesson-rte {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.lesson-rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 8px 8px 0 0;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.lesson-rte-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.lesson-rte-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.lesson-rte-colors {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.lesson-rte-color-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lesson-rte-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 0;
+}
+
+.lesson-rte-editor {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 0 0 8px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  line-height: 1.55;
+  outline: none;
+  overflow-y: auto;
+}
+
+.lesson-rte-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-secondary, #888);
+  pointer-events: none;
+}
+
+.lesson-rte-editor p {
+  margin: 0 0 0.65em;
+}
+
+.lesson-rte-editor a {
+  color: var(--accent-primary, #3b82f6);
+  text-decoration: underline;
+}
+
+.lesson-rte-link-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.lesson-rte-link-panel label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #aaa);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lesson-rte-link-panel input,
+.lesson-rte-link-panel select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+}
+
+.lesson-rte-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: none !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  color: var(--text-primary, #ddd) !important;
+}
+
+.lesson-rte-link-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
