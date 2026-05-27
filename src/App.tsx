@@ -19,6 +19,8 @@ type MemberTab = 'home' | 'courses' | 'downloads' | 'validation' | 'ranking' | '
 const MEMBER_TAB_KEY = 'contentpro_member_tab'
 const MEMBER_TABS: MemberTab[] = ['home', 'courses', 'downloads', 'validation', 'ranking', 'profile']
 
+const SHOW_RANKING = false
+
 type MemberThemeSettings = {
   member_theme_bg_main?: string
   member_theme_bg_secondary?: string
@@ -310,7 +312,7 @@ function App() {
     { tab: 'courses', Icon: GraduationCap, label: tr.nav_courses },
     { tab: 'downloads', Icon: Download, label: tr.nav_downloads },
     { tab: 'validation', Icon: ShieldCheck, label: tr.nav_validation },
-    { tab: 'ranking', Icon: Trophy, label: tr.nav_ranking },
+    ...(SHOW_RANKING ? [{ tab: 'ranking' as const, Icon: Trophy, label: tr.nav_ranking }] : []),
     { tab: 'profile', Icon: UserIcon, label: tr.nav_profile },
   ]
   const profileNav = memberNavItems.find((x) => x.tab === 'profile')
