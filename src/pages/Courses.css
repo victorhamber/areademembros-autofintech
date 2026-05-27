@@ -14,6 +14,40 @@
   color: var(--text-secondary);
 }
 
+.courses-hub-skeleton {
+  height: 52px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  margin-bottom: 8px;
+}
+
+.course-tile--skeleton {
+  min-height: 200px;
+  border-color: transparent;
+  background: linear-gradient(
+    110deg,
+    var(--bg-secondary) 0%,
+    color-mix(in srgb, var(--bg-secondary) 70%, var(--text-secondary)) 45%,
+    var(--bg-secondary) 90%
+  );
+  background-size: 200% 100%;
+  animation: courses-shimmer 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.courses-grid--skeleton {
+  pointer-events: none;
+}
+
+@keyframes courses-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .courses-page--empty {
   align-items: center;
   text-align: center;

@@ -111,14 +111,14 @@ export const BookCard: React.FC<BookCardProps> = ({
 
   if (isHotmart) {
     return (
-      <a href={salesUrl} className="book-card fade-in hotmart-fb" onClick={(e) => onClick(e, id, hasAccess)} style={{ textDecoration: 'none' }}>
+      <a href={salesUrl} className="book-card hotmart-fb" onClick={(e) => onClick(e, id, hasAccess)} style={{ textDecoration: 'none' }}>
         {content}
       </a>
     );
   }
 
   return (
-    <div className="book-card fade-in" onClick={(e) => onClick(e, id, hasAccess)}>
+    <div className="book-card" onClick={(e) => onClick(e, id, hasAccess)}>
       {content}
     </div>
   );

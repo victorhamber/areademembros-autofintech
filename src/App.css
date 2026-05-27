@@ -79,6 +79,15 @@
   min-width: 0;
 }
 
+/* Mantém abas montadas (evita reload/flash ao trocar menu) */
+.member-tab-panel[hidden] {
+  display: none !important;
+}
+
+.member-tab-panel {
+  width: 100%;
+}
+
 .app-main {
   flex: 1;
   overflow-y: auto;
@@ -264,14 +273,21 @@
     display: none;
   }
 
-  /* Largura confortável no conteúdo principal */
-  .app-main > div {
-    max-width: 1200px;
-    margin: 0 auto;
+  /* Largura confortável no conteúdo principal (painéis de aba ocupam 100% da coluna) */
+  .app-main > .member-tab-panel {
+    max-width: none;
     width: 100%;
+    margin: 0;
+  }
+
+  .app-main > .member-tab-panel > .profile-page {
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   /* Cursos: usa quase toda a largura disponível da coluna principal. */
+  .app-main > .member-tab-panel > .courses-page,
   .app-main > .courses-page {
     max-width: none;
     width: min(85%, calc(100% - 12px));
@@ -279,7 +295,15 @@
     margin-right: auto;
   }
 
+  .app-main > .member-tab-panel > .library-page,
+  .app-main > .library-page {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   /* Início: hero e faixa superior ocupam toda a largura da coluna (sem “caixa” 1200px) */
+  .app-main > .member-tab-panel > .home-page.home-page--fullbleed,
   .app-main > .home-page.home-page--fullbleed {
     max-width: none;
     width: 100%;

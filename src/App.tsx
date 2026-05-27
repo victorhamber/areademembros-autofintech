@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Home as HomeIcon, User as UserIcon, ShieldCheck, Trophy, GraduationCap, Download, LifeBuoy, type LucideIcon } from 'lucide-react'
 import { Home } from './pages/Home'
 import { ValidationPanel } from './pages/ValidationPanel'
@@ -17,6 +17,7 @@ import {
   MEMBER_TAB_STORAGE_KEY,
   readMemberTabFromLocation,
 } from './lib/memberTabs'
+import { applyMemberTheme, writeCachedMemberTheme, type MemberThemeSettings } from './lib/memberTheme'
 import './App.css'
 
 type MemberTab = 'home' | 'courses' | 'downloads' | 'validation' | 'ranking' | 'profile'
@@ -25,49 +26,6 @@ const MEMBER_TAB_KEY = MEMBER_TAB_STORAGE_KEY
 const MEMBER_TABS: MemberTab[] = ['home', 'courses', 'downloads', 'validation', 'ranking', 'profile']
 
 const SHOW_RANKING = false
-
-type MemberThemeSettings = {
-  member_theme_bg_main?: string
-  member_theme_bg_secondary?: string
-  member_theme_bg_card?: string
-  member_theme_text_primary?: string
-  member_theme_text_secondary?: string
-  member_theme_accent_primary?: string
-  member_theme_accent_primary_hover?: string
-  member_theme_border_subtle?: string
-  member_theme_button_text?: string
-  member_theme_video_accent?: string
-}
-
-function applyMemberTheme(theme: MemberThemeSettings) {
-  const root = document.documentElement
-  const map: Array<[keyof MemberThemeSettings, string]> = [
-    ['member_theme_bg_main', '--bg-main'],
-    ['member_theme_bg_secondary', '--bg-secondary'],
-    ['member_theme_bg_card', '--bg-card'],
-    ['member_theme_text_primary', '--text-primary'],
-    ['member_theme_text_secondary', '--text-secondary'],
-    ['member_theme_accent_primary', '--accent-primary'],
-    ['member_theme_accent_primary_hover', '--accent-primary-hover'],
-    ['member_theme_border_subtle', '--border-subtle'],
-    ['member_theme_button_text', '--button-text'],
-    ['member_theme_video_accent', '--video-accent'],
-  ]
-  for (const [settingKey, cssVar] of map) {
-    const value = String(theme?.[settingKey] || '').trim()
-    if (value) root.style.setProperty(cssVar, value)
-  }
-  const setAccentSoft = (hexColor: string, cssVar: string, alpha: number) => {
-    const hex = hexColor.match(/^#([0-9a-fA-F]{6})$/)?.[1]
-    if (!hex) return
-    const r = parseInt(hex.slice(0, 2), 16)
-    const g = parseInt(hex.slice(2, 4), 16)
-    const b = parseInt(hex.slice(4, 6), 16)
-    root.style.setProperty(cssVar, `rgba(${r}, ${g}, ${b}, ${alpha})`)
-  }
-  setAccentSoft(String(theme?.member_theme_accent_primary || '').trim(), '--accent-soft', 0.28)
-  setAccentSoft(String(theme?.member_theme_video_accent || '').trim(), '--video-accent-soft', 0.95)
-}
 
 function isAdminRoute(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, '') || '/'
@@ -183,10 +141,18 @@ function App() {
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('contentpro_userEmail'))
   const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('contentpro_userName'))
   const [activeTab, setActiveTabState] = useState<MemberTab>(readStoredMemberTab)
+  const [mountedTabs, setMountedTabs] = useState<Set<MemberTab>>(() => new Set([readStoredMemberTab()]))
+  const profileLoadedRef = useRef(false)
   const setActiveTab = (tab: MemberTab) => {
     setActiveTabState(tab)
     sessionStorage.setItem(MEMBER_TAB_KEY, tab)
     clearMemberTabNavigationFromUrl()
+    setMountedTabs((prev) => {
+      if (prev.has(tab)) return prev
+      const next = new Set(prev)
+      next.add(tab)
+      return next
+    })
   }
   const [showShowcase, setShowShowcase] = useState(false)
   const [showcaseSlug, setShowcaseSlug] = useState<string | null>(null)
@@ -222,8 +188,12 @@ function App() {
   }
 
   const fetchData = () => {
-    if (!userId) return
-    setIsLoading(true)
+    if (!userId) {
+      setIsLoading(false)
+      return
+    }
+    const showInitialSpinner = !profileLoadedRef.current
+    if (showInitialSpinner) setIsLoading(true)
     Promise.all([fetch('/api/profile', { headers: authHeaders() }).then(r => r.json())]).then(([profile]) => {
       if (profile?.name) { setUserName(profile.name); localStorage.setItem('contentpro_userName', profile.name) }
       
@@ -239,10 +209,16 @@ function App() {
         }
       }
     }).catch(console.error)
-      .finally(() => setIsLoading(false))
+      .finally(() => {
+        profileLoadedRef.current = true
+        setIsLoading(false)
+      })
   }
 
-  useEffect(() => { fetchData() }, [userId])
+  useEffect(() => {
+    profileLoadedRef.current = false
+    fetchData()
+  }, [userId])
 
   useEffect(() => {
     const onPopState = () => setRoutePathname(window.location.pathname)
@@ -287,7 +263,9 @@ function App() {
       .then((r) => r.json())
       .then((data: MemberThemeSettings) => {
         if (cancelled) return
-        applyMemberTheme(data || {})
+        const theme = data || {}
+        applyMemberTheme(theme)
+        writeCachedMemberTheme(theme)
       })
       .catch(() => {})
     return () => {
@@ -416,52 +394,60 @@ function App() {
 
           <div className="member-body">
             <main className={`app-main${activeTab === 'home' ? ' app-main--netflix-home' : ''}`}>
-              {activeTab === 'home' && (
-                <Home
-                  onOpenCourse={slug => {
-                    setPendingCourseSlug(slug)
-                    setActiveTab('courses')
-                  }}
-                  isLoading={isLoading}
-                  userEmail={userEmail}
-                  userName={userName}
-                  lang={lang}
-                  setLang={setLang}
-                  authHeaders={authHeaders}
-                />
+              {mountedTabs.has('home') && (
+                <div className="member-tab-panel" hidden={activeTab !== 'home'}>
+                  <Home
+                    onOpenCourse={slug => {
+                      setPendingCourseSlug(slug)
+                      setActiveTab('courses')
+                    }}
+                    isLoading={isLoading}
+                    userEmail={userEmail}
+                    userName={userName}
+                    lang={lang}
+                    setLang={setLang}
+                    authHeaders={authHeaders}
+                  />
+                </div>
               )}
-              {activeTab === 'courses' && userId && (
-                <Courses
-                  userId={userId}
-                  lang={lang}
-                  initialSlug={pendingCourseSlug}
-                  onInitialSlugConsumed={clearPendingCourseSlug}
-                  authHeaders={authHeaders}
-                  onNavigateMemberTab={(tab) => setActiveTab(tab)}
-                />
+              {mountedTabs.has('courses') && userId && (
+                <div className="member-tab-panel" hidden={activeTab !== 'courses'}>
+                  <Courses
+                    userId={userId}
+                    lang={lang}
+                    initialSlug={pendingCourseSlug}
+                    onInitialSlugConsumed={clearPendingCourseSlug}
+                    authHeaders={authHeaders}
+                    onNavigateMemberTab={(tab) => setActiveTab(tab)}
+                  />
+                </div>
               )}
-              {activeTab === 'downloads' && (
-                <Library
-                  books={[]}
-                  onRead={() => {}}
-                  onToggleWishlist={() => {}}
-                  isLoading={isLoading}
-                  lang={lang}
-                />
+              {mountedTabs.has('downloads') && (
+                <div className="member-tab-panel" hidden={activeTab !== 'downloads'}>
+                  <Library lang={lang} />
+                </div>
               )}
-              {activeTab === 'validation' && userId && (
-                <ValidationPanel userId={userId} lang={lang} userEmail={userEmail} authHeaders={authHeaders} />
+              {mountedTabs.has('validation') && userId && (
+                <div className="member-tab-panel" hidden={activeTab !== 'validation'}>
+                  <ValidationPanel userId={userId} lang={lang} userEmail={userEmail} authHeaders={authHeaders} />
+                </div>
               )}
-              {activeTab === 'ranking' && <Ranking lang={lang} />}
-              {activeTab === 'profile' && (
-                <ProfilePage
-                  userEmail={userEmail}
-                  userName={userName}
-                  lang={lang}
-                  onLogout={handleLogout}
-                  onProfileUpdate={handleProfileUpdate}
-                  authHeaders={authHeaders}
-                />
+              {mountedTabs.has('ranking') && (
+                <div className="member-tab-panel" hidden={activeTab !== 'ranking'}>
+                  <Ranking lang={lang} />
+                </div>
+              )}
+              {mountedTabs.has('profile') && (
+                <div className="member-tab-panel" hidden={activeTab !== 'profile'}>
+                  <ProfilePage
+                    userEmail={userEmail}
+                    userName={userName}
+                    lang={lang}
+                    onLogout={handleLogout}
+                    onProfileUpdate={handleProfileUpdate}
+                    authHeaders={authHeaders}
+                  />
+                </div>
               )}
             </main>
 

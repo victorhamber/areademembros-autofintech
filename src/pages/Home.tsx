@@ -4,6 +4,7 @@ import { Search } from 'lucide-react';
 import { t } from '../i18n/translations';
 import type { Lang } from '../i18n/translations';
 import { SHOW_LANGUAGE_SWITCHER } from '../i18n/featureFlags';
+import { readCachedMemberHero, writeCachedMemberHero } from '../lib/memberHeroCache';
 import './Home.css';
 
 interface HomeProps {
@@ -43,7 +44,7 @@ export const Home: React.FC<HomeProps> = ({
 }) => {
   const tr = t(lang);
   const [searchQuery, setSearchQuery] = useState('');
-  const [memberHero, setMemberHero] = useState<MemberHeroConfig | null>(null);
+  const [memberHero, setMemberHero] = useState<MemberHeroConfig | null>(() => readCachedMemberHero());
   const [publishedCourses, setPublishedCourses] = useState<PublicCourse[]>([]);
 
   const courseRowItems = useMemo(() => {
@@ -121,10 +122,16 @@ export const Home: React.FC<HomeProps> = ({
         const o = d as Record<string, unknown>;
         const backgroundUrl = typeof o.backgroundUrl === 'string' ? o.backgroundUrl : null;
         const kicker = typeof o.kicker === 'string' ? o.kicker : null;
-        setMemberHero({ backgroundUrl, kicker });
+        const next = { backgroundUrl, kicker };
+        setMemberHero(next);
+        writeCachedMemberHero(next);
       })
       .catch(() => {
-        if (!cancelled) setMemberHero({ backgroundUrl: null, kicker: null });
+        if (!cancelled) {
+          const empty = { backgroundUrl: null, kicker: null };
+          setMemberHero(empty);
+          writeCachedMemberHero(empty);
+        }
       });
     return () => {
       cancelled = true;

@@ -5,14 +5,10 @@ import type { Lang } from '../i18n/translations';
 import './Library.css';
 
 interface LibraryProps {
-  books: any[]; // mantido por compatibilidade com App.tsx
-  onRead: (title: string, coverUrl: string) => void; // mantido por compatibilidade
-  onToggleWishlist: (id: string) => void; // mantido por compatibilidade
-  isLoading?: boolean;
   lang: Lang;
 }
 
-export const Library: React.FC<LibraryProps> = ({ isLoading, lang }) => {
+export const Library: React.FC<LibraryProps> = ({ lang }) => {
   const tr = t(lang);
   const [downloads, setDownloads] = useState<
     Array<{
@@ -44,10 +40,9 @@ export const Library: React.FC<LibraryProps> = ({ isLoading, lang }) => {
       .finally(() => setLoadingDownloads(false));
   }, []);
 
-  // EMPTY STATE
-  if (!isLoading && !loadingDownloads && downloads.length === 0) {
+  if (!loadingDownloads && downloads.length === 0) {
     return (
-      <div className="library-empty">
+      <div className="library-page library-empty">
         <div className="empty-icon-wrapper">
           <DownloadIcon size={48} strokeWidth={1.2} />
         </div>
@@ -58,13 +53,16 @@ export const Library: React.FC<LibraryProps> = ({ isLoading, lang }) => {
   }
 
   return (
-    <div style={{ padding: 'var(--spacing-lg) var(--spacing-md)' }}>
-      <h1 style={{ marginBottom: 'var(--spacing-lg)' }}>{tr.downloads_title}</h1>
-
-      <h2 style={{ fontSize: '18px', marginBottom: 'var(--spacing-md)' }}>{tr.downloads_section_entitled}</h2>
+    <div className="library-page">
+      <h1 className="library-title">{tr.downloads_title}</h1>
+      <h2 className="library-section-title">{tr.downloads_section_entitled}</h2>
 
       {loadingDownloads ? (
-        <p style={{ color: 'var(--text-secondary)', padding: '8px 0' }}>{tr.downloads_loading}</p>
+        <div className="downloads-grid downloads-grid--loading" aria-busy="true" aria-label={tr.downloads_loading}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="download-card download-card--skeleton" aria-hidden />
+          ))}
+        </div>
       ) : (
         <div className="downloads-grid">
           {downloads.map((row) => (
@@ -82,7 +80,7 @@ export const Library: React.FC<LibraryProps> = ({ isLoading, lang }) => {
                   <FileDown size={18} /> Baixar
                 </a>
               ) : (
-                <button className="download-btn" disabled>
+                <button type="button" className="download-btn" disabled>
                   <FileDown size={18} /> Indisponível
                 </button>
               )}

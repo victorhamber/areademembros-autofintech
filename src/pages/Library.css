@@ -1,7 +1,50 @@
+.library-page {
+  padding: var(--spacing-lg) var(--spacing-md);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.library-title {
+  margin: 0 0 var(--spacing-lg);
+  font-size: 1.5rem;
+}
+
+.library-section-title {
+  font-size: 18px;
+  margin: 0 0 var(--spacing-md);
+}
+
 .downloads-grid {
   display: grid;
   grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: 12px;
+  min-height: 200px;
+}
+
+.downloads-grid--loading {
+  pointer-events: none;
+}
+
+.download-card--skeleton {
+  min-height: 168px;
+  border-color: transparent;
+  background: linear-gradient(
+    110deg,
+    var(--bg-secondary) 0%,
+    color-mix(in srgb, var(--bg-secondary) 70%, var(--text-secondary)) 45%,
+    var(--bg-secondary) 90%
+  );
+  background-size: 200% 100%;
+  animation: library-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes library-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 @media (min-width: 768px) {

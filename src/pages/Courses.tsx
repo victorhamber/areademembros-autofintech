@@ -66,8 +66,9 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   const [progress, setProgress] = useState<ProgressMap>({});
   const [loading, setLoading] = useState(true);
 
-  const [activeCourseSlug, setActiveCourseSlug] = useState('');
-  const [activeLessonId, setActiveLessonId] = useState('');
+  const initialResume = readEadResumeState();
+  const [activeCourseSlug, setActiveCourseSlug] = useState(() => initialResume?.courseSlug ?? '');
+  const [activeLessonId, setActiveLessonId] = useState(() => initialResume?.lessonId ?? '');
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
   const buildHeaders = (): Record<string, string> => {
@@ -291,8 +292,13 @@ export function Courses({ userId, lang, initialSlug, onInitialSlugConsumed, auth
   // --- LOADING ---
   if (loading) {
     return (
-      <div className="courses-page">
-        <p className="courses-loading">{tr.courses_loading}</p>
+      <div className="courses-page courses-page--loading" aria-busy="true" aria-label={tr.courses_loading}>
+        <div className="courses-hub-skeleton" aria-hidden />
+        <div className="courses-grid courses-grid--skeleton" aria-hidden>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="course-tile course-tile--skeleton" />
+          ))}
+        </div>
       </div>
     );
   }
