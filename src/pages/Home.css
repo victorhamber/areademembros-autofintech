@@ -52,10 +52,10 @@
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 0;
-  /* Mais padding-top = título mais baixo no banner, favorecendo ver a arte acima */
-  padding: calc(env(safe-area-inset-top, 0px) + clamp(56px, 12vh, 140px))
+  /* Texto colado na base da arte (banner em contain) */
+  padding: calc(env(safe-area-inset-top, 0px) + clamp(4px, 1vh, 12px))
     max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px))
-    clamp(16px, 3vh, 32px)
+    clamp(10px, 1.8vh, 18px)
     max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   position: relative;
   z-index: 2;
@@ -71,6 +71,11 @@
   margin-top: calc(-1 * var(--member-main-padding-top, 0px));
   margin-bottom: 0;
   overflow: hidden;
+  /* Altura alinhada ao banner panorâmico (contain) — evita faixa preta enorme */
+  aspect-ratio: 4 / 1;
+  min-height: clamp(200px, 26vw, 380px);
+  max-height: min(42vh, 460px);
+  height: auto;
 }
 
 @media (min-width: 768px) {
@@ -95,8 +100,8 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  /* Altura mais próxima do banner (evita corte e excesso de área vazia) */
-  min-height: clamp(320px, 52vh, 680px);
+  min-height: 100%;
+  height: 100%;
 }
 
 /* Fade longo para o preto da página — sem “linha” entre banner e conteúdo */
@@ -106,8 +111,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  /* Zona mais alta = some o corte seco da capa antes do texto */
-  height: min(52%, 420px);
+  height: min(42%, 300px);
   z-index: 1;
   pointer-events: none;
   background: linear-gradient(
@@ -126,12 +130,10 @@
   pointer-events: none;
   background: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0.1) 0%,
-    rgba(0, 0, 0, 0.02) 28%,
-    transparent 52%,
-    rgba(0, 0, 0, 0.2) 66%,
-    rgba(0, 0, 0, 0.52) 80%,
-    rgba(0, 0, 0, 0.82) 90%,
+    rgba(0, 0, 0, 0.08) 0%,
+    transparent 45%,
+    rgba(0, 0, 0, 0.25) 72%,
+    rgba(0, 0, 0, 0.65) 88%,
     var(--bg-main) 100%
   );
 }
@@ -164,11 +166,11 @@
 }
 
 .home-content {
-  margin-top: clamp(8px, 1.8vh, 18px);
+  margin-top: clamp(-20px, -2vh, -8px);
   position: relative;
   z-index: 3;
   background: var(--bg-main);
-  padding-top: var(--spacing-sm);
+  padding-top: 0;
   padding-left: max(var(--home-gutter, 16px), env(safe-area-inset-left, 0px));
   padding-right: max(var(--home-gutter, 16px), env(safe-area-inset-right, 0px));
   box-sizing: border-box;
@@ -177,8 +179,8 @@
 .home-content .search-container.search-container--row {
   padding-left: 0;
   padding-right: 0;
-  margin-top: var(--spacing-sm);
-  margin-bottom: var(--spacing-lg);
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
   padding-top: 0;
 }
 
