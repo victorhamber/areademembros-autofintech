@@ -315,6 +315,7 @@ export const Admin: React.FC = () => {
   const [userSearch, setUserSearch] = useState('');
   const [userPlanFilter, setUserPlanFilter] = useState('todos');
   const [userStatusFilter, setUserStatusFilter] = useState('todos');
+  const [userSort, setUserSort] = useState<'newest' | 'oldest'>('newest');
   const [pageUsers, setPageUsers] = useState(1);
   const [pageProducts, setPageProducts] = useState(1);
   const [pageWebhooks, setPageWebhooks] = useState(1);
@@ -1711,6 +1712,29 @@ export const Admin: React.FC = () => {
     return m;
   }, [licenses]);
 
+  const latestActivityTsByEmail = useMemo(() => {
+    const m = new Map<string, number>();
+    const consider = (emailRaw: unknown, dateLike: unknown) => {
+      const email = String(emailRaw || '').toLowerCase().trim();
+      if (!email) return;
+      const t = dateLike instanceof Date ? dateLike.getTime() : Date.parse(String(dateLike || ''));
+      if (!Number.isFinite(t)) return;
+      const prev = m.get(email) || 0;
+      if (t > prev) m.set(email, t);
+    };
+
+    for (const u of users as Array<{ email?: string; createdAt?: string | Date }>) {
+      consider(u.email, u.createdAt);
+    }
+    for (const l of licenses as Array<{ email?: string; createdAt?: string | Date; dataAtivacao?: string | Date; dataExpiracao?: string | Date }>) {
+      consider(l.email, l.createdAt);
+      consider(l.email, l.dataAtivacao);
+      consider(l.email, l.dataExpiracao);
+    }
+
+    return m;
+  }, [users, licenses]);
+
   const availablePlanFilters = useMemo(() => {
     const set = new Set<string>();
     for (const plans of licensePlansByEmail.values()) {
@@ -1740,19 +1764,33 @@ export const Admin: React.FC = () => {
 
   useEffect(() => {
     setPageUsers(1);
-  }, [userSearch, userPlanFilter, userStatusFilter]);
+  }, [userSearch, userPlanFilter, userStatusFilter, userSort]);
 
   useEffect(() => {
     const tp = Math.max(1, Math.ceil(filteredUsers.length / ADMIN_TABLE_PAGE_SIZE));
     setPageUsers((p) => Math.min(p, tp));
   }, [filteredUsers.length]);
 
+  const sortedFilteredUsers = useMemo(() => {
+    const dir = userSort === 'oldest' ? 1 : -1;
+    const arr = [...filteredUsers];
+    arr.sort((a: any, b: any) => {
+      const ea = String(a?.email || '').toLowerCase().trim();
+      const eb = String(b?.email || '').toLowerCase().trim();
+      const ta = latestActivityTsByEmail.get(ea) || 0;
+      const tb = latestActivityTsByEmail.get(eb) || 0;
+      if (ta !== tb) return (ta - tb) * dir;
+      return ea.localeCompare(eb, 'pt-BR');
+    });
+    return arr;
+  }, [filteredUsers, latestActivityTsByEmail, userSort]);
+
   const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / ADMIN_TABLE_PAGE_SIZE));
   const usersPageEff = Math.min(pageUsers, usersTotalPages);
   const pagedUsers = useMemo(() => {
     const start = (usersPageEff - 1) * ADMIN_TABLE_PAGE_SIZE;
-    return filteredUsers.slice(start, start + ADMIN_TABLE_PAGE_SIZE);
-  }, [filteredUsers, usersPageEff]);
+    return sortedFilteredUsers.slice(start, start + ADMIN_TABLE_PAGE_SIZE);
+  }, [sortedFilteredUsers, usersPageEff]);
 
   useEffect(() => {
     const tp = Math.max(1, Math.ceil(products.length / ADMIN_TABLE_PAGE_SIZE));
@@ -3547,6 +3585,13 @@ export const Admin: React.FC = () => {
                     <option value="inativa">Inativa</option>
                     <option value="expirada">Expirada</option>
                     <option value="sem_licenca">Sem licença</option>
+                  </select>
+                </div>
+                <div className="admin-clients-filters-group">
+                  <label htmlFor="client-sort-filter">Ordenar</label>
+                  <select id="client-sort-filter" value={userSort} onChange={(e) => setUserSort(e.target.value as 'newest' | 'oldest')}>
+                    <option value="newest">Mais novo</option>
+                    <option value="oldest">Mais antigo</option>
                   </select>
                 </div>
               </div>
