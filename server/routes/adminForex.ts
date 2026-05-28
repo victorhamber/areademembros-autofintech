@@ -2,9 +2,9 @@ import express from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
 
-function addDurationByPlan(planoRaw: string | null | undefined): Date {
+function addDurationByPlanFrom(planoRaw: string | null | undefined, base: Date): Date {
   const plano = String(planoRaw || 'mensal').toLowerCase().trim();
-  const d = new Date();
+  const d = new Date(base);
   const toleranceDays = 3;
   if (plano === 'teste') {
     d.setDate(d.getDate() + 7 + toleranceDays);
@@ -56,11 +56,12 @@ export function registerAdminForexRoutes(
           eventId,
           plano,
           statusLicenca: String(b.statusLicenca || 'ativa'),
-          dataExpiracao: addDurationByPlan(plano),
+          // A contagem começa no primeiro bind do EA (validação).
+          dataExpiracao: null,
           systemId: String(b.systemId || ''),
           offerCode: b.offerCode != null ? String(b.offerCode).trim() || null : null,
           subscriberCode: b.subscriberCode != null ? String(b.subscriberCode) : null,
-          dataAtivacao: new Date()
+          dataAtivacao: null
         }
       });
       res.json(lic);
@@ -84,7 +85,8 @@ export function registerAdminForexRoutes(
           numeroConta: b.numeroConta !== undefined ? String(b.numeroConta) : undefined,
           plano: b.plano != null ? String(b.plano) : undefined,
           statusLicenca: b.statusLicenca != null ? String(b.statusLicenca) : undefined,
-          dataExpiracao: addDurationByPlan(plano),
+          // Se já começou a contar, recalcula expiração a partir da data de ativação.
+          dataExpiracao: current.dataAtivacao ? addDurationByPlanFrom(plano, current.dataAtivacao) : null,
           systemId: b.systemId != null ? String(b.systemId) : undefined,
           offerCode: b.offerCode !== undefined ? (b.offerCode ? String(b.offerCode).trim() : null) : undefined,
           subscriberCode: b.subscriberCode !== undefined ? (b.subscriberCode ? String(b.subscriberCode) : null) : undefined

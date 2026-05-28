@@ -17,8 +17,8 @@ async function findProductByOfferCode(prisma: PrismaClient, offerCode: string) {
   return candidates.find((p) => csvIncludes(p.offerCode, code)) || null;
 }
 
-function addDuration(plano: string): Date {
-  const d = new Date();
+function addDurationFrom(plano: string, base: Date): Date {
+  const d = new Date(base);
   const p = String(plano || 'mensal').toLowerCase().trim();
   const toleranceDays = 3;
   if (p === 'teste') {
@@ -125,7 +125,7 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
   const hasProduct = systemIds.length > 0;
   if (!systemIds.length) systemIds.push('');
   const plano = product?.plano || 'mensal';
-  const data_expiracao = addDuration(plano);
+  const now = new Date();
 
   // --- 1) Ativar licença(s) se houver Product cadastrado ---
   if (hasProduct) {
@@ -145,14 +145,17 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
       }
 
       if (existing) {
+        const shouldStartNow = !!(existing.dataAtivacao && existing.dataExpiracao);
+        const baseForExpiry =
+          existing.dataExpiracao && existing.dataExpiracao > now ? existing.dataExpiracao : now;
         const update: {
           email: string;
           buyerName: string | null;
           plano: string;
           statusLicenca: string;
-          dataExpiracao: Date;
+          dataExpiracao: Date | null;
           systemId: string;
-          dataAtivacao: Date;
+          dataAtivacao: Date | null;
           subscriberCode?: string | null;
           eventId?: string;
           offerCode?: string | null;
@@ -161,9 +164,11 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
           buyerName: buyer_name || existing.buyerName,
           plano,
           statusLicenca: 'ativa',
-          dataExpiracao: data_expiracao,
+          // Contagem do prazo começa no primeiro bind do EA.
+          // Se já estava ativa/contando, estende a partir da expiração atual (ou agora).
+          dataExpiracao: shouldStartNow ? addDurationFrom(plano, baseForExpiry) : null,
           systemId: system_id || existing.systemId,
-          dataAtivacao: new Date()
+          dataAtivacao: shouldStartNow ? (existing.dataAtivacao as Date) : null
         };
         if (subscriber_code) update.subscriberCode = subscriber_code;
         if (offer_code) update.offerCode = offer_code;
@@ -180,9 +185,10 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
             eventId: isFirst ? event_id : `${event_id}_${system_id || idx}`,
             plano,
             statusLicenca: 'ativa',
-            dataExpiracao: data_expiracao,
+            // Começa a contar no primeiro bind do EA (validação com sucesso).
+            dataExpiracao: null,
             systemId: system_id,
-            dataAtivacao: new Date(),
+            dataAtivacao: null,
             subscriberCode: subscriber_code || null,
             offerCode: offer_code || null
           }

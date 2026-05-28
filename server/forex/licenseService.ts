@@ -5,6 +5,30 @@ import { log } from '../lib/logger.js';
 const ACTIVE = 'ativa';
 const EXPIRED = 'expirada';
 
+function addDurationByPlanFrom(planoRaw: string | null | undefined, base: Date): Date {
+  const plano = String(planoRaw || 'mensal').toLowerCase().trim();
+  const d = new Date(base);
+  const toleranceDays = 3;
+  if (plano === 'teste') {
+    d.setDate(d.getDate() + 7 + toleranceDays);
+    return d;
+  }
+  if (plano === 'semestral') {
+    d.setDate(d.getDate() + 180 + toleranceDays);
+    return d;
+  }
+  if (plano === 'anual') {
+    d.setDate(d.getDate() + 365 + toleranceDays);
+    return d;
+  }
+  if (plano === 'vitalicio') {
+    d.setDate(d.getDate() + 18250 + toleranceDays);
+    return d;
+  }
+  d.setDate(d.getDate() + 30 + toleranceDays); // mensal/default
+  return d;
+}
+
 function isEmailValid(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -94,6 +118,17 @@ export async function validateLicenseHandler(
       result = { status: 403, json: { status: 'error', message: 'Licença expirada.' } };
     } else {
       const now = new Date();
+      // Início da contagem: só começa no primeiro "bind" do EA (validação com sucesso).
+      // Compra pode ter acontecido antes, mas o prazo não corre até a primeira ativação real.
+      if (!license.dataAtivacao || !license.dataExpiracao) {
+        const startedAt = now;
+        const expiresAt = addDurationByPlanFrom(license.plano, startedAt);
+        license = await prisma.license.update({
+          where: { id: license.id },
+          data: { dataAtivacao: startedAt, dataExpiracao: expiresAt },
+        });
+        invalidateLicenseCacheForEmail(email);
+      }
       if (license.dataExpiracao && license.dataExpiracao < now) {
         await prisma.license.update({ where: { id: license.id }, data: { statusLicenca: EXPIRED } });
         invalidateLicenseCacheForEmail(email);

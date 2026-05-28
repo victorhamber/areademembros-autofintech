@@ -981,6 +981,11 @@ app.post('/api/admin/users', adminAuthMiddleware, async (req, res) => {
         name: name != null && String(name).trim() ? String(name).trim() : null
       }
     });
+    // Cadastro manual: enviar boas-vindas também (como no webhook).
+    // Não bloqueia a resposta do admin caso o provedor de e-mail falhe.
+    sendWelcomeEmail(prisma, String(email || '').toLowerCase().trim(), user.name || null, pwd, null).catch((err) =>
+      console.error('[Email] boas-vindas (admin) falhou:', err)
+    );
     res.json(user);
   } catch(error) {
     res.status(400).json({ error: 'Erro. Talvez e-mail já exista.' });
