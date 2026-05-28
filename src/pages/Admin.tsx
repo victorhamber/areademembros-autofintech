@@ -1712,7 +1712,7 @@ export const Admin: React.FC = () => {
     return m;
   }, [licenses]);
 
-  const latestActivityTsByEmail = useMemo(() => {
+  const latestPurchaseKeyByEmail = useMemo(() => {
     const m = new Map<string, number>();
     const consider = (emailRaw: unknown, dateLike: unknown) => {
       const email = String(emailRaw || '').toLowerCase().trim();
@@ -1723,13 +1723,11 @@ export const Admin: React.FC = () => {
       if (t > prev) m.set(email, t);
     };
 
-    for (const u of users as Array<{ email?: string; createdAt?: string | Date }>) {
-      consider(u.email, u.createdAt);
-    }
-    for (const l of licenses as Array<{ email?: string; createdAt?: string | Date; dataAtivacao?: string | Date; dataExpiracao?: string | Date }>) {
-      consider(l.email, l.createdAt);
+    // Ordenação por "ordem de compra": usa apenas datas da licença (ativação/criação).
+    // Não usa expiração porque pode ser futura e distorcer "mais novo".
+    for (const l of licenses as Array<{ email?: string; createdAt?: string | Date; dataAtivacao?: string | Date; id?: number }>) {
       consider(l.email, l.dataAtivacao);
-      consider(l.email, l.dataExpiracao);
+      consider(l.email, l.createdAt);
     }
 
     return m;
@@ -1777,13 +1775,13 @@ export const Admin: React.FC = () => {
     arr.sort((a: any, b: any) => {
       const ea = String(a?.email || '').toLowerCase().trim();
       const eb = String(b?.email || '').toLowerCase().trim();
-      const ta = latestActivityTsByEmail.get(ea) || 0;
-      const tb = latestActivityTsByEmail.get(eb) || 0;
+      const ta = latestPurchaseKeyByEmail.get(ea) || 0;
+      const tb = latestPurchaseKeyByEmail.get(eb) || 0;
       if (ta !== tb) return (ta - tb) * dir;
       return ea.localeCompare(eb, 'pt-BR');
     });
     return arr;
-  }, [filteredUsers, latestActivityTsByEmail, userSort]);
+  }, [filteredUsers, latestPurchaseKeyByEmail, userSort]);
 
   const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / ADMIN_TABLE_PAGE_SIZE));
   const usersPageEff = Math.min(pageUsers, usersTotalPages);
