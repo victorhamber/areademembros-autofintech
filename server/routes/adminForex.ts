@@ -1,6 +1,7 @@
 import express from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
+import { repairLicensesByOfferCode } from '../lib/repairLicensesByOfferCode.js';
 
 function addDurationByPlanFrom(planoRaw: string | null | undefined, base: Date): Date {
   const plano = String(planoRaw || 'mensal').toLowerCase().trim();
@@ -113,6 +114,23 @@ export function registerAdminForexRoutes(
     if (!email) return res.status(400).json({ error: 'E-mail obrigatório.' });
     const result = await prisma.license.deleteMany({ where: { email } });
     res.json({ success: true, deleted: result.count });
+  });
+
+  /** Alinha plano/systemId de todas as licenças ao catálogo via offerCode (contas antigas). */
+  app.post('/api/admin/licenses/repair-by-offer', adminAuth, async (req, res) => {
+    try {
+      const dryRun = (req.body as { dryRun?: boolean })?.dryRun === true;
+      const result = await repairLicensesByOfferCode(prisma, { dryRun });
+      res.json({
+        success: true,
+        message: dryRun
+          ? `${result.updated} licença(s) seriam corrigidas (${result.unchanged} já ok).`
+          : `${result.updated} licença(s) corrigidas (${result.unchanged} já estavam ok).`,
+        ...result,
+      });
+    } catch (e) {
+      res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+    }
   });
 
   app.get('/api/admin/products', adminAuth, async (_req, res) => {
