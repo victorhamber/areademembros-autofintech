@@ -25,6 +25,8 @@
     "db:consolidate:products:dry": "node scripts/consolidate-three-products.mjs --dry-run",
     "db:fix:license-products": "node scripts/fix-license-products-by-plan.mjs",
     "db:fix:license-products:dry": "node scripts/fix-license-products-by-plan.mjs --dry-run",
+    "db:fix:licenses-by-offer": "node scripts/fix-licenses-by-offer-code.mjs",
+    "db:fix:licenses-by-offer:dry": "node scripts/fix-licenses-by-offer-code.mjs --dry-run",
     "db:resync:wp-passwords": "node scripts/resync-wp-passwords.mjs",
     "db:resync:wp-passwords:dry": "node scripts/resync-wp-passwords.mjs --dry-run",
     "dev:api": "tsx server/index.ts",
