@@ -28,7 +28,21 @@ Parabéns por adquirir nossa licença. Seu acesso à área de membros já está 
 Login: {{email}}
 Senha: {{password}}
 
+Acesse sua área de membros: {{app_url}}
+
 Qualquer dúvida, entre em contato com nosso suporte.`;
+
+/** Texto editável — boas-vindas (ES). Placeholders: {{name}}, {{email}}, {{password}}, {{app_url}} */
+export const DEFAULT_WELCOME_BODY_ES = `¡Hola, {{name}}!
+
+Felicitaciones por adquirir nuestra licencia. Tu acceso al área de miembros ya está activo.
+
+Usuario: {{email}}
+Contraseña: {{password}}
+
+Accede al área de miembros: {{app_url}}
+
+Si tienes dudas, contacta con nuestro soporte.`;
 
 const RESET_LABELS: Record<EmailLang, { badge: string; button: string; altLink: string; footer: string }> = {
   pt: {
@@ -45,13 +59,15 @@ const RESET_LABELS: Record<EmailLang, { badge: string; button: string; altLink: 
   },
 };
 
-const WELCOME_LABELS: Record<EmailLang, { button: string; footer: string }> = {
+const WELCOME_LABELS: Record<EmailLang, { button: string; altLink: string; footer: string }> = {
   pt: {
     button: 'Acessar área de membros',
+    altLink: 'Link alternativo',
     footer: 'Autofintech · Mensagem automática, por favor não responda.',
   },
   es: {
     button: 'Acceder al área de miembros',
+    altLink: 'Enlace alternativo',
     footer: 'Autofintech · Mensaje automático, no responda.',
   },
 };
@@ -159,7 +175,8 @@ export function buildWelcomeEmailHtml(bodyPlain: string, lang: EmailLang = 'pt')
                     <a href="{{app_url}}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">${escapeHtml(labels.button)}</a>
                   </td>
                 </tr>
-              </table>`;
+              </table>
+              <p style="margin:0;font-size:12px;line-height:1.5;color:#64748b;word-break:break-all;">${escapeHtml(labels.altLink)}: <a href="{{app_url}}" style="color:#2563eb;text-decoration:underline;">{{app_url}}</a></p>`;
   return emailShell(inner, labels.footer);
 }
 

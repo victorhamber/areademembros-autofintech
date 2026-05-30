@@ -7,7 +7,6 @@ import crypto from 'crypto';
 import http from 'http';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
-import { Resend } from 'resend';
 import multer from 'multer';
 import { signUserToken, signAdminJwt } from './auth/jwt.js';
 import { resolveUserId } from './auth/resolveUser.js';
@@ -40,6 +39,7 @@ import {
 } from '../shared/emailTemplates.js';
 import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.js';
 import { sendWelcomeEmail, detectLang } from './lib/welcomeEmail.js';
+import { sendTransactionalEmail } from './lib/emailSender.js';
 import {
   findBuilderPageBySlug,
   isBuilderPagePublished,
@@ -67,25 +67,7 @@ async function getSetting(prismaClient: PrismaClient, key: string): Promise<stri
 }
 
 async function sendEmail(prismaClient: PrismaClient, to: string, subject: string, html: string) {
-  try {
-    const apiKey = await getSetting(prismaClient, 'resend_api_key');
-    if (!apiKey) { console.log('[Email] No Resend API key configured. Skipping.'); return; }
-
-    const senderName = (await getSetting(prismaClient, 'sender_name')) || 'Autofintech';
-    const senderEmail = (await getSetting(prismaClient, 'sender_email')) || 'noreply@example.com';
-
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from: `${senderName} <${senderEmail}>`,
-      to: [to],
-      subject,
-      html
-    });
-    if (error) console.error('[Email] Resend error:', error);
-    else console.log(`[Email] ✅ Sent to ${to}: ${subject}`);
-  } catch (err) {
-    console.error('[Email] Failed to send:', err);
-  }
+  await sendTransactionalEmail(prismaClient, to, subject, html);
 }
 
 function normalizeShortLinkSlug(raw: string): string {
@@ -1084,7 +1066,15 @@ app.get('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
 app.post('/api/admin/email-settings', adminAuthMiddleware, async (req, res) => {
   try {
     const body = req.body as Record<string, string>;
-    const allowed = ['resend_api_key', 'sender_name', 'sender_email', 'welcome_template_pt', 'reset_template_pt'] as const;
+    const allowed = [
+      'resend_api_key',
+      'sender_name',
+      'sender_email',
+      'welcome_template_pt',
+      'reset_template_pt',
+      'welcome_template_es',
+      'reset_template_es',
+    ] as const;
     for (const key of allowed) {
       if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
       let value = String(body[key] ?? '');
@@ -1106,6 +1096,51 @@ app.post('/api/admin/email-settings', adminAuthMiddleware, async (req, res) => {
   } catch (error) {
     console.error('[Email settings save]', error);
     res.status(500).json({ error: 'Falha ao salvar configurações de e-mail.' });
+  }
+});
+
+app.post('/api/admin/email-settings/test', adminAuthMiddleware, async (req, res) => {
+  try {
+    const to = String((req.body as { to?: string })?.to || '').trim().toLowerCase();
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      return res.status(400).json({ error: 'Informe um e-mail de destino válido para o teste.' });
+    }
+
+    const appUrl = getAppUrl();
+    const html = `<p style="font-family:sans-serif;font-size:15px;color:#334155;">
+      Este é um e-mail de teste da área de membros Autofintech.<br><br>
+      <strong>Destinatário configurado:</strong> ${to}<br>
+      Se você recebeu esta mensagem nesta caixa de entrada, o envio para compradores está funcionando.
+    </p>
+    <p style="font-family:sans-serif;font-size:13px;color:#64748b;">
+      App: <a href="${appUrl}">${appUrl}</a>
+    </p>`;
+
+    const result = await sendTransactionalEmail(
+      prisma,
+      to,
+      'Teste de e-mail — Autofintech Área de Membros',
+      html
+    );
+
+    if (!result.ok) {
+      return res.status(result.skipped ? 503 : 502).json({
+        error: result.error,
+        to: result.to,
+        from: result.from || undefined,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `E-mail de teste enviado para ${result.to}.`,
+      to: result.to,
+      from: result.from,
+      messageId: result.messageId,
+    });
+  } catch (error) {
+    console.error('[Email test]', error);
+    res.status(500).json({ error: 'Falha ao enviar e-mail de teste.' });
   }
 });
 

@@ -62,3 +62,35 @@ npm run db:migrate:wordpress
 ## Observação
 
 O script **limpa** o Postgres do app antes de importar (exceto com `--no-clear`). Faça backup se já tiver dados manuais no Postgres.
+
+## Sincronizar só licenças (troca de domínio / atualização parcial)
+
+Se o app **já está em produção** com cursos, conteúdos e compras, **não** use a migração completa. Use o sync parcial:
+
+```bash
+cd /app
+npm run db:sync:wp-licenses:dry
+```
+
+Confira `created`, `updated` e `unchanged`. Depois:
+
+```bash
+npm run db:sync:wp-licenses
+```
+
+Isso **upsert** licenças e produtos do WordPress sem apagar o restante do app.
+
+Opções extras:
+
+| Flag | Efeito |
+|------|--------|
+| `--no-products` | Só licenças |
+| `--ensure-users` | Cria usuários faltantes (sem senha) para e-mails das licenças |
+| `--mirror-licenses` | Remove licenças do app que não existem no WordPress |
+
+Senhas WordPress (login dos membros):
+
+```bash
+npm run db:resync:wp-passwords:dry
+npm run db:resync:wp-passwords
+```

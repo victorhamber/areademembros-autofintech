@@ -403,6 +403,8 @@ export const Admin: React.FC = () => {
   const [forexWebhook, setForexWebhook] = useState('');
   const [forexApiLines, setForexApiLines] = useState('');
   const [emailSaving, setEmailSaving] = useState(false);
+  const [testEmailTo, setTestEmailTo] = useState('');
+  const [testEmailSending, setTestEmailSending] = useState(false);
   const [bannerSaving, setBannerSaving] = useState(false);
   const [themeSaving, setThemeSaving] = useState(false);
   const emptyProductForm = () => ({
@@ -1457,6 +1459,42 @@ export const Admin: React.FC = () => {
       alert('Erro de conexão.');
     } finally {
       setEmailSaving(false);
+    }
+  };
+
+  const sendTestEmail = async () => {
+    const h = authHeaders();
+    if (!h.Authorization) return;
+    const to = testEmailTo.trim().toLowerCase();
+    if (!to) {
+      alert('Informe o e-mail de destino do teste.');
+      return;
+    }
+    setTestEmailSending(true);
+    try {
+      const res = await fetch('/api/admin/email-settings/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...h },
+        body: JSON.stringify({ to }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+        to?: string;
+        from?: string;
+      };
+      if (!res.ok) {
+        alert(j.error || 'Falha ao enviar e-mail de teste.');
+        return;
+      }
+      alert(
+        j.message ||
+          `E-mail de teste enviado para ${j.to || to}. Verifique a caixa de entrada (e spam). Remetente: ${j.from || '—'}.`
+      );
+    } catch {
+      alert('Erro de conexão.');
+    } finally {
+      setTestEmailSending(false);
     }
   };
 
@@ -4363,6 +4401,51 @@ export const Admin: React.FC = () => {
                 </div>
               </div>
 
+              <div
+                style={{
+                  marginTop: '14px',
+                  padding: '14px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255, 152, 0, 0.25)',
+                  background: 'rgba(255, 152, 0, 0.08)',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  lineHeight: 1.55,
+                }}
+              >
+                <strong style={{ color: '#ffb74d' }}>Importante — destinatário vs remetente</strong>
+                <br />
+                O e-mail do comprador vem do webhook Hotmart (<code>data.buyer.email</code>). O campo acima é só o <strong>remetente</strong> (From).
+                <br />
+                No Resend, o domínio do remetente precisa estar verificado — senão os e-mails podem falhar ou ir só para a conta do Resend.
+                <br />
+                Se você ainda usa o plugin WordPress de licenças, ele envia uma <strong>notificação de admin</strong> para <code>contato@victorhamber.com</code> — isso não é o e-mail de boas-vindas do comprador.
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginTop: '16px' }}>
+                <div style={{ flex: 1, minWidth: '220px' }}>
+                  <label>Testar envio para um comprador</label>
+                  <input
+                    type="email"
+                    placeholder="email-do-comprador@exemplo.com"
+                    value={testEmailTo}
+                    onChange={(e) => setTestEmailTo(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary-sm"
+                  disabled={testEmailSending}
+                  onClick={() => void sendTestEmail()}
+                  style={{ marginBottom: '2px' }}
+                >
+                  {testEmailSending ? 'Enviando...' : 'Enviar e-mail de teste'}
+                </button>
+              </div>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                Use um e-mail que <strong>não</strong> seja o seu admin. Se o teste chegar na caixa certa, o fluxo de compra também deve funcionar.
+              </p>
+
               <hr style={{ borderColor: 'var(--border-subtle)', margin: '20px 0' }} />
 
               <div style={{ 
@@ -4378,13 +4461,13 @@ export const Admin: React.FC = () => {
                 <h4 style={{ margin: '0 0 5px 0', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>🇧🇷 Português (Brasil)</h4>
                 
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
-                  Edite apenas o <strong>texto</strong> dos e-mails. O layout visual (cores, botão e cabeçalho Autofintech) é aplicado automaticamente no envio.
+                  Edite apenas o <strong>texto</strong> dos e-mails. O layout visual (cores, botão &quot;Acessar área de membros&quot; e cabeçalho Autofintech) é aplicado automaticamente no envio.
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ marginTop: '0' }}>E-mail de Boas-vindas</label>
                   <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0' }}>
-                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'} — use linha em branco entre parágrafos.
+                    Placeholders: {'{{name}}'}, {'{{email}}'}, {'{{password}}'}, {'{{app_url}}'} — inclua {'{{app_url}}'} no texto para o link da home; use linha em branco entre parágrafos.
                   </p>
                 </div>
                 <textarea

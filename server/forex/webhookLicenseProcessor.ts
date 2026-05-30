@@ -113,11 +113,27 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
   if (!email) return { ok: false, status: 400, message: 'Missing buyer email' };
 
   const { user, isNewUser } = await ensureUser(prisma, email, buyer_name, buyer_country);
+  let welcomeEmailNote = '';
   if (isNewUser) {
     log('INFO', `Novo usuário criado via webhook: ${email} (senha padrão: Mudar123@)`);
-    sendWelcomeEmail(prisma, email, buyer_name || null, 'Mudar123@', buyer_country).catch(err =>
-      log('ERROR', `Falha ao enviar e-mail de boas-vindas para ${email}: ${err}`)
-    );
+    try {
+      const mail = await sendWelcomeEmail(prisma, email, buyer_name || null, 'Mudar123@', buyer_country);
+      if (mail.ok) {
+        welcomeEmailNote = ` Boas-vindas enviada para ${mail.to}.`;
+        log('INFO', `E-mail de boas-vindas enviado para ${mail.to} (Resend id: ${mail.messageId || 'n/a'})`);
+      } else if (mail.skipped) {
+        welcomeEmailNote = ' Boas-vindas não enviada (Resend não configurado).';
+        log('WARN', `Boas-vindas não enviada para ${email}: ${mail.error}`);
+      } else {
+        welcomeEmailNote = ` Boas-vindas falhou: ${mail.error}`;
+        log('ERROR', `Falha ao enviar boas-vindas para ${email}: ${mail.error}`);
+      }
+    } catch (err) {
+      welcomeEmailNote = ` Boas-vindas falhou: ${err instanceof Error ? err.message : String(err)}`;
+      log('ERROR', `Falha ao enviar e-mail de boas-vindas para ${email}: ${err}`);
+    }
+  } else {
+    log('INFO', `Usuário já existia (${email}) — e-mail de boas-vindas não reenviado (evita duplicata).`);
   }
 
   const product = offer_code ? await findProductByOfferCode(prisma, offer_code) : null;
@@ -242,7 +258,7 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
     }
   }
 
-  return { ok: true, status: 200, message: 'Webhook processado com sucesso!' };
+  return { ok: true, status: 200, message: `Webhook processado com sucesso!${welcomeEmailNote}` };
 }
 
 async function deactivateLicense(prisma: PrismaClient, data: Record<string, unknown>) {
