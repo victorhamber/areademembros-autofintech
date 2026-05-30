@@ -20,6 +20,7 @@
     "db:migrate:wordpress:dry": "node scripts/migrate-wordpress-mariadb-to-app.mjs --dry-run",
     "db:sync:wp-licenses": "node scripts/sync-licenses-from-wordpress.mjs",
     "db:sync:wp-licenses:dry": "node scripts/sync-licenses-from-wordpress.mjs --dry-run",
+    "db:repair:sequences": "tsx scripts/repair-sequences.ts",
     "db:consolidate:products": "node scripts/consolidate-three-products.mjs",
     "db:consolidate:products:dry": "node scripts/consolidate-three-products.mjs --dry-run",
     "db:fix:license-products": "node scripts/fix-license-products-by-plan.mjs",

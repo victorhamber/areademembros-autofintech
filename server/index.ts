@@ -43,6 +43,7 @@ import { sendTransactionalEmail } from './lib/emailSender.js';
 import { getMemberAppUrl, getWebhookUrls } from './lib/appUrls.js';
 import { validateHotmartWebhookAuth } from './lib/hotmartWebhookAuth.js';
 import { formatPrismaError } from './lib/prismaErrors.js';
+import { createLicenseWebhookRawLog, repairAutoincrementSequences } from './lib/repairSequences.js';
 import {
   findBuilderPageBySlug,
   isBuilderPagePublished,
@@ -695,7 +696,7 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
     console.log(`[Hotmart Webhook Unificado] Event: ${event}, Buyer: ${buyerEmail}, Offer: ${offerCode}`);
 
     const raw = JSON.stringify(body);
-    const logRow = await prisma.licenseWebhookRawLog.create({ data: { rawData: raw, processed: false } });
+    const logRow = await createLicenseWebhookRawLog(prisma, raw, false);
 
     const result = await processLicenseWebhook(prisma, body as Record<string, unknown>);
     await prisma.licenseWebhookRawLog.update({ where: { id: logRow.id }, data: { processed: true } });
@@ -1561,6 +1562,13 @@ if (fs.existsSync(distPath)) {
 // SERVER INITIALIZATION
 // ==========================================
 async function startServer() {
+  try {
+    const n = await repairAutoincrementSequences(prisma);
+    console.log(`[db] Sequences autoincrement verificadas (${n} tabelas).`);
+  } catch (e) {
+    console.error('[db] repairAutoincrementSequences:', e);
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     try {
       await ensureDevTestAccount(prisma);

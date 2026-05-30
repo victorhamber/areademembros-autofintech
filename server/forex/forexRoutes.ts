@@ -9,6 +9,7 @@ import { validateLicenseHandler } from './licenseService.js';
 import { processLicenseWebhook } from './webhookLicenseProcessor.js';
 import { submitPerformance } from './performanceSubmit.js';
 import { getRankingResponse } from './rankingService.js';
+import { createLicenseWebhookRawLog } from '../lib/repairSequences.js';
 
 function clientIp(req: express.Request): string {
   const xf = req.headers['x-forwarded-for'];
@@ -55,7 +56,7 @@ export function registerForexRoutes(app: express.Application, prisma: PrismaClie
     }
 
     const raw = JSON.stringify(req.body);
-    const logRow = await prisma.licenseWebhookRawLog.create({ data: { rawData: raw, processed: false } });
+    const logRow = await createLicenseWebhookRawLog(prisma, raw, false);
 
     try {
       const result = await processLicenseWebhook(prisma, (req.body || {}) as Record<string, unknown>);
