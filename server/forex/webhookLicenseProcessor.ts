@@ -3,19 +3,16 @@ import { log } from '../lib/logger.js';
 import { invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
 import { grantContentAccessForSystem, revokeContentAccessForSystem } from './licenseService.js';
 import { postRobotJson } from './robotNotify.js';
-import { parseCsv, csvIncludes } from '../lib/csv.js';
+import { parseCsv } from '../lib/csv.js';
+import { findProductByOfferCodeInList } from '../lib/licenseProductMatch.js';
 import { sendWelcomeEmail } from '../lib/welcomeEmail.js';
 import { isPrismaUniqueViolation } from '../lib/prismaErrors.js';
 
 async function findProductByOfferCode(prisma: PrismaClient, offerCode: string) {
-  const code = offerCode.trim();
+  const code = String(offerCode || '').trim();
   if (!code) return null;
-  const direct = await prisma.product.findFirst({ where: { offerCode: code } });
-  if (direct) return direct;
-  const candidates = await prisma.product.findMany({
-    where: { offerCode: { contains: code } }
-  });
-  return candidates.find((p) => csvIncludes(p.offerCode, code)) || null;
+  const products = await prisma.product.findMany();
+  return findProductByOfferCodeInList(products, code);
 }
 
 function addDurationFrom(plano: string, base: Date): Date {
@@ -146,7 +143,17 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
     log('INFO', `Usuário já existia (${email}) — e-mail de boas-vindas não reenviado (evita duplicata).`);
   }
 
-  const product = offer_code ? await findProductByOfferCode(prisma, offer_code) : null;
+  let product =
+    (offer_code ? await findProductByOfferCode(prisma, offer_code) : null) ||
+    (product_id ? await findProductByOfferCode(prisma, product_id) : null);
+  const resolvedOfferCode = offer_code || (product && product_id ? product_id : '');
+  if ((offer_code || product_id) && !product) {
+    log(
+      'WARN',
+      `Produto não encontrado para offer=${offer_code || '—'} product_id=${product_id || '—'} — licença EA não criada/atualizada. Cadastre o código em Produtos.`
+    );
+  }
+
   const systemIds = parseCsv(product?.systemId || '');
   const hasProduct = systemIds.length > 0;
   if (!systemIds.length) systemIds.push('');
@@ -160,6 +167,12 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
       const licenseEventId = isFirst ? event_id : `${event_id}_${system_id || idx}`;
 
       let existing = await prisma.license.findUnique({ where: { eventId: licenseEventId } });
+      if (!existing && resolvedOfferCode) {
+        existing = await prisma.license.findFirst({
+          where: { email, offerCode: resolvedOfferCode },
+          orderBy: { id: 'desc' }
+        });
+      }
       if (!existing && subscriber_code && system_id) {
         existing = await prisma.license.findFirst({
           where: { subscriberCode: subscriber_code, email, systemId: system_id }
@@ -184,7 +197,7 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
         systemId: system_id || existing?.systemId || '',
         dataAtivacao: shouldStartNow ? (existing?.dataAtivacao as Date) : null,
         subscriberCode: subscriber_code || existing?.subscriberCode || null,
-        offerCode: offer_code || existing?.offerCode || null
+        offerCode: resolvedOfferCode || existing?.offerCode || null
       };
 
       if (existing) {
@@ -197,7 +210,10 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
         }
         await prisma.license.update({ where: { id: existing.id }, data: update });
         invalidateLicenseCacheForEmail(email);
-        log('INFO', `Licença ${existing.id} reativada/renovada ${email} sys=${system_id} offer=${offer_code}`);
+        log(
+          'INFO',
+          `Licença ${existing.id} reativada/renovada ${email} sys=${system_id} offer=${resolvedOfferCode} plano=${plano} produto=${product?.productName || '—'}`
+        );
       } else {
         try {
           await prisma.license.create({
@@ -207,7 +223,10 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
               eventId: licenseEventId
             }
           });
-          log('INFO', `Nova licença criada ${email} event=${licenseEventId} sys=${system_id} offer=${offer_code}`);
+          log(
+            'INFO',
+            `Nova licença criada ${email} event=${licenseEventId} sys=${system_id} offer=${resolvedOfferCode} plano=${plano} produto=${product?.productName || '—'}`
+          );
         } catch (err) {
           if (isPrismaUniqueViolation(err, 'eventId')) {
             await prisma.license.update({

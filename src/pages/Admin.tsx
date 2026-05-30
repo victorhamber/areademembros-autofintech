@@ -2612,8 +2612,9 @@ export const Admin: React.FC = () => {
               ) : null}
             </p>
             <p className="admin-modal-lead">
-              O acesso às <strong>trilhas EAD</strong> segue os cursos publicados no painel. As licenças abaixo valem para o robô / EA: o campo{' '}
-              <strong>systemId</strong> deve coincidir com o cadastro em <strong>Produtos</strong> (é ele que define qual conteúdo o cliente pode usar).
+              O acesso às <strong>trilhas EAD</strong> segue os cursos publicados no painel. As licenças abaixo valem para o robô / EA: o{' '}
+              <strong>código da oferta Hotmart</strong> (cadastrado em Produtos) define produto e plano; o <strong>systemId</strong> é o que o EA envia na validação. A{' '}
+              <strong>data de expiração só começa a contar na primeira validação</strong> do robô no gráfico — antes disso a licença fica ativa sem prazo em curso.
             </p>
 
             <div className="admin-modal-license-list-block">
@@ -2673,7 +2674,9 @@ export const Admin: React.FC = () => {
                           <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
                             {l.dataExpiracao
                               ? new Date(l.dataExpiracao).toLocaleDateString('pt-BR')
-                              : '—'}
+                              : effectiveLicenseStatus(l.statusLicenca, l.dataExpiracao) === 'ativa'
+                                ? 'Aguardando 1ª validação EA'
+                                : '—'}
                           </td>
                           <td style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                             <div className="admin-modal-license-table-actions">
@@ -2741,14 +2744,20 @@ export const Admin: React.FC = () => {
                 onChange={(e) => {
                   const productId = e.target.value;
                   if (!productId) return;
-                  const p = (products as Array<{ id: number; systemId?: string; plano?: string }>).find(
+                  const p = (products as Array<{ id: number; systemId?: string; plano?: string; offerCode?: string }>).find(
                     (x) => String(x.id) === productId
                   );
                   if (!p) return;
+                  const firstOffer =
+                    String(p.offerCode || '')
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean)[0] || '';
                   setLicenseForm((f) => ({
                     ...f,
                     systemId: String(p.systemId || '').trim(),
                     plano: String(p.plano || f.plano || 'mensal'),
+                    offerCode: firstOffer || f.offerCode,
                   }));
                 }}
               >
@@ -2829,7 +2838,7 @@ export const Admin: React.FC = () => {
                 </div>
               </div>
               <label className="admin-modal-field-label" htmlFor="license-expires">
-                Expira em (automático pelo plano)
+                Duração prevista (contagem inicia na 1ª validação do EA)
               </label>
               <input
                 id="license-expires"
@@ -2838,6 +2847,9 @@ export const Admin: React.FC = () => {
                 readOnly
                 disabled
               />
+              <p className="admin-modal-field-hint" style={{ marginTop: 6, marginBottom: 0, fontSize: 12 }}>
+                Após a compra a licença fica ativa, mas o prazo só é gravado quando o robô validar pela primeira vez no gráfico.
+              </p>
               <label className="admin-modal-field-label" htmlFor="license-mt5">
                 Nº conta MT5 (opcional)
               </label>
@@ -2869,6 +2881,7 @@ export const Admin: React.FC = () => {
                               statusLicenca: licenseForm.statusLicenca,
                               dataExpiracao: datetimeLocalToIsoOrNull(licenseForm.dataExpiracao),
                               numeroConta: licenseForm.numeroConta.trim(),
+                              offerCode: licenseForm.offerCode.trim() || null,
                             }),
                           });
                           if (!res.ok) alert('Falha ao atualizar licença.');
@@ -2929,6 +2942,7 @@ export const Admin: React.FC = () => {
                             statusLicenca: licenseForm.statusLicenca,
                             dataExpiracao: datetimeLocalToIsoOrNull(licenseForm.dataExpiracao),
                             numeroConta: licenseForm.numeroConta.trim(),
+                            offerCode: licenseForm.offerCode.trim() || null,
                           }),
                         });
                         if (!res.ok) alert('Falha ao criar licença.');
@@ -4599,7 +4613,7 @@ export const Admin: React.FC = () => {
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
                 {editingProductId
                   ? 'Altere os dados do produto e clique em salvar. O download do robô continua no painel ao lado.'
-                  : 'Configure o produto e o vínculo Hotmart → system_id. O arquivo do robô fica ao lado.'}
+                  : 'O webhook Hotmart identifica o produto pelo código da oferta. A partir dele o sistema aplica systemId, plano e nome automaticamente na licença.'}
               </p>
               <label>Nome</label>
               <input value={newProduct.productName} onChange={e => setNewProduct(p => ({ ...p, productName: e.target.value }))} />
@@ -4612,14 +4626,14 @@ export const Admin: React.FC = () => {
               <small style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
                 Use vírgulas para vincular o produto a vários sistemas (cria/ativa uma licença para cada um).
               </small>
-              <label>offer_code (Hotmart)</label>
+              <label>offer_code (Hotmart) *</label>
               <input
                 value={newProduct.offerCode}
                 onChange={e => setNewProduct(p => ({ ...p, offerCode: e.target.value }))}
                 placeholder="Ex.: dghySD ou dghySD,abcDEF (separe por vírgula)"
               />
               <small style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                Suporta vários códigos de oferta apontando para este produto.
+                Código enviado no webhook (<code>purchase.offer.code</code>). É ele que define qual produto/plano o cliente recebe — mesmo quando vários produtos compartilham o mesmo systemId.
               </small>
               <label>plano</label>
               <select value={newProduct.plano} onChange={e => setNewProduct(p => ({ ...p, plano: e.target.value }))}>
@@ -4637,8 +4651,8 @@ export const Admin: React.FC = () => {
                   </button>
                 )}
                 <button type="button" className="btn-primary" onClick={async () => {
-              if (!newProduct.productName.trim() || !newProduct.systemId.trim()) {
-                alert('Preencha nome e system_id.');
+              if (!newProduct.productName.trim() || !newProduct.systemId.trim() || !newProduct.offerCode.trim()) {
+                alert('Preencha nome, system_id e offer_code (Hotmart).');
                 return;
               }
               const isEdit = editingProductId != null;
@@ -4748,13 +4762,28 @@ export const Admin: React.FC = () => {
             <div className="admin-table-scroll">
               <table className="admin-table">
                 <thead>
-                  <tr><th>ID</th><th>Nome</th><th>systemId</th><th>Download</th><th>Versão</th><th /></tr>
+                  <tr><th>ID</th><th>Nome</th><th>offer_code</th><th>Plano</th><th>systemId</th><th>Download</th><th>Versão</th><th /></tr>
                 </thead>
                 <tbody>
                   {pagedProducts.map((p: any) => (
                     <tr key={p.id}>
                       <td>{p.id}</td>
                       <td>{p.productName}</td>
+                      <td>
+                        <div className="admin-csv-pills">
+                          {String(p.offerCode || '')
+                            .split(',')
+                            .map((v: string) => v.trim())
+                            .filter(Boolean)
+                            .map((v: string) => (
+                              <code key={v} className="admin-csv-pill">{v}</code>
+                            ))}
+                          {!String(p.offerCode || '').trim() ? (
+                            <span className="admin-table-muted">—</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>{p.plano || '—'}</td>
                       <td>
                         <div className="admin-csv-pills">
                           {String(p.systemId || '')
