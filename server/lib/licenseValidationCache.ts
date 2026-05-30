@@ -1,7 +1,8 @@
 type Cached = { body: object; status: number; expires: number };
 const store = new Map<string, Cached>();
 
-const SUCCESS_TTL_MS = 15_000;
+const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+const SUCCESS_TTL_MS = TWO_DAYS_MS;
 const ERROR_TTL_MS = 60_000;
 
 export function cacheGet(key: string): Cached | null {

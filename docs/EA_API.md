@@ -37,7 +37,9 @@ Base URL de exemplo: `https://seu-dominio.com` — todas as rotas abaixo são re
 | API Key ausente ou inválida | 403 | `{"status":"error","message":"Unauthorized: invalid or missing X-API-Key"}` |
 | Rate limit (60 req/min por IP) | 429 | `{"status":"error","message":"Rate limit exceeded. Try again later."}` |
 
-**Cache:** combinação email+conta+system_id fica em cache em memória por **5 minutos** (TTL 300s), como no WordPress.
+**Cache:** combinação email+conta+system_id fica em cache em memória por **2 dias** (alinhado à revalidação periódica do EA). Erros ficam em cache por 60 s.
+
+**Revalidação no EA:** validação imediata ao iniciar no gráfico; depois, a cada **2 dias** (desativações por reembolso/chargeback vêm via webhook Hotmart, não por polling).
 
 **Idempotência:** não se aplica (read-only).
 
