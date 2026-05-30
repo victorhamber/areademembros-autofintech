@@ -19,7 +19,7 @@ function addDurationFrom(plano: string, base: Date): Date {
   const d = new Date(base);
   const p = String(plano || 'mensal').toLowerCase().trim();
   const toleranceDays = 3;
-  if (p === 'teste') {
+  if (p === 'teste' || p === 'desafio') {
     d.setDate(d.getDate() + 7 + toleranceDays);
     return d;
   }
@@ -167,23 +167,33 @@ async function activateLicense(prisma: PrismaClient, data: Record<string, unknow
       const licenseEventId = isFirst ? event_id : `${event_id}_${system_id || idx}`;
 
       let existing = await prisma.license.findUnique({ where: { eventId: licenseEventId } });
-      if (!existing && resolvedOfferCode) {
-        existing = await prisma.license.findFirst({
-          where: { email, offerCode: resolvedOfferCode },
-          orderBy: { id: 'desc' }
-        });
+      if (!existing && isFirst) {
+        existing = await prisma.license.findFirst({ where: { eventId: event_id } });
       }
       if (!existing && subscriber_code && system_id) {
         existing = await prisma.license.findFirst({
           where: { subscriberCode: subscriber_code, email, systemId: system_id }
         });
       }
-      if (!existing && system_id) {
-        existing = await prisma.license.findFirst({ where: { email, systemId: system_id } });
+      if (!existing && resolvedOfferCode) {
+        existing = await prisma.license.findFirst({
+          where: { email, offerCode: resolvedOfferCode },
+          orderBy: { id: 'desc' }
+        });
       }
-      if (!existing && isFirst) {
-        existing = await prisma.license.findFirst({ where: { eventId: event_id } });
+      // Legado: licença antiga sem offerCode — só reutiliza se plano + systemId baterem.
+      if (!existing && system_id && !resolvedOfferCode) {
+        existing = await prisma.license.findFirst({
+          where: {
+            email,
+            systemId: system_id,
+            plano,
+            OR: [{ offerCode: null }, { offerCode: '' }]
+          },
+          orderBy: { id: 'desc' }
+        });
       }
+      // Nunca reutilizar só por email+systemId: anual e desafio podem compartilhar o mesmo systemId.
 
       const shouldStartNow = !!(existing?.dataAtivacao && existing?.dataExpiracao);
       const baseForExpiry =
@@ -365,7 +375,12 @@ async function deactivateLicense(prisma: PrismaClient, data: Record<string, unkn
     const systemIds = parseCsv(product?.systemId || '');
     if (systemIds.length) {
       const bySystem = await prisma.license.findMany({
-        where: { email, systemId: { in: systemIds }, statusLicenca: 'ativa' }
+        where: {
+          email,
+          systemId: { in: systemIds },
+          statusLicenca: 'ativa',
+          ...(offer_code ? { offerCode: offer_code } : {})
+        }
       });
       for (const lic of bySystem) {
         await prisma.license.update({

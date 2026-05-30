@@ -9,7 +9,7 @@ function addDurationByPlanFrom(planoRaw: string | null | undefined, base: Date):
   const plano = String(planoRaw || 'mensal').toLowerCase().trim();
   const d = new Date(base);
   const toleranceDays = 3;
-  if (plano === 'teste') {
+  if (plano === 'teste' || plano === 'desafio') {
     d.setDate(d.getDate() + 7 + toleranceDays);
     return d;
   }

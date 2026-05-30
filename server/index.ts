@@ -1201,6 +1201,14 @@ app.post('/api/admin/settings', adminAuthMiddleware, async (req, res) => {
           }
         }
       }
+      if (key === 'member_support_url') {
+        const v = String(value ?? '').trim();
+        if (v && !/^https?:\/\//i.test(v)) {
+          return res.status(400).json({
+            error: 'Link de suporte inválido. Use um endereço começando com http:// ou https://.',
+          });
+        }
+      }
       if (MEMBER_THEME_KEYS.includes(key as (typeof MEMBER_THEME_KEYS)[number])) {
         const v = String(value ?? '').trim();
         if (!colorPattern.test(v)) {

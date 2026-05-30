@@ -4244,13 +4244,13 @@ export const Admin: React.FC = () => {
 
             <label>Link de suporte</label>
             <input
-              type="url"
+              type="text"
               placeholder="https://wa.me/5511999999999"
               value={emailSettings.member_support_url || ''}
               onChange={(e) => setEmailSettings((prev) => ({ ...prev, member_support_url: e.target.value }))}
             />
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-              Exemplo WhatsApp: <code>https://wa.me/5511999999999</code> ou <code>https://wa.me/5511999999999?text=Ol%C3%A1</code>
+              Qualquer link com <code>http://</code> ou <code>https://</code> (WhatsApp, Telegram, formulário, etc.).
             </p>
 
             <button
@@ -4258,15 +4258,22 @@ export const Admin: React.FC = () => {
               className="btn-primary"
               style={{ marginTop: '14px' }}
               onClick={async () => {
+                const h = authHeaders();
+                if (!h.Authorization) return;
                 const value = String(emailSettings.member_support_url || '').trim();
                 try {
                   const res = await fetch('/api/admin/settings', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                    body: JSON.stringify({ key: 'member_support_url', value }),
+                    headers: { 'Content-Type': 'application/json', ...h },
+                    body: JSON.stringify({ member_support_url: value }),
                   });
-                  if (!res.ok) throw new Error('Erro ao salvar');
+                  if (!res.ok) {
+                    const j = (await res.json().catch(() => ({}))) as { error?: string };
+                    alert(j.error || 'Erro ao salvar.');
+                    return;
+                  }
                   alert('Link de suporte salvo com sucesso!');
+                  void fetchEmailSettings();
                 } catch {
                   alert('Não foi possível salvar o link de suporte.');
                 }
