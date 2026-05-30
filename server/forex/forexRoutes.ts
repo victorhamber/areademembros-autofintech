@@ -2,6 +2,7 @@ import express from 'express';
 import iconv from 'iconv-lite';
 import type { PrismaClient } from '@prisma/client';
 import { getForexApiKeys, getForexWebhookToken } from '../lib/apiSettings.js';
+import { extractHotmartWebhookToken } from '../lib/appUrls.js';
 import { checkRateLimit } from '../lib/rateLimitMem.js';
 import { log } from '../lib/logger.js';
 import { validateLicenseHandler } from './licenseService.js';
@@ -37,17 +38,18 @@ export function registerForexRoutes(app: express.Application, prisma: PrismaClie
   router.post('/validate_license', validate);
 
   router.post('/webhook', async (req, res) => {
-    const token =
-      String(req.headers['hottok'] || req.headers['x-hotmart-hottok'] || req.headers['x-webhook-token'] || '');
-    const expected = await getForexWebhookToken(prisma);
-    if (!expected) {
+    const token = extractHotmartWebhookToken(req);
+    const dbToken = (await getForexWebhookToken(prisma)).trim();
+    const envToken = String(process.env.HOTMART_HOTTOK || '').trim();
+    const validTokens = [...new Set([dbToken, envToken].filter(Boolean))];
+    if (!validTokens.length) {
       log('SECURITY', 'Webhook rejeitado: forex_webhook_token não configurado');
       return res.status(500).json({
         status: 'error',
         message: 'Configuration Error: Webhook Token not set in settings'
       });
     }
-    if (token !== expected) {
+    if (!validTokens.includes(token)) {
       log('SECURITY', 'Webhook token inválido');
       return res.status(401).json({ status: 'error', message: 'Unauthorized: Invalid Webhook Token' });
     }

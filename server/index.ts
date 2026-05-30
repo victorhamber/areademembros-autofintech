@@ -40,6 +40,8 @@ import {
 import { MEMBER_THEME_DEFAULTS, MEMBER_THEME_KEYS } from '../shared/memberTheme.js';
 import { sendWelcomeEmail, detectLang } from './lib/welcomeEmail.js';
 import { sendTransactionalEmail } from './lib/emailSender.js';
+import { getMemberAppUrl, getWebhookUrls } from './lib/appUrls.js';
+import { validateHotmartWebhookAuth } from './lib/hotmartWebhookAuth.js';
 import {
   findBuilderPageBySlug,
   isBuilderPagePublished,
@@ -52,10 +54,8 @@ import {
 
 const DEFAULT_PASSWORD = 'Mudar123@';
 
-const DEFAULT_APP_URL = 'https://app.readlyme.com';
 function getAppUrl() {
-  const raw = (process.env.APP_URL || DEFAULT_APP_URL).trim();
-  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+  return getMemberAppUrl();
 }
 
 // ==========================================
@@ -678,12 +678,12 @@ app.get('/api/contents', async (req, res) => {
 // Webhook unificado Hotmart — cria usuário + ativa licença + concede acesso ao conteúdo
 app.post('/api/webhooks/hotmart', async (req, res) => {
   try {
-    const hottok = (req.headers['x-hotmart-hottok'] || req.query.hottok) as string;
-    if (process.env.HOTMART_HOTTOK && hottok !== process.env.HOTMART_HOTTOK) {
+    const auth = await validateHotmartWebhookAuth(prisma, req);
+    if (!auth.ok) {
       await prisma.webhookLog.create({
-        data: { event: 'AUTH_FAILED', status: 'rejected', details: 'Invalid hottok token' }
+        data: { event: 'AUTH_FAILED', status: 'rejected', details: auth.reason }
       });
-      return res.status(401).json({ error: 'Invalid Hotmart Token' });
+      return res.status(401).json({ error: auth.reason });
     }
 
     const body = req.body;
@@ -1021,6 +1021,10 @@ app.delete('/api/admin/users/:id', adminAuthMiddleware, async (req, res) => {
 // -----------------------------
 
 // -- WEBHOOK LOGS --
+app.get('/api/admin/webhook-urls', adminAuthMiddleware, (_req, res) => {
+  res.json(getWebhookUrls());
+});
+
 app.get('/api/admin/webhook-logs', adminAuthMiddleware, async (req, res) => {
   try {
     const logs = await prisma.webhookLog.findMany({

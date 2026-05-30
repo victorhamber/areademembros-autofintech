@@ -8,15 +8,9 @@ import {
   DEFAULT_WELCOME_BODY_ES,
 } from '../../shared/emailTemplates.js';
 import { sendTransactionalEmail } from './emailSender.js';
+import { getMemberAppUrl } from './appUrls.js';
 
 const ES_COUNTRIES = ['AR','BO','CL','CO','CR','CU','DO','EC','SV','GQ','GT','HN','MX','NI','PA','PY','PE','ES','UY','VE'];
-
-const DEFAULT_APP_URL = 'https://app.autofintech.com.br';
-
-function getAppUrl() {
-  const raw = (process.env.APP_URL || DEFAULT_APP_URL).trim();
-  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
-}
 
 export function detectLang(country: string | null | undefined): 'es' | 'pt' {
   if (!country) return 'pt';
@@ -41,7 +35,7 @@ export async function sendWelcomeEmail(
   const stored = await getSetting(prismaClient, templateKey);
   const fallback = lang === 'es' ? DEFAULT_WELCOME_BODY_ES : DEFAULT_WELCOME_BODY_PT;
   const bodyPlain = emailBodyFromStored(stored, fallback);
-  const appUrl = getAppUrl();
+  const appUrl = getMemberAppUrl();
   const html = applyEmailPlaceholders(buildWelcomeEmailHtml(bodyPlain, lang), {
     name: name || 'Cliente',
     email: recipient,

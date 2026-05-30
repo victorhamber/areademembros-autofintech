@@ -260,6 +260,13 @@ export const Admin: React.FC = () => {
 
   const [users, setUsers] = useState<any[]>([]);
   const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
+  const [webhookUrls, setWebhookUrls] = useState<{
+    appUrl: string;
+    webhookBaseUrl: string;
+    hotmartWebhook: string;
+    forexWebhook: string;
+    alternateHotmartWebhooks: string[];
+  } | null>(null);
 
   // -- COURSES (EAD) STATE --
   const [courses, setCourses] = useState<any[]>([]);
@@ -1161,6 +1168,17 @@ export const Admin: React.FC = () => {
     }
   };
 
+  const fetchWebhookUrls = async (jwt?: string) => {
+    const h = authHeaders(jwt);
+    if (!h.Authorization) return;
+    try {
+      const res = await fetch('/api/admin/webhook-urls', { headers: h });
+      if (res.ok) setWebhookUrls(await res.json());
+    } catch {
+      console.error('Error fetching webhook urls');
+    }
+  };
+
   const fetchEmailSettings = async (jwt?: string) => {
     const h = authHeaders(jwt);
     if (!h.Authorization) return;
@@ -1592,6 +1610,7 @@ export const Admin: React.FC = () => {
       await Promise.all([
         fetchUsers(jwt),
         fetchWebhookLogs(jwt),
+        fetchWebhookUrls(jwt),
         fetchEmailSettings(jwt),
         fetchLicenses(jwt),
         fetchProducts(jwt),
@@ -4255,15 +4274,37 @@ export const Admin: React.FC = () => {
             </p>
 
             <label>URL do Webhook (cole na Hotmart)</label>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '6px 0 8px' }}>
+              Recomendado manter <strong>app.autofintech.com.br</strong> na Hotmart se já estava funcionando.
+              Os dois domínios apontam para o mesmo app — qualquer um funciona se o DNS estiver correto.
+            </p>
             <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-              <input type="text" readOnly value={`${window.location.origin}/api/webhooks/hotmart`} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', cursor: 'text' }} />
-              <button 
-                type="button" className="btn-primary"
-                onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/hotmart`); alert('URL copiada!'); }}
+              <input
+                type="text"
+                readOnly
+                value={webhookUrls?.hotmartWebhook || `${window.location.origin}/api/webhooks/hotmart`}
+                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', cursor: 'text' }}
+              />
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  const url = webhookUrls?.hotmartWebhook || `${window.location.origin}/api/webhooks/hotmart`;
+                  navigator.clipboard.writeText(url);
+                  alert('URL copiada!');
+                }}
               >
                 <Copy size={16} /> Copiar
               </button>
             </div>
+            {webhookUrls && webhookUrls.alternateHotmartWebhooks.length > 1 && (
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                URLs alternativas (mesmo backend):{' '}
+                {webhookUrls.alternateHotmartWebhooks.map((u) => (
+                  <code key={u} style={{ display: 'block', marginTop: '4px' }}>{u}</code>
+                ))}
+              </p>
+            )}
 
             <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(212,175,55,0.08)', borderRadius: '8px', border: '1px solid rgba(212,175,55,0.2)' }}>
               <h4 style={{ color: 'var(--accent-primary)', marginBottom: '12px' }}>📋 Como Configurar na Hotmart</h4>
@@ -4272,7 +4313,7 @@ export const Admin: React.FC = () => {
                 <li>Clique em <strong>"Configurar Webhook"</strong></li>
                 <li>Cole a <strong>URL acima</strong> no campo de URL</li>
                 <li>Selecione os eventos: <code>PURCHASE_APPROVED</code>, <code>PURCHASE_CANCELED</code>, <code>PURCHASE_REFUNDED</code>, <code>PURCHASE_CHARGEBACK</code></li>
-                <li>Copie o <strong>Hottok</strong> gerado e configure na variável de ambiente <code>HOTMART_HOTTOK</code> do seu servidor</li>
+                <li>Copie o <strong>Hottok</strong> da Hotmart e configure em <code>HOTMART_HOTTOK</code> (EasyPanel) <strong>ou</strong> em Admin → Segurança → Token do webhook</li>
                 <li>Salve e faça uma <strong>compra teste</strong> para validar</li>
               </ol>
             </div>
@@ -5280,7 +5321,7 @@ export const Admin: React.FC = () => {
               else alert('Erro ao salvar');
             }}>Salvar</button>
             <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 12 }}>
-              URL do webhook de licenças: <code>{typeof window !== 'undefined' ? window.location.origin : ''}/api/forex-rendimento/v1/webhook</code>
+              URL do webhook de licenças: <code>{webhookUrls?.forexWebhook || (typeof window !== 'undefined' ? `${window.location.origin}/api/forex-rendimento/v1/webhook` : '')}</code>
             </p>
             <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
               Ver arquivo no projeto: <code>docs/EA_API.md</code>
