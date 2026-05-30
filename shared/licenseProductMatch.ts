@@ -73,23 +73,19 @@ function productMatchesKind(product: ProductLite, kind: PlanKind): boolean {
 function narrowCandidates(candidates: ProductLite[], lic: LicenseLite): ProductLite[] {
   if (candidates.length <= 1) return candidates;
 
-  const sid = String(lic.systemId || '').trim();
-  if (sid) {
-    const bySid = candidates.filter((p) => csvIncludes(String(p.systemId || ''), sid));
-    if (bySid.length === 1) return bySid;
-    if (bySid.length > 1) candidates = bySid;
-  }
-
+  // Código da oferta é o que diferencia planos quando todos compartilham o mesmo systemId.
   const offer = String(lic.offerCode || '').trim();
   if (offer) {
     const byOffer = candidates.filter((p) => csvIncludes(String(p.offerCode || ''), offer));
-    if (byOffer.length) return byOffer;
+    if (byOffer.length === 1) return byOffer;
+    if (byOffer.length > 1) candidates = byOffer;
   }
 
   const plan = norm(lic.plano);
   if (plan) {
     const byPlanField = candidates.filter((p) => norm(p.plano) === plan);
-    if (byPlanField.length) return byPlanField;
+    if (byPlanField.length === 1) return byPlanField;
+    if (byPlanField.length) candidates = byPlanField;
   }
 
   return candidates;
@@ -98,6 +94,78 @@ function narrowCandidates(candidates: ProductLite[], lic: LicenseLite): ProductL
 function productsBySystem(products: ProductLite[], systemId: string): ProductLite[] {
   if (!systemId) return [];
   return products.filter((p) => csvIncludes(String(p.systemId || ''), systemId));
+}
+
+/** Produtos do catálogo cujo CSV de systemId inclui o id enviado pelo EA. */
+export function productsForSystemId<T extends ProductLite>(products: T[], systemId: string): T[] {
+  return productsBySystem(products, String(systemId || '').trim()) as T[];
+}
+
+/** Licença pertence ao produto via código da oferta (prioridade) ou plano cadastrado. */
+export function licenseMatchesProduct(lic: LicenseLite, product: ProductLite): boolean {
+  const offer = String(lic.offerCode || '').trim();
+  if (offer) {
+    return csvIncludes(String(product.offerCode || ''), offer);
+  }
+  const licPlan = norm(lic.plano);
+  const prodPlan = norm(product.plano);
+  return !!(licPlan && prodPlan && licPlan === prodPlan);
+}
+
+/**
+ * Licenças elegíveis na validação do EA.
+ * Todos os planos compartilham o mesmo systemId — o plano/produto vem do offerCode gravado na licença.
+ */
+export function filterLicensesForValidation<T extends LicenseLite>(
+  licenses: T[],
+  products: ProductLite[],
+  systemId: string
+): T[] {
+  const sid = String(systemId || '').trim();
+  if (!sid) return [];
+
+  const onSystem = licenses.filter((lic) => {
+    const licSid = String(lic.systemId || '').trim();
+    return !licSid || licSid === sid;
+  });
+
+  const withOffer = onSystem.filter((lic) => {
+    const offer = String(lic.offerCode || '').trim();
+    if (offer) {
+      return products.some((p) => csvIncludes(String(p.offerCode || ''), offer));
+    }
+    const plan = norm(lic.plano);
+    if (plan) {
+      return products.some((p) => norm(p.plano) === plan);
+    }
+    return false;
+  });
+
+  return withOffer.length > 0 ? withOffer : onSystem;
+}
+
+export function pickLicenseFromCandidates<T extends LicenseLite & { numeroConta?: string | null }>(
+  candidates: T[],
+  numeroConta: string
+): T | null {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  const linked = candidates.find((c) => String(c.numeroConta || '').trim() === numeroConta);
+  if (linked) return linked;
+
+  const empty = candidates.filter((c) => !String(c.numeroConta || '').trim());
+  if (empty.length === 0) return null;
+  if (empty.length === 1) return empty[0];
+
+  // Mesmo systemId compartilhado: várias licenças vazias só são válidas se forem o mesmo plano (offerCode).
+  const offers = new Set(empty.map((c) => String(c.offerCode || '').trim()).filter(Boolean));
+  if (offers.size > 1) return null;
+
+  const planos = new Set(empty.map((c) => norm(c.plano)).filter(Boolean));
+  if (planos.size > 1) return null;
+
+  return empty[0];
 }
 
 export function pickProductsForLicense(products: ProductLite[], lic: LicenseLite): ProductLite[] {
@@ -113,23 +181,17 @@ export function pickProductsForLicense(products: ProductLite[], lic: LicenseLite
     }
   }
 
-  // 2) systemId + offer/plano (legado)
+  // 2) Legado sem offerCode: diferenciar pelo plano (systemId é igual em todos os produtos)
   const sid = String(lic.systemId || '').trim();
-  if (sid) {
-    const candidates = productsBySystem(products, sid);
-    if (candidates.length) {
-      if (offer) {
-        const byOffer = candidates.filter((p) => csvIncludes(String(p.offerCode || ''), offer));
-        if (byOffer.length === 1) return byOffer;
+  if (sid && !offer) {
+    const plan = norm(lic.plano);
+    if (plan) {
+      const byPlan = products.filter((p) => norm(p.plano) === plan);
+      if (byPlan.length === 1) return byPlan;
+      if (byPlan.length > 1) {
+        const narrowed = narrowCandidates(byPlan, lic);
+        return narrowed.length === 1 ? narrowed : [];
       }
-
-      const plan = norm(lic.plano);
-      if (plan) {
-        const byPlan = candidates.filter((p) => norm(p.plano) === plan);
-        if (byPlan.length === 1) return byPlan;
-      }
-
-      if (candidates.length === 1) return candidates;
     }
   }
 

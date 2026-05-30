@@ -100,7 +100,9 @@ Mesma regra do PHP (`RankingEndpoint` / EA):
 
 **Body:** payload JSON Hotmart (eventos `PURCHASE_APPROVED`, `PURCHASE_COMPLETE`, cancelamentos, etc.) — processamento alinhado a `WebhookProcessor`.
 
-**Idempotência:** `event_id` da transação em `License.eventId` (unique); renovações usam `subscriber_code` quando presente.
+**Idempotência:** `event_id` da transação em `License.eventId` (unique). Compras novas sempre criam nova licença. Renovações estendem via `subscriber_code` + `offerCode`/plano.
+
+**Planos e systemId:** Vários produtos/planos podem compartilhar o mesmo `systemId` no cadastro. O que diferencia Anual, Desafio, Vitalício etc. é o **código da oferta Hotmart** (`purchase.offer.code`), gravado em `License.offerCode` e usado para resolver produto, plano e duração. O EA continua enviando apenas `system_id` na validação; licenças do mesmo plano (mesmo offerCode) com contas MT5 diferentes são distinguidas pelo `numero_conta`.
 
 ---
 

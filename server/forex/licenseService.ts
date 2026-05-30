@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { cacheGet, cacheSet, invalidateLicenseCacheForEmail } from '../lib/licenseValidationCache.js';
+import { filterLicensesForValidation, pickLicenseFromCandidates } from '../lib/licenseProductMatch.js';
 import { log } from '../lib/logger.js';
 
 const ACTIVE = 'ativa';
@@ -66,32 +67,38 @@ export async function validateLicenseHandler(
     ? await prisma.license.findFirst({ where: { id: licenseId, email } })
     : null;
 
+  const products = await prisma.product.findMany({
+    select: { id: true, systemId: true, offerCode: true, plano: true, productName: true },
+  });
+
   if (!license && system_id) {
-    const candidates = await prisma.license.findMany({
-      where: { email, systemId: system_id },
+    const allForEmail = await prisma.license.findMany({
+      where: { email },
       orderBy: { id: 'desc' },
     });
-    if (candidates.length === 1) license = candidates[0];
-    else if (candidates.length > 1) {
-      const linked = candidates.find((c) => c.numeroConta === numero_conta);
-      const empty = candidates.find((c) => !String(c.numeroConta || '').trim());
-      license = linked || empty || null;
-      if (!license) {
-        return {
-          status: 400,
-          json: {
-            status: 'error',
-            message: 'Você tem mais de uma licença neste produto. Selecione qual licença deseja validar.',
-          },
-        };
-      }
+    const candidates = filterLicensesForValidation(allForEmail, products, system_id);
+    license = pickLicenseFromCandidates(candidates, numero_conta);
+    if (!license && candidates.length > 1) {
+      return {
+        status: 400,
+        json: {
+          status: 'error',
+          message:
+            'Você tem mais de uma licença ativa (planos diferentes ou contas pendentes). Vincule cada licença manualmente no painel ou valide uma conta por vez.',
+        },
+      };
     }
   }
 
   if (!license && system_id) {
-    license = await prisma.license.findFirst({
-      where: { email, numeroConta: numero_conta, systemId: system_id },
+    const allForEmail = await prisma.license.findMany({
+      where: { email },
+      orderBy: { id: 'desc' },
     });
+    const byAccount = filterLicensesForValidation(allForEmail, products, system_id).filter(
+      (c) => String(c.numeroConta || '').trim() === numero_conta
+    );
+    license = byAccount.length === 1 ? byAccount[0] : null;
   }
 
   // Conta já vinculada no painel — localiza licença ativa mesmo se o EA enviar system_id diferente
@@ -104,20 +111,14 @@ export async function validateLicenseHandler(
   }
 
   if (!license && system_id) {
-    const unboundForSystem = await prisma.license.findMany({
-      where: { email, systemId: system_id, statusLicenca: ACTIVE, numeroConta: '' },
+    const allForEmail = await prisma.license.findMany({
+      where: { email, statusLicenca: ACTIVE },
       orderBy: { id: 'desc' },
     });
-    if (unboundForSystem.length === 1) license = unboundForSystem[0];
-  }
-
-  // Uma única licença ativa sem conta (primeira validação, EA com system_id desatualizado)
-  if (!license) {
-    const unboundActive = await prisma.license.findMany({
-      where: { email, statusLicenca: ACTIVE, numeroConta: '' },
-      orderBy: { id: 'desc' },
-    });
-    if (unboundActive.length === 1) license = unboundActive[0];
+    const unboundForSystem = filterLicensesForValidation(allForEmail, products, system_id).filter(
+      (l) => !String(l.numeroConta || '').trim()
+    );
+    license = pickLicenseFromCandidates(unboundForSystem, numero_conta);
   }
 
   if (license) {
