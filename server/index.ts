@@ -42,6 +42,7 @@ import { sendWelcomeEmail, detectLang } from './lib/welcomeEmail.js';
 import { sendTransactionalEmail } from './lib/emailSender.js';
 import { getMemberAppUrl, getWebhookUrls } from './lib/appUrls.js';
 import { validateHotmartWebhookAuth } from './lib/hotmartWebhookAuth.js';
+import { formatPrismaError } from './lib/prismaErrors.js';
 import {
   findBuilderPageBySlug,
   isBuilderPagePublished,
@@ -705,11 +706,34 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
 
     return res.status(result.status).json({ status: result.ok ? 'success' : 'error', message: result.message });
   } catch (error) {
-    console.error('[Hotmart Webhook Error]', error);
-    await prisma.webhookLog.create({
-      data: { event: 'SYSTEM_ERROR', status: 'error', details: String(error) }
-    }).catch(() => {});
-    return res.status(200).json({ status: 'Internal error logged' });
+    const details = formatPrismaError(error);
+    console.error('[Hotmart Webhook Error]', details, error);
+    const body = (req.body || {}) as {
+      event?: string;
+      data?: {
+        buyer?: { email?: string };
+        product?: { offer_code?: string | number };
+        purchase?: { offer?: { code?: string } };
+      };
+    };
+    const event = body.event || 'SYSTEM_ERROR';
+    const buyerEmail = body.data?.buyer?.email?.toLowerCase()?.trim();
+    const offerCode = String(
+      body.data?.product?.offer_code || body.data?.purchase?.offer?.code || body.data?.product || ''
+    ).trim() || undefined;
+
+    await prisma.webhookLog
+      .create({
+        data: {
+          event,
+          buyerEmail,
+          productId: offerCode,
+          status: 'error',
+          details: `SYSTEM: ${details}`
+        }
+      })
+      .catch(() => {});
+    return res.status(200).json({ status: 'Internal error logged', error: details });
   }
 });
 
