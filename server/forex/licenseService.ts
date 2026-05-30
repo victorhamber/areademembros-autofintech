@@ -88,6 +88,38 @@ export async function validateLicenseHandler(
     }
   }
 
+  if (!license && system_id) {
+    license = await prisma.license.findFirst({
+      where: { email, numeroConta: numero_conta, systemId: system_id },
+    });
+  }
+
+  // Conta já vinculada no painel — localiza licença ativa mesmo se o EA enviar system_id diferente
+  if (!license && numero_conta) {
+    const byAccount = await prisma.license.findMany({
+      where: { email, numeroConta: numero_conta, statusLicenca: ACTIVE },
+      orderBy: { id: 'desc' },
+    });
+    if (byAccount.length === 1) license = byAccount[0];
+  }
+
+  if (!license && system_id) {
+    const unboundForSystem = await prisma.license.findMany({
+      where: { email, systemId: system_id, statusLicenca: ACTIVE, numeroConta: '' },
+      orderBy: { id: 'desc' },
+    });
+    if (unboundForSystem.length === 1) license = unboundForSystem[0];
+  }
+
+  // Uma única licença ativa sem conta (primeira validação, EA com system_id desatualizado)
+  if (!license) {
+    const unboundActive = await prisma.license.findMany({
+      where: { email, statusLicenca: ACTIVE, numeroConta: '' },
+      orderBy: { id: 'desc' },
+    });
+    if (unboundActive.length === 1) license = unboundActive[0];
+  }
+
   if (license) {
     const currentAccount = String(license.numeroConta || '').trim();
     if (!currentAccount) {
@@ -106,10 +138,6 @@ export async function validateLicenseHandler(
         },
       };
     }
-  } else if (system_id) {
-    license = await prisma.license.findFirst({
-      where: { email, numeroConta: numero_conta, systemId: system_id },
-    });
   }
 
   let result: { status: number; json: object };
