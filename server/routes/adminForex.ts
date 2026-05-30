@@ -78,6 +78,23 @@ export function registerAdminForexRoutes(
       const current = await prisma.license.findUnique({ where: { id } });
       if (!current) return res.status(404).json({ error: 'Licença não encontrada.' });
       const plano = b.plano != null ? String(b.plano) : current.plano;
+
+      let dataExpiracao: Date | null | undefined;
+      if (Object.prototype.hasOwnProperty.call(b, 'dataExpiracao')) {
+        const raw = b.dataExpiracao;
+        if (raw === null || raw === '') {
+          dataExpiracao = null;
+        } else {
+          const parsed = new Date(String(raw));
+          if (Number.isNaN(parsed.getTime())) {
+            return res.status(400).json({ error: 'Data de expiração inválida.' });
+          }
+          dataExpiracao = parsed;
+        }
+      } else if (b.plano != null && current.dataAtivacao) {
+        dataExpiracao = addDurationByPlanFrom(plano, current.dataAtivacao);
+      }
+
       const lic = await prisma.license.update({
         where: { id },
         data: {
@@ -86,11 +103,11 @@ export function registerAdminForexRoutes(
           numeroConta: b.numeroConta !== undefined ? String(b.numeroConta) : undefined,
           plano: b.plano != null ? String(b.plano) : undefined,
           statusLicenca: b.statusLicenca != null ? String(b.statusLicenca) : undefined,
-          // Se já começou a contar, recalcula expiração a partir da data de ativação.
-          dataExpiracao: current.dataAtivacao ? addDurationByPlanFrom(plano, current.dataAtivacao) : null,
+          ...(dataExpiracao !== undefined ? { dataExpiracao } : {}),
           systemId: b.systemId != null ? String(b.systemId) : undefined,
           offerCode: b.offerCode !== undefined ? (b.offerCode ? String(b.offerCode).trim() : null) : undefined,
-          subscriberCode: b.subscriberCode !== undefined ? (b.subscriberCode ? String(b.subscriberCode) : null) : undefined
+          subscriberCode: b.subscriberCode !== undefined ? (b.subscriberCode ? String(b.subscriberCode) : null) : undefined,
+          ...(dataExpiracao && !current.dataAtivacao ? { dataAtivacao: new Date() } : {}),
         }
       });
       invalidateLicenseCacheForEmail(lic.email);

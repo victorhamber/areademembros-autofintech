@@ -2884,17 +2884,17 @@ export const Admin: React.FC = () => {
                 </div>
               </div>
               <label className="admin-modal-field-label" htmlFor="license-expires">
-                Duração prevista (contagem inicia na 1ª validação do EA)
+                Data de expiração
               </label>
               <input
                 id="license-expires"
                 type="datetime-local"
                 value={licenseForm.dataExpiracao}
-                readOnly
-                disabled
+                onChange={(e) => setLicenseForm((f) => ({ ...f, dataExpiracao: e.target.value }))}
+                disabled={licenseModalBusy}
               />
               <p className="admin-modal-field-hint" style={{ marginTop: 6, marginBottom: 0, fontSize: 12 }}>
-                Após a compra a licença fica ativa, mas o prazo só é gravado quando o robô validar pela primeira vez no gráfico.
+                Normalmente o prazo começa na 1ª validação do EA. Você pode ajustar manualmente aqui (deixe vazio para remover a data).
               </p>
               <label className="admin-modal-field-label" htmlFor="license-mt5">
                 Nº conta MT5 (opcional)
