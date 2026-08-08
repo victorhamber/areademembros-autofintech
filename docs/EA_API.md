@@ -26,22 +26,60 @@ Base URL de exemplo: `https://seu-dominio.com` — todas as rotas abaixo são re
 - `email` formato válido.
 - `numero_conta` mínimo 3 caracteres.
 - `system_id` obrigatório (string).
+- **Auto-bind (1ª vez):** se existir licença elegível ativa com `numeroConta` vazio, o servidor grava a conta enviada pelo EA e segue a validação. Se a conta já estiver preenchida e for diferente, **não** sobrescreve (mismatch — troca só pelo painel).
 
-**Respostas (igual intenção do PHP):**
+**Respostas:**
 
-| Situação | HTTP | Body |
+| Situação | HTTP | Body (campo `code`) |
 |----------|------|------|
-| Licença ativa e não expirada | 200 | `{"status":"success","message":"Licença válida.","data_expiracao":"2026-01-01T00:00:00.000Z"}` |
-| Licença expirada (status `expirada`) | 403 | `{"status":"error","message":"Licença expirada."}` |
-| Inválida / inativa / não encontrada | 403 | `{"status":"error","message":"Licença inválida ou inativa."}` |
+| Licença ativa e não expirada | 200 | `{"status":"success","code":"LICENSE_OK","message":"Licença válida.",...}` |
+| 1ª vinculação automática da conta | 200 | `{"status":"success","code":"LICENSE_OK","account_bound":true,...}` |
+| Licença **desativada** no painel (`inativa`) | 403 | `{"status":"error","code":"LICENSE_INACTIVE","message":"Licença desativada no painel."}` |
+| Licença **expirada** | 403 | `{"status":"error","code":"LICENSE_EXPIRED","message":"Licença expirada."}` |
+| Conta não confere com a do painel | 403 | `{"status":"error","code":"ACCOUNT_MISMATCH",...}` |
+| Conta ainda não vinculada (legado) | 403 | `{"status":"error","code":"ACCOUNT_REQUIRED",...}` |
+| Nenhuma licença ativa para e-mail/produto | 403 | `{"status":"error","code":"LICENSE_NOT_FOUND",...}` |
 | API Key ausente ou inválida | 403 | `{"status":"error","message":"Unauthorized: invalid or missing X-API-Key"}` |
 | Rate limit (60 req/min por IP) | 429 | `{"status":"error","message":"Rate limit exceeded. Try again later."}` |
 
-**Cache:** combinação email+conta+system_id fica em cache em memória por **2 dias** (alinhado à revalidação periódica do EA). Erros ficam em cache por 60 s.
+**EA CloseGuard:** na revalidação periódica, remove o expert com `LICENSE_INACTIVE`, `LICENSE_EXPIRED`, `ACCOUNT_MISMATCH` ou `LICENSE_NOT_FOUND` (após 3 confirmações seguidas). Falha de rede **não** derruba o robô do gráfico.
 
-**Revalidação no EA:** validação imediata ao iniciar no gráfico; depois, a cada **2 dias** (desativações por reembolso/chargeback vêm via webhook Hotmart, não por polling).
+**Cache:** sucesso e revogação definitiva (`LICENSE_INACTIVE` / `LICENSE_EXPIRED`) em memória. Erros soft (conta/produto) **não** são cacheados, para não “grudar” um bloqueio falso. Auto-bind invalida o cache do e-mail.
 
-**Idempotência:** não se aplica (read-only).
+**Revalidação no EA:** validação ao fixar no gráfico; depois a cada ~15 s (só remove se desativada/expirada).
+
+**Idempotência:** não se aplica (read-only na validação; auto-bind só escreve se `numeroConta` estava vazio).
+
+---
+
+## POST `/api/webhooks/tash` (teste gratuito)
+
+Endpoint **separado** do Hotmart. Só ativa licença de teste/desafio do Product ID configurado em Admin (`tash_webhook_product_id`). Nunca ativa anual/vitalício/mensal.
+
+**Uso com formulário Trajetto:** o embed HTML envia para `api.trajettu.com/.../submit`. Na Trajetto, configure um **webhook de saída** apontando para este endpoint (não altere o HTML do form).
+
+**Auth (qualquer um):**
+- Query: `?token=<tash_webhook_token>` (recomendado para Trajetto)
+- Header: `X-Webhook-Token` ou `X-Tash-Token`
+
+**Body (JSON)** — aceita formato Trajetto:
+
+```json
+{
+  "email": "lead@email.com",
+  "fn": "Nome",
+  "ln": "Sobrenome",
+  "phone": "+5511999999999"
+}
+```
+
+Também aceita `name`/`nome`/`fullname`, `telefone`, e objetos aninhados `fields` / `data` / `lead`.
+
+**Resposta sucesso:** `{"status":"success","message":"Licença de teste ativada.","eventId":"tash_...","licenseId":123}`
+
+**Settings:** `tash_webhook_token`, `tash_webhook_product_id` (Admin → Webhooks / Segurança EA).
+
+O webhook Hotmart **não é alterado** por este fluxo.
 
 ---
 
