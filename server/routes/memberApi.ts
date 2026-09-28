@@ -35,6 +35,128 @@ export function registerMemberApiRoutes(app: express.Application, prisma: Prisma
     res.json(withNames);
   });
 
+  app.get('/api/me/robot-stats', async (req, res) => {
+    const userId = resolveUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const email = user.email.toLowerCase();
+    const now = new Date();
+    const retentionStart = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000);
+    const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const requestedMonth = String(req.query.month || currentMonth);
+    const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth) ? requestedMonth : currentMonth;
+    const [monthYear, monthNumber] = month.split('-').map(Number);
+    // Dois dias de margem permitem ao cliente recortar o mês no relógio da
+    // corretora ou em qualquer fuso IANA sem perder eventos nas bordas.
+    const monthStart = Date.UTC(monthYear, monthNumber - 1, 1);
+    const monthEnd = Date.UTC(monthYear, monthNumber, 1);
+    const queryFrom = new Date(Math.max(retentionStart.getTime(), monthStart - 2 * 24 * 60 * 60 * 1000));
+    const queryTo = new Date(Math.min(now.getTime() + 24 * 60 * 60 * 1000, monthEnd + 2 * 24 * 60 * 60 * 1000));
+
+    const licenses = await prisma.license.findMany({
+      where: { email, numeroConta: { not: '' } },
+      select: { numeroConta: true },
+      orderBy: { id: 'desc' },
+    });
+
+    const grouped = await prisma.robotTelemetryEvent.groupBy({
+      by: ['numeroConta', 'ativo'],
+      where: { email, occurredAt: { gte: retentionStart } },
+    });
+
+    const accountMap = new Map<string, Set<string>>();
+    for (const lic of licenses) {
+      const conta = lic.numeroConta.trim();
+      if (conta.length < 3) continue;
+      if (!accountMap.has(conta)) accountMap.set(conta, new Set());
+    }
+    for (const row of grouped) {
+      const conta = row.numeroConta.trim();
+      if (!accountMap.has(conta)) accountMap.set(conta, new Set());
+      if (row.ativo) accountMap.get(conta)!.add(row.ativo);
+    }
+
+    const accounts = [...accountMap.entries()].map(([numeroConta, symbols]) => ({
+      numeroConta,
+      symbols: [...symbols].sort(),
+    }));
+
+    const requestedAccount = String(req.query.account || '').trim();
+    const account = accounts.some((a) => a.numeroConta === requestedAccount)
+      ? requestedAccount
+      : accounts[0]?.numeroConta || '';
+
+    const symbolOptions = accounts.find((a) => a.numeroConta === account)?.symbols || [];
+    const requestedSymbol = String(req.query.symbol || '').trim();
+    const symbol = symbolOptions.includes(requestedSymbol)
+      ? requestedSymbol
+      : symbolOptions[0] || '';
+
+    if (!account) {
+      return res.json({
+        brokerOffsetMin: null,
+        accounts: [],
+        account: '',
+        symbol: '',
+        month,
+        retentionDays: 120,
+        events: [],
+      });
+    }
+
+    const events = await prisma.robotTelemetryEvent.findMany({
+      where: {
+        email,
+        numeroConta: account,
+        occurredAt: { gte: queryFrom, lte: queryTo },
+        ...(symbol ? { ativo: symbol } : {}),
+      },
+      orderBy: { occurredAt: 'asc' },
+      take: 15000,
+      select: {
+        kind: true,
+        ativo: true,
+        brokerTime: true,
+        brokerOffsetMin: true,
+        profitUsd: true,
+        floatUsd: true,
+        floatMinUsd: true,
+        floatMaxUsd: true,
+        balanceUsd: true,
+        floatMinBalanceUsd: true,
+        closeReason: true,
+        corretora: true,
+      },
+    });
+
+    const last = events.length ? events[events.length - 1] : null;
+
+    res.json({
+      brokerOffsetMin: last ? last.brokerOffsetMin : null,
+      corretora: last?.corretora || '',
+      accounts,
+      account,
+      symbol,
+      month,
+      retentionDays: 120,
+      events: events.map((ev) => ({
+        kind: ev.kind,
+        ativo: ev.ativo,
+        brokerTime: ev.brokerTime,
+        brokerOffsetMin: ev.brokerOffsetMin,
+        profitUsd: ev.profitUsd,
+        floatUsd: ev.floatUsd,
+        floatMinUsd: ev.floatMinUsd,
+        floatMaxUsd: ev.floatMaxUsd,
+        balanceUsd: ev.balanceUsd,
+        floatMinBalanceUsd: ev.floatMinBalanceUsd,
+        closeReason: ev.closeReason,
+      })),
+    });
+  });
+
   /** Mesma lógica do EA/plugin: valida e-mail da conta + número da conta + system_id */
   app.post('/api/me/validate-license', async (req, res) => {
     const userId = resolveUserId(req);
