@@ -144,9 +144,13 @@ export function registerAdminOraculoRoutes(
     try {
       const body = (req.body || {}) as Record<string, unknown>;
       const imageUrl = String(body.imageUrl ?? body.image_url ?? '').trim();
+      const imageUrlDesktop = String(body.imageUrlDesktop ?? body.image_url_desktop ?? '').trim();
       const url = String(body.url || '').trim();
       if (!isHttpsImage(absolutizeHttps(imageUrl))) {
-        return res.status(400).json({ error: 'A peça precisa de uma imagem HTTPS (png, jpg, gif ou webp).' });
+        return res.status(400).json({ error: 'A imagem dos monitores precisa ser HTTPS (png, jpg, gif ou webp), em 340×480 px.' });
+      }
+      if (!isHttpsImage(absolutizeHttps(imageUrlDesktop))) {
+        return res.status(400).json({ error: 'A imagem do desktop precisa ser HTTPS (png, jpg, gif ou webp), em 340×720 px.' });
       }
       if (!isHttpsPage(absolutizeHttps(url))) {
         return res.status(400).json({ error: 'O clique precisa abrir um link HTTPS.' });
@@ -164,6 +168,7 @@ export function registerAdminOraculoRoutes(
           slug,
           label,
           imageUrl,
+          imageUrlDesktop,
           url,
           startsAt,
           expiresAt,
@@ -183,9 +188,13 @@ export function registerAdminOraculoRoutes(
       const current = await prisma.oraculoAd.findUnique({ where: { id: String(req.params.id) } });
       if (!current) return res.status(404).json({ error: 'Peça não encontrada.' });
       const imageUrl = String(body.imageUrl ?? body.image_url ?? current.imageUrl).trim();
+      const imageUrlDesktop = String(body.imageUrlDesktop ?? body.image_url_desktop ?? current.imageUrlDesktop).trim();
       const url = String(body.url ?? current.url).trim();
       if (!isHttpsImage(absolutizeHttps(imageUrl))) {
-        return res.status(400).json({ error: 'A peça precisa de uma imagem HTTPS (png, jpg, gif ou webp).' });
+        return res.status(400).json({ error: 'A imagem dos monitores precisa ser HTTPS (png, jpg, gif ou webp), em 340×480 px.' });
+      }
+      if (!isHttpsImage(absolutizeHttps(imageUrlDesktop))) {
+        return res.status(400).json({ error: 'A imagem do desktop precisa ser HTTPS (png, jpg, gif ou webp), em 340×720 px.' });
       }
       if (!isHttpsPage(absolutizeHttps(url))) {
         return res.status(400).json({ error: 'O clique precisa abrir um link HTTPS.' });
@@ -204,6 +213,7 @@ export function registerAdminOraculoRoutes(
           slug,
           label: String(body.label ?? current.label).trim().slice(0, 80),
           imageUrl,
+          imageUrlDesktop,
           url,
           startsAt,
           expiresAt,

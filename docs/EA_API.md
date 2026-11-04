@@ -155,7 +155,7 @@ Canais do desktop, separados da validação de licença. Contrato e JSON: `docs/
 | Sininho | Sininho Oráculo | `/api/oraculo/v1/notifications` |
 | Barra (imagem + link) | Publicidade Oráculo | `/api/oraculo/v1/ads` |
 
-A barra no programa mede 186 px no desktop e no monitor comum, e 210 px no notebook.
+A barra no programa mede 186 px no desktop e no monitor comum, e 210 px no notebook. O JSON traz `image_url` (monitores, arquivo 340×400) e `image_url_desktop` (desktop, arquivo 340×760).
 
 Sem API Key. O programa não envia e-mail, conta nem licença nesses endereços.
 

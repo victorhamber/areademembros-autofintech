@@ -386,9 +386,10 @@ model OraculoNotification {
 model OraculoAd {
   id        String   @id @default(uuid())
   slug      String   @unique
-  label     String   @default("")
-  imageUrl  String
-  url       String
+  label            String   @default("")
+  imageUrl         String
+  imageUrlDesktop  String   @default("")
+  url              String
   startsAt  DateTime
   expiresAt DateTime
   enabled   Boolean  @default(true)

@@ -2570,10 +2570,23 @@
   background: #141c26;
 }
 
+.oraculo-ad-previews {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.oraculo-ad-previews h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .oraculo-ad-card {
   display: block;
   width: 100%;
-  height: 280px;
+  height: 200px;
   border-radius: 8px;
   overflow: hidden;
   background: #10151e;
@@ -2581,6 +2594,14 @@
   font-size: 12px;
   text-decoration: none;
   text-align: center;
+}
+
+.oraculo-ad-card--monitor {
+  height: 200px;
+}
+
+.oraculo-ad-card--desktop {
+  height: 380px;
 }
 
 .oraculo-ad-card img {

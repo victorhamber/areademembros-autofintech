@@ -67,6 +67,7 @@ type NotificationRow = {
 type AdRow = {
   slug: string;
   imageUrl: string;
+  imageUrlDesktop?: string;
   url: string;
   startsAt: Date;
   expiresAt: Date;
@@ -92,10 +93,12 @@ export function publicNotification(row: NotificationRow, base = getWebhookBaseUr
 
 export function publicAd(row: AdRow, base = getWebhookBaseUrl()) {
   const image = absolutizeHttps(row.imageUrl, base);
+  const desktop = absolutizeHttps(row.imageUrlDesktop || '', base);
   const link = absolutizeHttps(row.url, base);
   return {
     id: row.slug,
     image_url: isHttpsImage(image) ? image : '',
+    image_url_desktop: isHttpsImage(desktop) ? desktop : '',
     url: isHttpsPage(link) ? link : '',
     starts_at: toIsoZ(row.startsAt),
     expires_at: toIsoZ(row.expiresAt),

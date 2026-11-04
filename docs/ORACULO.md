@@ -57,7 +57,7 @@ JSON público:
 
 Só imagem e link. Vídeo fica no sininho.
 
-No Oráculo a barra mede 186 px no desktop e no monitor comum, e 210 px no notebook. A imagem entra inteira, alinhada no topo, sem corte. A prévia do admin usa os 186 px.
+No Oráculo a barra mede 186 px no desktop e no monitor comum, e 210 px no notebook. Cada peça pede dois arquivos: monitores em 340×400 px (aparece em 170×200) e desktop em 340×760 px (aparece em 170×380). O notebook usa a imagem dos monitores.
 
 ## No programa
 
