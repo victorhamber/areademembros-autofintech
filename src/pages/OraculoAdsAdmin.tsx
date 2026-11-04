@@ -243,7 +243,7 @@ export function OraculoAdsAdmin({
         </form>
 
         <aside className="oraculo-preview-wrap">
-          <h2>Vão da barra (186 px)</h2>
+          <h2>Vão da barra (220 px)</h2>
           <div className="oraculo-ad-rail">
             <div className="oraculo-ad-rail__nav">Suporte</div>
             <a
@@ -260,7 +260,7 @@ export function OraculoAdsAdmin({
             </a>
           </div>
           <p className="oraculo-admin-help">
-            Arte vertical, cerca de <strong>170×220</strong>. Rosto e texto no centro — as bordas podem cortar um pouco.
+            No monitor comum a barra tem <strong>220 px</strong>. No notebook, <strong>210 px</strong>. No desktop ela cresce na mesma proporção, até <strong>340 px</strong>. A imagem entra inteira, no topo, sem corte. Exporte vertical com pelo menos <strong>648 px</strong> de largura para continuar nítida na tela grande.
             <br />
             <code>{publicUrl}</code>
             <button type="button" className="btn-secondary-sm" onClick={() => void copyText(publicUrl)}>

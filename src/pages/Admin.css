@@ -2552,7 +2552,7 @@
 }
 
 .oraculo-ad-rail {
-  width: 186px;
+  width: 220px;
   background: #0b0e14;
   border: 1px solid #232e3e;
   border-radius: 12px;
@@ -2572,8 +2572,8 @@
 
 .oraculo-ad-card {
   display: block;
-  width: 170px;
-  height: 220px;
+  width: 100%;
+  height: 280px;
   border-radius: 8px;
   overflow: hidden;
   background: #10151e;
@@ -2586,7 +2586,8 @@
 .oraculo-ad-card img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center top;
 }
 
 .oraculo-ad-card span {

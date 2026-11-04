@@ -2,6 +2,8 @@
 
 Dois canais separados. Não misture mensagem de produto com anúncio da barra.
 
+Este painel (AutoFintech) só alcança o Oráculo autenticado neste servidor. Quem entrou pela Forex Rendimento não lê estes JSON.
+
 ## Sininho (marketing)
 
 Admin: **Sininho Oráculo**.
@@ -54,6 +56,8 @@ JSON público:
 ```
 
 Só imagem e link. Vídeo fica no sininho.
+
+No Oráculo a barra mede 210 px no notebook, 220 px no monitor comum e cresce até 340 px no desktop. A imagem entra inteira, alinhada no topo, sem corte. A prévia do admin usa os 220 px do monitor comum.
 
 ## No programa
 
