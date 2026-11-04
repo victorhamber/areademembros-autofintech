@@ -146,6 +146,19 @@ Mesma regra do PHP (`RankingEndpoint` / EA):
 
 ---
 
+## Oráculo — sininho e publicidade
+
+Canais do desktop, separados da validação de licença. Contrato e JSON: `docs/ORACULO.md`.
+
+| Canal | Admin | GET público |
+|-------|--------|-------------|
+| Sininho | Sininho Oráculo | `/api/oraculo/v1/notifications` |
+| Barra (imagem + link) | Publicidade Oráculo | `/api/oraculo/v1/ads` |
+
+Sem API Key. O programa não envia e-mail, conta nem licença nesses endereços.
+
+---
+
 ## Migração de URL no EA
 
 Substituir:

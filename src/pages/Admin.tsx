@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, FolderPlus, Image as ImageIcon, Film, Music2, File as FileIcon } from 'lucide-react';
+import { Pencil, Trash2, Users, KeyRound, UserPlus, Webhook, Copy, RefreshCw, Trash, Search, Mail, Key, GraduationCap, Layers, ListChecks, Images, Code2, LifeBuoy, Link2, FolderOpen, FolderPlus, Image as ImageIcon, Film, Music2, File as FileIcon, Bell, Megaphone } from 'lucide-react';
+import { OraculoBellAdmin } from './OraculoBellAdmin';
+import { OraculoAdsAdmin } from './OraculoAdsAdmin';
 import { resolveProductForLicense, rootPurchaseEventId } from '@shared/licenseProductMatch';
 import {
   DEFAULT_RESET_BODY_PT,
@@ -164,7 +166,9 @@ type AdminTab =
   | 'builder'
   | 'support'
   | 'links'
-  | 'media';
+  | 'media'
+  | 'oraculoBell'
+  | 'oraculoAds';
 
 const ADMIN_TABS: AdminTab[] = [
   'courses',
@@ -178,6 +182,8 @@ const ADMIN_TABS: AdminTab[] = [
   'support',
   'links',
   'media',
+  'oraculoBell',
+  'oraculoAds',
 ];
 
 type AdminUiState = {
@@ -277,6 +283,8 @@ export const Admin: React.FC = () => {
     hotmartWebhook: string;
     tashWebhook: string;
     forexWebhook: string;
+    oraculoNotifications?: string;
+    oraculoAds?: string;
     alternateHotmartWebhooks: string[];
     alternateTashWebhooks: string[];
   } | null>(null);
@@ -2708,6 +2716,14 @@ export const Admin: React.FC = () => {
       title: 'Segurança EA',
       subtitle: 'Ajuste chaves e proteção da camada operacional.',
     },
+    oraculoBell: {
+      title: 'Sininho Oráculo',
+      subtitle: 'Mensagens de marketing que aparecem no sininho do programa.',
+    },
+    oraculoAds: {
+      title: 'Publicidade Oráculo',
+      subtitle: 'Peças de imagem e link no vão debaixo de Suporte.',
+    },
   };
   const currentAdminMeta = adminTabMeta[activeTab];
   const filteredMediaAssets = (() => {
@@ -3155,6 +3171,14 @@ export const Admin: React.FC = () => {
             <button type="button" className={`admin-sidebar-item ${activeTab === 'forexEA' ? 'active' : ''}`} onClick={() => setActiveTab('forexEA')}>
               <Key size={20} aria-hidden />
               <span>Segurança EA</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'oraculoBell' ? 'active' : ''}`} onClick={() => setActiveTab('oraculoBell')}>
+              <Bell size={20} aria-hidden />
+              <span>Sininho Oráculo</span>
+            </button>
+            <button type="button" className={`admin-sidebar-item ${activeTab === 'oraculoAds' ? 'active' : ''}`} onClick={() => setActiveTab('oraculoAds')}>
+              <Megaphone size={20} aria-hidden />
+              <span>Publicidade Oráculo</span>
             </button>
           </nav>
           <div className="admin-sidebar-footer">
@@ -5677,6 +5701,20 @@ try {
             </p>
           </div>
         </div>
+      )}
+
+      {activeTab === 'oraculoBell' && (
+        <OraculoBellAdmin
+          authHeaders={authHeaders}
+          publicUrl={webhookUrls?.oraculoNotifications || `${window.location.origin}/api/oraculo/v1/notifications`}
+        />
+      )}
+
+      {activeTab === 'oraculoAds' && (
+        <OraculoAdsAdmin
+          authHeaders={authHeaders}
+          publicUrl={webhookUrls?.oraculoAds || `${window.location.origin}/api/oraculo/v1/ads`}
+        />
       )}
 
         </div>

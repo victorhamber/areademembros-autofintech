@@ -361,3 +361,40 @@ model MediaAsset {
 
   @@index([folderId])
 }
+
+/// Mensagem de marketing do Oráculo (sininho). JSON público em /api/oraculo/v1/notifications.
+model OraculoNotification {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  title     String
+  body      String
+  url       String   @default("")
+  mediaUrl  String   @default("")
+  popup     Boolean  @default(true)
+  silent    Boolean  @default(false)
+  kind      String   @default("marketing")
+  startsAt  DateTime
+  expiresAt DateTime
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled, expiresAt])
+}
+
+/// Peça do card de publicidade do Oráculo (barra, abaixo de Suporte). JSON em /api/oraculo/v1/ads.
+model OraculoAd {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  label     String   @default("")
+  imageUrl  String
+  url       String
+  startsAt  DateTime
+  expiresAt DateTime
+  enabled   Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled, expiresAt, sortOrder])
+}

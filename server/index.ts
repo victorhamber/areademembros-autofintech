@@ -15,6 +15,8 @@ import { processLicenseWebhook } from './forex/webhookLicenseProcessor.js';
 import { registerMemberApiRoutes } from './routes/memberApi.js';
 import { registerEadAndTrialRoutes } from './routes/eadAndTrial.js';
 import { registerAdminForexRoutes } from './routes/adminForex.js';
+import { registerAdminOraculoRoutes } from './routes/adminOraculo.js';
+import { registerOraculoPublicRoutes } from './routes/oraculoPublic.js';
 import { registerTashWebhookRoutes } from './routes/tashWebhook.js';
 import { startScheduledJobs } from './jobs/scheduler.js';
 import { userHasMemberAccess } from './lib/userAccess.js';
@@ -193,6 +195,7 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
 registerForexRoutes(app, prisma);
+registerOraculoPublicRoutes(app, prisma);
 registerMemberApiRoutes(app, prisma);
 registerEadAndTrialRoutes(app, prisma);
 registerTashWebhookRoutes(app, prisma);
@@ -875,6 +878,7 @@ app.post('/api/admin/login', (req, res) => {
 // ADMIN DASHBOARD ROUTES
 // ==========================================
 registerAdminForexRoutes(app, prisma, adminAuthMiddleware);
+registerAdminOraculoRoutes(app, prisma, adminAuthMiddleware);
 
 app.get('/api/admin/categories', adminAuthMiddleware, async (req, res) => {
   try {

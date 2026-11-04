@@ -2434,3 +2434,209 @@
   color: var(--text-primary);
   font-size: 13px;
 }
+
+.oraculo-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.oraculo-admin-help {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+
+.oraculo-admin-help code {
+  display: inline-block;
+  margin: 8px 8px 8px 0;
+  word-break: break-all;
+}
+
+.oraculo-admin-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.oraculo-admin-dates label,
+.oraculo-admin-check {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oraculo-admin-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.oraculo-admin-file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oraculo-admin-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.oraculo-admin-error {
+  color: #fca5a5;
+  font-size: 13px;
+  margin: 0;
+}
+
+.oraculo-preview-wrap h2 {
+  margin-top: 0;
+}
+
+.oraculo-bell-preview {
+  background: #0b0e14;
+  border: 1px solid #232e3e;
+  border-radius: 12px;
+  padding: 16px;
+  color: #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oraculo-bell-preview__chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.oraculo-bell-preview strong {
+  font-size: 18px;
+}
+
+.oraculo-bell-preview p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.oraculo-bell-preview__media {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  background: #10151e;
+  border-radius: 8px;
+}
+
+.oraculo-bell-preview__btn {
+  align-self: flex-start;
+  background: #10b981;
+  color: #042f1f;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.oraculo-ad-rail {
+  width: 186px;
+  background: #0b0e14;
+  border: 1px solid #232e3e;
+  border-radius: 12px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oraculo-ad-rail__nav {
+  color: #94a3b8;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #141c26;
+}
+
+.oraculo-ad-card {
+  display: block;
+  width: 170px;
+  height: 220px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #10151e;
+  color: #64748b;
+  font-size: 12px;
+  text-decoration: none;
+  text-align: center;
+}
+
+.oraculo-ad-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.oraculo-ad-card span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 12px;
+}
+
+.oraculo-ad-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.oraculo-ad-row img {
+  width: 42px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.oraculo-status {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.oraculo-status--live {
+  background: #0d281e;
+  color: #10b981;
+}
+
+.oraculo-status--soon {
+  background: #211a0c;
+  color: #fbbf24;
+}
+
+.oraculo-status--done,
+.oraculo-status--off {
+  background: #1a2230;
+  color: #94a3b8;
+}
+
+@media (max-width: 980px) {
+  .oraculo-admin-grid,
+  .oraculo-admin-dates {
+    grid-template-columns: 1fr;
+  }
+}
