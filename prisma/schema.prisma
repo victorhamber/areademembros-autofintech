@@ -399,3 +399,15 @@ model OraculoAd {
 
   @@index([enabled, expiresAt, sortOrder])
 }
+
+/// Fila única do suporte do Oráculo. O mesmo IP permanece. IP novo anda Gustavo/Vitor.
+model OraculoSupportVisit {
+  ip        String   @id
+  provider  String
+  createdAt DateTime @default(now())
+}
+
+model OraculoSupportCursor {
+  id       Int @id
+  nextSide Int @default(0)
+}

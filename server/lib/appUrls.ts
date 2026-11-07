@@ -33,6 +33,7 @@ export function getWebhookUrls() {
     forexWebhook: `${webhookBaseUrl}/api/forex-rendimento/v1/webhook`,
     oraculoNotifications: `${webhookBaseUrl}/api/oraculo/v1/notifications`,
     oraculoAds: `${webhookBaseUrl}/api/oraculo/v1/ads`,
+    oraculoSupport: `${webhookBaseUrl}/api/oraculo/v1/support-contact`,
     /** Ambos os domínios apontam para o mesmo app — qualquer um funciona se o DNS/proxy estiver ok. */
     alternateHotmartWebhooks: bases.map((b) => `${b}/api/webhooks/hotmart`),
     alternateTashWebhooks: bases.map((b) => `${b}/api/webhooks/tash`),

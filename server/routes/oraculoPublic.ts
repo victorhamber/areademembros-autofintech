@@ -2,6 +2,7 @@ import express from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { checkRateLimit } from '../lib/rateLimitMem.js';
 import { capPublicJson, publicAd, publicNotification } from '../lib/oraculoFeed.js';
+import { assignSupportContact, contactAt } from '../lib/oraculoSupportQueue.js';
 import { log } from '../lib/logger.js';
 
 function clientIp(req: express.Request): string {
@@ -53,4 +54,20 @@ export function registerOraculoPublicRoutes(app: express.Application, prisma: Pr
 
   app.get('/api/oraculo/v1/notifications', (req, res) => void serve(req, res, 'notifications'));
   app.get('/api/oraculo/v1/ads', (req, res) => void serve(req, res, 'ads'));
+
+  app.post('/api/oraculo/v1/support-contact', async (req, res) => {
+    const ip = clientIp(req);
+    if (!checkRateLimit(`oraculo_support_${ip}`, 30, 60_000)) {
+      return res.status(429).json({ status: 'error', message: 'Rate limit exceeded. Try again later.' });
+    }
+    try {
+      const visit = await assignSupportContact(prisma, ip);
+      const contact = contactAt(visit.provider === 'forexrendimento' ? 1 : 0);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ status: 'success', provider: contact.provider, url: contact.url });
+    } catch (err) {
+      log('ERROR', 'oraculo support queue', { err: String(err) });
+      return res.status(500).json({ status: 'error', message: 'Falha ao escolher o suporte.' });
+    }
+  });
 }
